@@ -13,6 +13,11 @@ export const DEVICE_POSITION = { lat: 50.259, lon: 19.021 };
 /** The place GPS resolves to. Real geocoding replaces this once expo-location lands. */
 export const DEVICE_CITY = 'Katowice';
 
+/** Wszystkie miejscowości — po nazwie, bo tylko ją trzymają ustawienia. */
+export function findPlaceByName(name: string): Place | undefined {
+  return [...CITIES, ...GMINY].find((p) => p.name === name);
+}
+
 export const CITIES: Place[] = [
   // śląskie
   { name: 'Katowice', region: 'śląskie', lat: 50.259, lon: 19.021, bortle: 9 },

@@ -1,7 +1,7 @@
 import { Line, Rect, Svg, Text as SvgText } from 'react-native-svg';
 
-import { CHART_TIMES } from '@/data/night';
 import { cloudBarColor } from '@/lib/astro';
+import type { NightForecast } from '@/lib/weather';
 import { colors, fonts } from '@/theme';
 
 const WIDTH = 336;
@@ -11,18 +11,26 @@ const PLOT_BASE = 120;
 const PLOT_HEIGHT = PLOT_BASE - PLOT_TOP;
 
 const GRID_LINES = [0, 25, 50, 75, 100];
-/** Only every fourth slot gets a label, otherwise they collide. */
-const LABELLED_SLOTS = [1, 5, 9, 13];
 
-const MARKERS = [
-  { x: 3, label: '20:43', anchor: 'start', dx: 4 },
-  { x: WIDTH - 3, label: '04:28', anchor: 'end', dx: -4 },
-] as const;
+function hhmm(date: Date): string {
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+}
 
-export function CloudCoverChart({ bars }: { bars: number[] }) {
-  const slot = WIDTH / bars.length;
-  const barWidth = Math.min(10, slot - 4);
+export function CloudCoverChart({ forecast }: { forecast: NightForecast }) {
+  const { hours, from, to } = forecast;
+
+  const slot = WIDTH / hours.length;
+  const barWidth = Math.min(14, slot - 4);
   const y = (value: number) => PLOT_BASE - (value / 100) * PLOT_HEIGHT;
+
+  // Przy krótkich letnich nocach słupków jest mało, przy zimowych sporo —
+  // podpisujemy co drugi/trzeci, żeby etykiety się nie zlewały.
+  const labelEvery = hours.length > 10 ? 3 : 2;
+
+  const markers = [
+    { x: 3, label: hhmm(from), anchor: 'start', dx: 4 },
+    { x: WIDTH - 3, label: hhmm(to), anchor: 'end', dx: -4 },
+  ] as const;
 
   return (
     <Svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} width="100%" height={HEIGHT}>
@@ -38,33 +46,35 @@ export function CloudCoverChart({ bars }: { bars: number[] }) {
         />
       ))}
 
-      {bars.map((value, i) => (
+      {hours.map((hour, i) => (
         <Rect
-          key={`bar-${i}`}
+          key={`bar-${hour.at.getTime()}`}
           x={i * slot + (slot - barWidth) / 2}
-          y={y(value)}
+          y={y(hour.cloud)}
           width={barWidth}
-          height={PLOT_BASE - y(value)}
+          height={PLOT_BASE - y(hour.cloud)}
           rx={2}
-          fill={cloudBarColor(value)}
+          fill={cloudBarColor(hour.cloud)}
         />
       ))}
 
-      {LABELLED_SLOTS.map((i) => (
-        <SvgText
-          key={`time-${i}`}
-          x={i * slot + slot / 2}
-          y={139}
-          fill={colors.textMuted}
-          fontSize={10}
-          fontFamily={fonts.mono}
-          textAnchor="middle"
-        >
-          {CHART_TIMES[i]}
-        </SvgText>
-      ))}
+      {hours.map((hour, i) =>
+        i % labelEvery === 0 ? (
+          <SvgText
+            key={`time-${hour.at.getTime()}`}
+            x={i * slot + slot / 2}
+            y={139}
+            fill={colors.textMuted}
+            fontSize={10}
+            fontFamily={fonts.mono}
+            textAnchor="middle"
+          >
+            {hhmm(hour.at)}
+          </SvgText>
+        ) : null,
+      )}
 
-      {MARKERS.map((marker) => (
+      {markers.map((marker) => (
         <Line
           key={`marker-line-${marker.label}`}
           x1={marker.x}
@@ -77,7 +87,7 @@ export function CloudCoverChart({ bars }: { bars: number[] }) {
           opacity={0.45}
         />
       ))}
-      {MARKERS.map((marker) => (
+      {markers.map((marker) => (
         <SvgText
           key={`marker-text-${marker.label}`}
           x={marker.x + marker.dx}

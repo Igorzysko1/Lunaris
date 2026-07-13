@@ -10,6 +10,8 @@
  */
 
 import { CITIES, GMINY, type Place } from '../src/data/places.ts';
+import { computeNightRating, ratingMeta } from '../src/lib/astro.ts';
+import { moonAt } from '../src/lib/moon.ts';
 
 const API = 'https://api.open-meteo.com/v1/forecast';
 
@@ -175,7 +177,22 @@ console.log(
 );
 console.log(`  opady          ${totalPrecip.toFixed(1)} mm łącznie`);
 
-console.log(
-  `\n${DIM}Ocena nocy (0–100) nie jest liczona — wzór nie został ustalony.\n` +
-    `Powyższe to surowe wejścia do niego. Patrz: Lunaris/Otwarte pytania.md${RESET}\n`,
-);
+if (place) {
+  const moon = moonAt();
+  const rating = computeNightRating({
+    avgCloud: avg(clouds),
+    avgHumidity: avg(rows.map((r) => r.humidity ?? 0)),
+    precipitation: totalPrecip,
+    moonIllumination: moon.illumination,
+    bortle: place.bortle,
+  });
+  const meta = ratingMeta(rating);
+
+  console.log(`\n${BOLD}Ocena nocy${RESET}  ${BOLD}${rating}${RESET}/100 — ${meta.label}`);
+  console.log(
+    `  ${DIM}Księżyc ${moon.glyph} ${moon.name}, ${moon.illumination}% oświetlenia · Bortle ${place.bortle}${RESET}`,
+  );
+  console.log(`  ${DIM}Ten sam wzór, którego używa aplikacja (src/lib/astro.ts).${RESET}\n`);
+} else {
+  console.log(`\n${DIM}Ocena nocy wymaga Bortle — podaj nazwę miejscowości zamiast --lat/--lon.${RESET}\n`);
+}

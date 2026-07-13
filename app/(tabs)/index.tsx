@@ -13,14 +13,14 @@ import {
 } from '@/components/night-cards';
 import { Card, SectionLabel } from '@/components/primitives';
 import { EVENTS } from '@/data/events';
-import { TODAY_LABEL } from '@/data/night';
+import { formatToday } from '@/lib/date';
 import { useNightData } from '@/lib/use-night-data';
 import { useSettings } from '@/store/settings';
 import { HAIRLINE, colors, fonts, radius } from '@/theme';
 
 export default function NightScreen() {
   const { location } = useSettings();
-  const { status, data, refresh, refreshing } = useNightData();
+  const { status, data, refresh, refreshing } = useNightData(location);
   const nextEvent = EVENTS[0];
 
   return (
@@ -28,7 +28,7 @@ export default function NightScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.header}>
           <View>
-            <Text style={styles.date}>{TODAY_LABEL}</Text>
+            <Text style={styles.date}>{formatToday()}</Text>
             <View style={styles.locationRow}>
               <Ionicons name="location" size={14} color={colors.purple} />
               <Text style={styles.city}>{location}</Text>
@@ -37,9 +37,20 @@ export default function NightScreen() {
           <RefreshButton spinning={refreshing} onPress={refresh} />
         </View>
 
-        {status === 'loading' ? (
-          <NightSkeleton />
-        ) : (
+        {status === 'loading' && <NightSkeleton />}
+
+        {status === 'error' && (
+          <Card style={styles.gap}>
+            <View style={styles.chartError}>
+              <Text style={styles.errorText}>Nie udało się pobrać prognozy na tę noc.</Text>
+              <Pressable onPress={refresh}>
+                <Text style={styles.retry}>Spróbuj ponownie</Text>
+              </Pressable>
+            </View>
+          </Card>
+        )}
+
+        {status === 'ready' && data && (
           <View>
             <View style={styles.gap}>
               <NightRatingCard data={data} />
@@ -47,24 +58,15 @@ export default function NightScreen() {
 
             <Card style={styles.gap}>
               <SectionLabel style={styles.chartLabel}>Zachmurzenie w nocy</SectionLabel>
-              {status === 'error' ? (
-                <View style={styles.chartError}>
-                  <Text style={styles.errorText}>Nie udało się pobrać prognozy zachmurzenia.</Text>
-                  <Pressable onPress={refresh}>
-                    <Text style={styles.retry}>Spróbuj ponownie</Text>
-                  </Pressable>
-                </View>
-              ) : (
-                <CloudCoverChart bars={data.bars} />
-              )}
+              <CloudCoverChart forecast={data.forecast} />
             </Card>
 
             <View style={styles.gap}>
-              <AstroTimesRow />
+              <AstroTimesRow sunset={data.forecast.from} sunrise={data.forecast.to} />
             </View>
 
             <View style={styles.moonGap}>
-              <MoonPhaseCard />
+              <MoonPhaseCard moon={data.moon} />
             </View>
 
             <SectionLabel style={styles.eventLabel}>Następny event</SectionLabel>

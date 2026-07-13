@@ -1,34 +1,70 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
-import { SCENARIOS, type NightData, type ScenarioKey } from '@/data/night';
+import { findPlaceByName } from '@/data/places';
+import { computeNightRating } from '@/lib/astro';
+import { moonAt, type Moon } from '@/lib/moon';
+import { fetchNightForecast, type NightForecast } from '@/lib/weather';
 
 export type NightStatus = 'loading' | 'ready' | 'error';
 
-const REFRESH_MS = 1300;
+export type NightData = {
+  forecast: NightForecast;
+  moon: Moon;
+  /** Ocena nocy 0–100 — patrz computeNightRating(). */
+  rating: number;
+  bortle: number;
+};
 
 /**
- * Stands in for the forecast fetch. Mock data always resolves, but the status
- * machine matches what a real request will need, so the screen already renders
- * loading and error states.
+ * Prognoza na najbliższą noc w wybranej lokalizacji.
+ * Przeładowuje się przy zmianie miejscowości i na żądanie (przycisk odświeżania).
  */
-export function useNightData(scenario: ScenarioKey = 'Dobra') {
-  const [status, setStatus] = useState<NightStatus>('ready');
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+export function useNightData(placeName: string) {
+  const [status, setStatus] = useState<NightStatus>('loading');
+  const [data, setData] = useState<NightData | null>(null);
+  const [attempt, setAttempt] = useState(0);
 
-  useEffect(() => () => {
-    if (timer.current) clearTimeout(timer.current);
-  }, []);
+  const refresh = useCallback(() => setAttempt((n) => n + 1), []);
 
-  const refresh = useCallback(() => {
-    if (timer.current) return;
+  useEffect(() => {
+    const place = findPlaceByName(placeName);
+    if (!place) {
+      setStatus('error');
+      return;
+    }
+
+    const controller = new AbortController();
+    let active = true;
+
     setStatus('loading');
-    timer.current = setTimeout(() => {
-      timer.current = null;
-      setStatus('ready');
-    }, REFRESH_MS);
-  }, []);
 
-  const data: NightData = SCENARIOS[scenario];
+    fetchNightForecast(place.lat, place.lon, controller.signal)
+      .then((forecast) => {
+        if (!active) return;
+        const moon = moonAt();
+        setData({
+          forecast,
+          moon,
+          bortle: place.bortle,
+          rating: computeNightRating({
+            avgCloud: forecast.avgCloud,
+            avgHumidity: forecast.avgHumidity,
+            precipitation: forecast.totalPrecipitation,
+            moonIllumination: moon.illumination,
+            bortle: place.bortle,
+          }),
+        });
+        setStatus('ready');
+      })
+      .catch(() => {
+        if (active) setStatus('error');
+      });
+
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [placeName, attempt]);
 
   return { status, data, refresh, refreshing: status === 'loading' };
 }

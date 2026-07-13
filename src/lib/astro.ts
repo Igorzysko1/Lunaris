@@ -1,5 +1,7 @@
-import { DEVICE_POSITION } from '@/data/places';
-import { colors } from '@/theme';
+// Importy względne (nie alias @/), żeby warstwę domenową dało się uruchomić
+// poza Metro — korzysta z niej skrypt scripts/check-weather.ts.
+import { DEVICE_POSITION } from '../data/places.ts';
+import { colors } from '../theme.ts';
 
 const EARTH_RADIUS_KM = 6371;
 const toRad = (x: number) => (x * Math.PI) / 180;
@@ -26,6 +28,36 @@ export function bortleMeta(bortle: number): { label: string; color: string } {
   return { label: 'MIEJSKIE', color: colors.coral };
 }
 
+export type RatingInputs = {
+  /** Średnie zachmurzenie w oknie nocy (%). */
+  avgCloud: number;
+  avgHumidity: number;
+  /** Suma opadów w oknie nocy (mm). */
+  precipitation: number;
+  /** Oświetlenie tarczy Księżyca (%). */
+  moonIllumination: number;
+  bortle: number;
+};
+
+/**
+ * Ocena nocy 0–100. Zachmurzenie dominuje, reszta koryguje.
+ *
+ * Wagi są ustalone arbitralnie (patrz Lunaris/30 Decyzje) — nie wynikają z modelu
+ * fizycznego. Wilgotność karze dopiero powyżej 70%, bo poniżej nie przeszkadza.
+ */
+export function computeNightRating(input: RatingInputs): number {
+  const cloudPenalty = 0.6 * input.avgCloud;
+  const humidityPenalty = 0.15 * Math.max(0, input.avgHumidity - 70) * 2;
+  const precipPenalty = 10 * Math.min(1, input.precipitation);
+  const moonPenalty = 0.15 * input.moonIllumination;
+  const bortlePenalty = 2 * (input.bortle - 1);
+
+  const score =
+    100 - cloudPenalty - humidityPenalty - precipPenalty - moonPenalty - bortlePenalty;
+
+  return Math.round(Math.min(100, Math.max(0, score)));
+}
+
 export function ratingMeta(rating: number): { label: string; color: string } {
   if (rating >= 80) return { label: 'Doskonała', color: colors.teal };
   if (rating >= 60) return { label: 'Dobra', color: colors.green };
@@ -39,4 +71,14 @@ export function cloudBarColor(cloudPct: number): string {
   if (cloudPct < 40) return colors.green;
   if (cloudPct < 70) return colors.amber;
   return colors.coral;
+}
+
+/**
+ * Ryzyko osiadania rosy na optyce, wg różnicy temperatury i punktu rosy (°C).
+ * Im ciaśniej temperatura zbliża się do punktu rosy, tym szybciej zaparuje sprzęt.
+ */
+export function dewRiskColor(spreadC: number): string {
+  if (spreadC < 2) return colors.coral;
+  if (spreadC < 5) return colors.amber;
+  return colors.teal;
 }

@@ -3,12 +3,15 @@ import { Animated, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Card, Divider, SectionLabel } from '@/components/primitives';
-import { ASTRO_TIMES, MOON_PHASE, type NightData } from '@/data/night';
-import { ratingMeta } from '@/lib/astro';
+import { ASTRO_TIMES } from '@/data/night';
+import { dewRiskColor, ratingMeta } from '@/lib/astro';
+import type { Moon } from '@/lib/moon';
+import type { NightData } from '@/lib/use-night-data';
 import { HAIRLINE, colors, fonts, radius } from '@/theme';
 
 export function NightRatingCard({ data }: { data: NightData }) {
   const meta = ratingMeta(data.rating);
+  const { forecast } = data;
   const enter = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -38,7 +41,7 @@ export function NightRatingCard({ data }: { data: NightData }) {
           <Text style={styles.ratingLabel}>{meta.label}</Text>
         </View>
         <View style={styles.alignRight}>
-          <Text style={styles.cloudsValue}>{data.clouds}%</Text>
+          <Text style={styles.cloudsValue}>{Math.round(forecast.avgCloud)}%</Text>
           <Text style={styles.metricLabel}>chmury</Text>
         </View>
       </View>
@@ -46,37 +49,49 @@ export function NightRatingCard({ data }: { data: NightData }) {
       <Divider style={styles.ratingDivider} />
 
       <View style={styles.metricsRow}>
-        <Metric label="Wilgotność" value={`${data.humidity}%`} />
-        <Metric label="Widoczność" value={`${data.visibility} km`} />
-        <Metric label="Opady" value={`${data.precipitation} mm`} />
+        <Metric label="Wilgotność" value={`${Math.round(forecast.avgHumidity)}%`} />
+        <Metric
+          label="Rosa"
+          value={`${forecast.minDewSpread.toFixed(1)}°`}
+          color={dewRiskColor(forecast.minDewSpread)}
+        />
+        <Metric label="Opady" value={`${forecast.totalPrecipitation.toFixed(1)} mm`} />
       </View>
     </Card>
   );
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
+function Metric({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
     <View>
       <Text style={styles.metricLabel}>{label}</Text>
-      <Text style={styles.metricValue}>{value}</Text>
+      <Text style={[styles.metricValue, color ? { color } : null]}>{value}</Text>
     </View>
   );
 }
 
-const ASTRO_ROW = [
-  { icon: 'arrow-down-outline', label: 'Zach. Słońca', value: ASTRO_TIMES.sunset },
-  { icon: 'moon-outline', label: 'Wsch. Ks.', value: ASTRO_TIMES.moonrise },
-  { icon: 'moon-outline', label: 'Zach. Ks.', value: ASTRO_TIMES.moonset },
-  { icon: 'arrow-up-outline', label: 'Wsch. Słońca', value: ASTRO_TIMES.sunrise },
-] as const;
+function hhmm(date: Date): string {
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+}
 
-export function AstroTimesRow() {
+/**
+ * Słońce pochodzi z efemeryd Open-Meteo. Wschód i zachód Księżyca są jeszcze
+ * zamockowane — Open-Meteo nie zwraca danych o Księżycu (patrz Lunaris/Znane luki).
+ */
+export function AstroTimesRow({ sunset, sunrise }: { sunset: Date; sunrise: Date }) {
+  const cells = [
+    { icon: 'arrow-down-outline', label: 'Zach. Słońca', value: hhmm(sunset) },
+    { icon: 'moon-outline', label: 'Wsch. Ks.', value: ASTRO_TIMES.moonrise },
+    { icon: 'moon-outline', label: 'Zach. Ks.', value: ASTRO_TIMES.moonset },
+    { icon: 'arrow-up-outline', label: 'Wsch. Słońca', value: hhmm(sunrise) },
+  ] as const;
+
   return (
     <View style={styles.astroRow}>
-      {ASTRO_ROW.map((item, i) => (
+      {cells.map((item, i) => (
         <View
           key={item.label}
-          style={[styles.astroCell, i < ASTRO_ROW.length - 1 && styles.astroCellBorder]}
+          style={[styles.astroCell, i < cells.length - 1 && styles.astroCellBorder]}
         >
           <View style={styles.astroLabelRow}>
             <Ionicons name={item.icon} size={13} color={colors.textMuted} />
@@ -89,18 +104,18 @@ export function AstroTimesRow() {
   );
 }
 
-export function MoonPhaseCard() {
+export function MoonPhaseCard({ moon }: { moon: Moon }) {
   return (
     <Card style={styles.moonCard}>
       <View style={styles.moonLeft}>
-        <Text style={styles.moonGlyph}>{MOON_PHASE.glyph}</Text>
+        <Text style={styles.moonGlyph}>{moon.glyph}</Text>
         <View>
-          <Text style={styles.moonName}>{MOON_PHASE.name}</Text>
-          <Text style={styles.moonDetail}>{MOON_PHASE.detail}</Text>
+          <Text style={styles.moonName}>{moon.name}</Text>
+          <Text style={styles.moonDetail}>{moon.detail}</Text>
         </View>
       </View>
       <View style={styles.alignRight}>
-        <Text style={styles.moonIllumination}>{MOON_PHASE.illumination}%</Text>
+        <Text style={styles.moonIllumination}>{moon.illumination}%</Text>
         <Text style={styles.metricLabel}>oświetlenia</Text>
       </View>
     </Card>
