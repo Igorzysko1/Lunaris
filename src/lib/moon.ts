@@ -1,15 +1,19 @@
 /**
- * Faza Księżyca liczona lokalnie — Open-Meteo nie zwraca danych o Księżycu,
- * a oświetlenie tarczy wchodzi do oceny nocy (jasny Księżyc rozświetla niebo).
+ * Dane o Księżycu — Open-Meteo nie zwraca o nim niczego.
  *
- * Przybliżenie oparte o średni miesiąc synodyczny. Wystarcza do oceny warunków
- * (błąd rzędu godzin), nie nadaje się do efemeryd.
+ * Liczone przez suncalc (algorytmy Meeusa), a nie własnym przybliżeniem cyklu
+ * synodycznego: to drugie ignoruje eliptyczność orbity i myliło się o kilka godzin
+ * w dacie nowiu oraz o ~1 pkt proc. w oświetleniu tarczy.
  */
 
-const SYNODIC_MONTH = 29.530588853;
-/** Nów z 6 stycznia 2000, 18:14 UTC — punkt odniesienia cyklu. */
-const KNOWN_NEW_MOON = Date.UTC(2000, 0, 6, 18, 14) / 86_400_000;
+import * as SunCalc from 'suncalc';
 
+const MONTHS_SHORT = [
+  'sty', 'lut', 'mar', 'kwi', 'maj', 'cze',
+  'lip', 'sie', 'wrz', 'paź', 'lis', 'gru',
+];
+
+/** suncalc: phase 0 = nów, 0.25 = I kwadra, 0.5 = pełnia, 0.75 = ostatnia kwadra. */
 const PHASES = [
   { name: 'Nów', glyph: '🌑' },
   { name: 'Sierp przybywający', glyph: '🌒' },
@@ -21,56 +25,72 @@ const PHASES = [
   { name: 'Sierp ubywający', glyph: '🌘' },
 ];
 
-const MONTHS_SHORT = [
-  'sty', 'lut', 'mar', 'kwi', 'maj', 'cze',
-  'lip', 'sie', 'wrz', 'paź', 'lis', 'gru',
-];
-
 export type Moon = {
-  /** Dni od ostatniego nowiu (0 – 29.53). */
-  age: number;
   /** Procent oświetlonej tarczy, 0 (nów) – 100 (pełnia). */
   illumination: number;
   name: string;
   glyph: string;
   /** np. „Pełnia za 3 dni · 15 lip." */
   detail: string;
+  /** Wschód i zachód Księżyca danej doby. Bywa, że któregoś nie ma. */
+  rise: Date | null;
+  set: Date | null;
 };
 
-function moonAge(date: Date): number {
-  const days = date.getTime() / 86_400_000 - KNOWN_NEW_MOON;
-  const age = days % SYNODIC_MONTH;
-  return age < 0 ? age + SYNODIC_MONTH : age;
-}
+const phaseOf = (date: Date) => SunCalc.getMoonIllumination(date).phase;
 
 function formatDate(date: Date): string {
   return `${date.getDate()} ${MONTHS_SHORT[date.getMonth()]}.`;
 }
 
-/** Ile dni do najbliższego przesilenia fazy (nowiu albo pełni) i kiedy ono wypada. */
-function nextMilestone(age: number, now: Date) {
-  const full = SYNODIC_MONTH / 2;
-  const isBeforeFull = age < full;
-  const daysAway = isBeforeFull ? full - age : SYNODIC_MONTH - age;
-  const when = new Date(now.getTime() + daysAway * 86_400_000);
-  return { label: isBeforeFull ? 'Pełnia' : 'Nów', daysAway, when };
-}
-
 function plural(days: number): string {
-  if (days === 0) return 'dziś';
+  if (days <= 0) return 'dziś';
   if (days === 1) return 'za 1 dzień';
   return `za ${days} dni`;
 }
 
-export function moonAt(date: Date = new Date()): Moon {
-  const age = moonAge(date);
-  const illumination = Math.round(((1 - Math.cos((2 * Math.PI * age) / SYNODIC_MONTH)) / 2) * 100);
+/**
+ * Najbliższa pełnia albo nów — co wypadnie pierwsze.
+ * Skanuje co godzinę, bo suncalc nie zwraca dat przesileń fazy.
+ */
+function nextMilestone(from: Date): { label: string; when: Date } {
+  const HOUR = 3_600_000;
+  let previous = phaseOf(from);
 
-  const index = Math.floor((age / SYNODIC_MONTH) * 8 + 0.5) % 8;
-  const phase = PHASES[index];
+  for (let h = 1; h <= 24 * 32; h++) {
+    const at = new Date(from.getTime() + h * HOUR);
+    const phase = phaseOf(at);
 
-  const milestone = nextMilestone(age, date);
-  const detail = `${milestone.label} ${plural(Math.round(milestone.daysAway))} · ${formatDate(milestone.when)}`;
+    // Nów: faza przewija się z ~1 z powrotem do ~0.
+    if (phase < previous) return { label: 'Nów', when: at };
+    // Pełnia: faza przekracza 0.5.
+    if (previous < 0.5 && phase >= 0.5) return { label: 'Pełnia', when: at };
 
-  return { age, illumination, name: phase.name, glyph: phase.glyph, detail };
+    previous = phase;
+  }
+
+  // Nieosiągalne: cykl synodyczny trwa ~29.5 dnia, a skanujemy 32.
+  throw new Error('Nie znaleziono najbliższej pełni ani nowiu');
+}
+
+export function moonAt(date: Date, lat: number, lon: number): Moon {
+  const { fraction, phase } = SunCalc.getMoonIllumination(date);
+
+  const index = Math.round(phase * 8) % 8;
+  const { name, glyph } = PHASES[index];
+
+  const milestone = nextMilestone(date);
+  const daysAway = Math.round((milestone.when.getTime() - date.getTime()) / 86_400_000);
+  const detail = `${milestone.label} ${plural(daysAway)} · ${formatDate(milestone.when)}`;
+
+  const times = SunCalc.getMoonTimes(date, lat, lon);
+
+  return {
+    illumination: Math.round(fraction * 100),
+    name,
+    glyph,
+    detail,
+    rise: times.rise ?? null,
+    set: times.set ?? null,
+  };
 }

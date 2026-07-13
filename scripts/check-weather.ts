@@ -178,7 +178,7 @@ console.log(
 console.log(`  opady          ${totalPrecip.toFixed(1)} mm łącznie`);
 
 if (place) {
-  const moon = moonAt();
+  const moon = moonAt(night.from, place.lat, place.lon);
   const rating = computeNightRating({
     avgCloud: avg(clouds),
     avgHumidity: avg(rows.map((r) => r.humidity ?? 0)),
@@ -188,10 +188,14 @@ if (place) {
   });
   const meta = ratingMeta(rating);
 
+  const moonRise = moon.rise ? hhmm(moon.rise) : '—';
+  const moonSet = moon.set ? hhmm(moon.set) : '—';
+
   console.log(`\n${BOLD}Ocena nocy${RESET}  ${BOLD}${rating}${RESET}/100 — ${meta.label}`);
   console.log(
     `  ${DIM}Księżyc ${moon.glyph} ${moon.name}, ${moon.illumination}% oświetlenia · Bortle ${place.bortle}${RESET}`,
   );
+  console.log(`  ${DIM}wschód Ks. ${moonRise} · zachód Ks. ${moonSet} · ${moon.detail}${RESET}`);
   console.log(`  ${DIM}Ten sam wzór, którego używa aplikacja (src/lib/astro.ts).${RESET}\n`);
 } else {
   console.log(`\n${DIM}Ocena nocy wymaga Bortle — podaj nazwę miejscowości zamiast --lat/--lon.${RESET}\n`);

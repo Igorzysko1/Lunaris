@@ -3,7 +3,6 @@ import { Animated, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Card, Divider, SectionLabel } from '@/components/primitives';
-import { ASTRO_TIMES } from '@/data/night';
 import { dewRiskColor, ratingMeta } from '@/lib/astro';
 import type { Moon } from '@/lib/moon';
 import type { NightData } from '@/lib/use-night-data';
@@ -70,19 +69,26 @@ function Metric({ label, value, color }: { label: string; value: string; color?:
   );
 }
 
-function hhmm(date: Date): string {
+/** Księżyc nie każdej doby wschodzi i zachodzi — wtedy nie ma czego pokazać. */
+function hhmm(date: Date | null): string {
+  if (!date) return '—';
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 }
 
-/**
- * Słońce pochodzi z efemeryd Open-Meteo. Wschód i zachód Księżyca są jeszcze
- * zamockowane — Open-Meteo nie zwraca danych o Księżycu (patrz Lunaris/Znane luki).
- */
-export function AstroTimesRow({ sunset, sunrise }: { sunset: Date; sunrise: Date }) {
+/** Słońce z efemeryd Open-Meteo, Księżyc liczony przez suncalc. */
+export function AstroTimesRow({
+  sunset,
+  sunrise,
+  moon,
+}: {
+  sunset: Date;
+  sunrise: Date;
+  moon: Moon;
+}) {
   const cells = [
     { icon: 'arrow-down-outline', label: 'Zach. Słońca', value: hhmm(sunset) },
-    { icon: 'moon-outline', label: 'Wsch. Ks.', value: ASTRO_TIMES.moonrise },
-    { icon: 'moon-outline', label: 'Zach. Ks.', value: ASTRO_TIMES.moonset },
+    { icon: 'moon-outline', label: 'Wsch. Ks.', value: hhmm(moon.rise) },
+    { icon: 'moon-outline', label: 'Zach. Ks.', value: hhmm(moon.set) },
     { icon: 'arrow-up-outline', label: 'Wsch. Słońca', value: hhmm(sunrise) },
   ] as const;
 

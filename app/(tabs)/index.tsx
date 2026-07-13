@@ -62,7 +62,11 @@ export default function NightScreen() {
             </Card>
 
             <View style={styles.gap}>
-              <AstroTimesRow sunset={data.forecast.from} sunrise={data.forecast.to} />
+              <AstroTimesRow
+                sunset={data.forecast.from}
+                sunrise={data.forecast.to}
+                moon={data.moon}
+              />
             </View>
 
             <View style={styles.moonGap}>

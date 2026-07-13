@@ -41,7 +41,9 @@ export function useNightData(placeName: string) {
     fetchNightForecast(place.lat, place.lon, controller.signal)
       .then((forecast) => {
         if (!active) return;
-        const moon = moonAt();
+        // Wschód i zachód Księżyca zależą od miejsca — liczymy dla doby, w której
+        // zaczyna się noc (czyli tej z zachodem Słońca), nie dla „dziś".
+        const moon = moonAt(forecast.from, place.lat, place.lon);
         setData({
           forecast,
           moon,
