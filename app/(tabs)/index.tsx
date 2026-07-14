@@ -14,16 +14,14 @@ import {
 import { LightPollutionLink } from '@/components/LightPollutionLink';
 import { Card, SectionLabel } from '@/components/primitives';
 import { EVENTS } from '@/data/events';
-import { findPlaceByName } from '@/data/places';
 import { formatToday } from '@/lib/date';
 import { useNightData } from '@/lib/use-night-data';
 import { useSettings } from '@/store/settings';
 import { HAIRLINE, colors, fonts, radius } from '@/theme';
 
 export default function NightScreen() {
-  const { location } = useSettings();
-  const { status, data, refresh, refreshing } = useNightData(location);
-  const place = findPlaceByName(location);
+  const { active } = useSettings();
+  const { status, data, refresh, refreshing } = useNightData(active.coords, active.bortle);
   const nextEvent = EVENTS[0];
 
   return (
@@ -33,8 +31,12 @@ export default function NightScreen() {
           <View>
             <Text style={styles.date}>{formatToday()}</Text>
             <View style={styles.locationRow}>
-              <Ionicons name="location" size={14} color={colors.purple} />
-              <Text style={styles.city}>{location}</Text>
+              <Ionicons
+                name={active.source === 'gps' ? 'navigate' : 'location'}
+                size={14}
+                color={colors.purple}
+              />
+              <Text style={styles.city}>{active.label}</Text>
             </View>
           </View>
           <RefreshButton spinning={refreshing} onPress={refresh} />
@@ -76,14 +78,13 @@ export default function NightScreen() {
               <MoonPhaseCard moon={data.moon} />
             </View>
 
-            {place && (
-              <LightPollutionLink
-                lat={place.lat}
-                lon={place.lon}
-                subtitle="Znajdź ciemniejsze miejsce w okolicy"
-                style={styles.moonGap}
-              />
-            )}
+            <LightPollutionLink
+              lat={active.coords.lat}
+              lon={active.coords.lon}
+              subtitle="Znajdź ciemniejsze miejsce w okolicy"
+              style={styles.moonGap}
+            />
+
 
             <SectionLabel style={styles.eventLabel}>Następny event</SectionLabel>
             <EventCard event={nextEvent} timeLabel={`Dziś · ${nextEvent.date}`} />

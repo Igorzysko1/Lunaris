@@ -29,7 +29,13 @@
     },
     "plugins": [
       "expo-router",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Lunaris używa Twojej lokalizacji, żeby pokazać prognozę i jakość nieba dla miejsca, w którym jesteś."
+        }
+      ]
     ]
   }
 }

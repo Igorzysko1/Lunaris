@@ -1,3 +1,5 @@
+import { distanceKm } from '../lib/astro.ts';
+
 export type Place = {
   name: string;
   region: string;
@@ -7,15 +9,31 @@ export type Place = {
   bortle: number;
 };
 
-/** Device GPS position used to sort places by distance — Katowice. */
-export const DEVICE_POSITION = { lat: 50.259, lon: 19.021 };
+export type Coords = { lat: number; lon: number };
 
-/** The place GPS resolves to. Real geocoding replaces this once expo-location lands. */
-export const DEVICE_CITY = 'Katowice';
+/**
+ * Pozycja używana, **gdy GPS jest niedostępny** (brak zgody, wyłączona lokalizacja).
+ * Prawdziwą pozycję czyta expo-location — patrz src/lib/use-device-location.ts.
+ */
+export const FALLBACK_POSITION: Coords = { lat: 50.259, lon: 19.021 };
+
+/** Miejscowość odpowiadająca FALLBACK_POSITION. */
+export const FALLBACK_CITY = 'Katowice';
 
 /** Wszystkie miejscowości — po nazwie, bo tylko ją trzymają ustawienia. */
 export function findPlaceByName(name: string): Place | undefined {
   return [...CITIES, ...GMINY].find((p) => p.name === name);
+}
+
+/**
+ * Najbliższa znana miejscowość dla dowolnego punktu.
+ * Potrzebna, bo GPS może wskazać miejsce spoza naszej listy, a Bortle mamy tylko
+ * dla miejscowości z listy — patrz Lunaris/Otwarte pytania.md.
+ */
+export function nearestPlace(coords: Coords): Place {
+  return [...CITIES, ...GMINY].reduce((best, place) =>
+    distanceKm(coords, place) < distanceKm(coords, best) ? place : best,
+  );
 }
 
 export const CITIES: Place[] = [

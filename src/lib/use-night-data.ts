@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 
-import { findPlaceByName } from '@/data/places';
+import type { Coords } from '@/data/places';
 import { computeNightRating } from '@/lib/astro';
 import { moonAt, type Moon } from '@/lib/moon';
 import { fetchNightForecast, type NightForecast } from '@/lib/weather';
@@ -16,44 +16,40 @@ export type NightData = {
 };
 
 /**
- * Prognoza na najbliższą noc w wybranej lokalizacji.
- * Przeładowuje się przy zmianie miejscowości i na żądanie (przycisk odświeżania).
+ * Prognoza na najbliższą noc dla podanego punktu.
+ * Przeładowuje się przy zmianie lokalizacji i na żądanie (przycisk odświeżania).
  */
-export function useNightData(placeName: string) {
+export function useNightData(coords: Coords, bortle: number) {
   const [status, setStatus] = useState<NightStatus>('loading');
   const [data, setData] = useState<NightData | null>(null);
   const [attempt, setAttempt] = useState(0);
 
   const refresh = useCallback(() => setAttempt((n) => n + 1), []);
 
-  useEffect(() => {
-    const place = findPlaceByName(placeName);
-    if (!place) {
-      setStatus('error');
-      return;
-    }
+  const { lat, lon } = coords;
 
+  useEffect(() => {
     const controller = new AbortController();
     let active = true;
 
     setStatus('loading');
 
-    fetchNightForecast(place.lat, place.lon, controller.signal)
+    fetchNightForecast(lat, lon, controller.signal)
       .then((forecast) => {
         if (!active) return;
         // Wschód i zachód Księżyca zależą od miejsca — liczymy dla doby, w której
         // zaczyna się noc (czyli tej z zachodem Słońca), nie dla „dziś".
-        const moon = moonAt(forecast.from, place.lat, place.lon);
+        const moon = moonAt(forecast.from, lat, lon);
         setData({
           forecast,
           moon,
-          bortle: place.bortle,
+          bortle,
           rating: computeNightRating({
             avgCloud: forecast.avgCloud,
             avgHumidity: forecast.avgHumidity,
             precipitation: forecast.totalPrecipitation,
             moonIllumination: moon.illumination,
-            bortle: place.bortle,
+            bortle,
           }),
         });
         setStatus('ready');
@@ -66,7 +62,7 @@ export function useNightData(placeName: string) {
       active = false;
       controller.abort();
     };
-  }, [placeName, attempt]);
+  }, [lat, lon, bortle, attempt]);
 
   return { status, data, refresh, refreshing: status === 'loading' };
 }

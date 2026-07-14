@@ -10,14 +10,18 @@ import { colors, fonts } from '@/theme';
 
 export default function SettingsScreen() {
   const {
-    location,
+    placeName,
     autoLocation,
+    active,
     notifications,
     leadTime,
     toggleAutoLocation,
     toggleNotifications,
     setLeadTime,
+    retryGps,
   } = useSettings();
+
+  const gpsFailed = active.gpsStatus === 'denied' || active.gpsStatus === 'unavailable';
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -31,22 +35,47 @@ export default function SettingsScreen() {
             <Toggle value={autoLocation} onPress={toggleAutoLocation} />
           </View>
 
-          {autoLocation ? (
+          {autoLocation && !gpsFailed && (
             <>
               <Divider />
               <View style={styles.subRow}>
-                <Text style={styles.subLabel}>Wykryto automatycznie</Text>
-                <Text style={styles.subValue}>{location}</Text>
+                <Text style={styles.subLabel}>
+                  {active.gpsStatus === 'loading' ? 'Ustalam pozycję…' : 'Wykryto automatycznie'}
+                </Text>
+                <Text style={styles.subValue}>
+                  {active.source === 'gps' ? active.label : '—'}
+                </Text>
               </View>
             </>
-          ) : (
+          )}
+
+          {autoLocation && gpsFailed && (
+            <>
+              <Divider />
+              <View style={styles.errorRow}>
+                <Text style={styles.errorText}>
+                  {active.gpsStatus === 'denied'
+                    ? 'Brak zgody na lokalizację. Włącz ją w ustawieniach systemu.'
+                    : 'Nie udało się ustalić pozycji.'}
+                </Text>
+                <Text style={styles.errorHint}>
+                  Używam ostatnio wybranej miejscowości: {active.label}
+                </Text>
+                <Pressable onPress={retryGps}>
+                  <Text style={styles.link}>Spróbuj ponownie</Text>
+                </Pressable>
+              </View>
+            </>
+          )}
+
+          {!autoLocation && (
             <>
               <Divider />
               <Link href="/location" asChild>
                 <Pressable style={styles.row}>
                   <Text style={styles.rowLabel}>Miejscowość</Text>
                   <View style={styles.rowValue}>
-                    <Text style={styles.link}>{location}</Text>
+                    <Text style={styles.link}>{placeName}</Text>
                     <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
                   </View>
                 </Pressable>
@@ -164,6 +193,21 @@ const styles = StyleSheet.create({
   },
   subValueMuted: {
     fontFamily: fonts.mono,
+    fontSize: 13,
+    color: colors.textMuted,
+  },
+  errorRow: {
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    gap: 6,
+  },
+  errorText: {
+    fontFamily: fonts.sans,
+    fontSize: 13,
+    color: colors.coral,
+  },
+  errorHint: {
+    fontFamily: fonts.sans,
     fontSize: 13,
     color: colors.textMuted,
   },

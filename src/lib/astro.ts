@@ -1,19 +1,19 @@
 // Importy względne (nie alias @/), żeby warstwę domenową dało się uruchomić
 // poza Metro — korzysta z niej skrypt scripts/check-weather.ts.
-import { DEVICE_POSITION } from '../data/places.ts';
+import type { Coords } from '../data/places.ts';
 import { colors } from '../theme.ts';
 
 const EARTH_RADIUS_KM = 6371;
 const toRad = (x: number) => (x * Math.PI) / 180;
 
-/** Great-circle distance from the device position, in kilometres. */
-export function distanceFromDevice(lat: number, lon: number): number {
-  const dLat = toRad(lat - DEVICE_POSITION.lat);
-  const dLon = toRad(lon - DEVICE_POSITION.lon);
-  const a =
+/** Odległość po wielkim kole między dwoma punktami, w kilometrach. */
+export function distanceKm(a: Coords, b: Coords): number {
+  const dLat = toRad(b.lat - a.lat);
+  const dLon = toRad(b.lon - a.lon);
+  const h =
     Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(DEVICE_POSITION.lat)) * Math.cos(toRad(lat)) * Math.sin(dLon / 2) ** 2;
-  return 2 * EARTH_RADIUS_KM * Math.asin(Math.sqrt(a));
+    Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLon / 2) ** 2;
+  return 2 * EARTH_RADIUS_KM * Math.asin(Math.sqrt(h));
 }
 
 export function formatDistance(km: number): string {

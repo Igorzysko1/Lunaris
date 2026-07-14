@@ -6,9 +6,9 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { LightPollutionLink } from '@/components/LightPollutionLink';
 import { Badge, Pill } from '@/components/primitives';
-import { CITIES, DEVICE_CITY, DEVICE_POSITION, GMINY, type Place } from '@/data/places';
-import { bortleMeta, distanceFromDevice, formatDistance } from '@/lib/astro';
-import { useSettings } from '@/store/settings';
+import { CITIES, GMINY, type Coords, type Place } from '@/data/places';
+import { bortleMeta, distanceKm, formatDistance } from '@/lib/astro';
+import { useSettings, type ActiveLocation } from '@/store/settings';
 import { HAIRLINE, colors, fonts, radius } from '@/theme';
 
 type PickerTab = 'cities' | 'gminy';
@@ -20,9 +20,12 @@ const TABS: { key: PickerTab; label: string }[] = [
 
 export default function LocationScreen() {
   const router = useRouter();
-  const { location, autoLocation, selectPlace, useGps } = useSettings();
+  const { placeName, autoLocation, active, selectPlace, useGps } = useSettings();
   const [query, setQuery] = useState('');
   const [tab, setTab] = useState<PickerTab>('cities');
+
+  // Sortujemy od miejsca, w którym faktycznie jesteśmy (albo które wybrano ręcznie).
+  const origin = active.coords;
 
   const places = useMemo(() => {
     const source = tab === 'gminy' ? GMINY : CITIES;
@@ -31,11 +34,8 @@ export default function LocationScreen() {
       .filter(
         (p) => p.name.toLowerCase().includes(q) || p.region.toLowerCase().includes(q),
       )
-      .sort(
-        (a, b) =>
-          distanceFromDevice(a.lat, a.lon) - distanceFromDevice(b.lat, b.lon),
-      );
-  }, [tab, query]);
+      .sort((a, b) => distanceKm(origin, a) - distanceKm(origin, b));
+  }, [tab, query, origin]);
 
   const choosePlace = (name: string) => {
     selectPlace(name);
@@ -82,8 +82,8 @@ export default function LocationScreen() {
 
       <ScrollView contentContainerStyle={styles.list} keyboardShouldPersistTaps="handled">
         <LightPollutionLink
-          lat={DEVICE_POSITION.lat}
-          lon={DEVICE_POSITION.lon}
+          lat={origin.lat}
+          lon={origin.lon}
           subtitle="Zobacz, gdzie naprawdę jest ciemno"
           style={styles.mapLink}
         />
@@ -93,19 +93,20 @@ export default function LocationScreen() {
             <Ionicons name="navigate" size={18} color={colors.purple} />
             <View>
               <Text style={styles.placeName}>Moja lokalizacja</Text>
-              <Text style={styles.gpsDetail}>
-                GPS · {DEVICE_CITY} · sortowanie od najbliższych
-              </Text>
+              <Text style={styles.gpsDetail}>{gpsDetail(autoLocation, active)}</Text>
             </View>
           </View>
-          {autoLocation && <Ionicons name="checkmark" size={18} color={colors.purple} />}
+          {autoLocation && active.source === 'gps' && (
+            <Ionicons name="checkmark" size={18} color={colors.purple} />
+          )}
         </Pressable>
 
         {places.map((place) => (
           <PlaceRow
             key={`${place.name}-${place.region}`}
             place={place}
-            selected={!autoLocation && location === place.name}
+            origin={origin}
+            selected={!autoLocation && placeName === place.name}
             onPress={() => choosePlace(place.name)}
           />
         ))}
@@ -120,17 +121,37 @@ export default function LocationScreen() {
   );
 }
 
+/** Wiersz GPS mówi prawdę o tym, co się stało — a nie udaje, że wszystko gra. */
+function gpsDetail(autoLocation: boolean, active: ActiveLocation): string {
+  if (!autoLocation) return 'Wykryj miejsce, w którym jesteś';
+
+  switch (active.gpsStatus) {
+    case 'loading':
+      return 'Ustalam pozycję…';
+    case 'denied':
+      return 'Brak zgody na lokalizację — włącz ją w ustawieniach systemu';
+    case 'unavailable':
+      return 'Nie udało się ustalić pozycji';
+    case 'granted':
+      return `GPS · ${active.label} · sortowanie od najbliższych`;
+    default:
+      return 'GPS';
+  }
+}
+
 function PlaceRow({
   place,
+  origin,
   selected,
   onPress,
 }: {
   place: Place;
+  origin: Coords;
   selected: boolean;
   onPress: () => void;
 }) {
   const bortle = bortleMeta(place.bortle);
-  const distance = formatDistance(distanceFromDevice(place.lat, place.lon));
+  const distance = formatDistance(distanceKm(origin, place));
 
   return (
     <Pressable onPress={onPress} style={styles.placeRow}>
