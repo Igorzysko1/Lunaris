@@ -4,8 +4,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
+import { LightPollutionLink } from '@/components/LightPollutionLink';
 import { Badge, Pill } from '@/components/primitives';
-import { CITIES, DEVICE_CITY, GMINY, type Place } from '@/data/places';
+import { CITIES, DEVICE_CITY, DEVICE_POSITION, GMINY, type Place } from '@/data/places';
 import { bortleMeta, distanceFromDevice, formatDistance } from '@/lib/astro';
 import { useSettings } from '@/store/settings';
 import { HAIRLINE, colors, fonts, radius } from '@/theme';
@@ -80,6 +81,13 @@ export default function LocationScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.list} keyboardShouldPersistTaps="handled">
+        <LightPollutionLink
+          lat={DEVICE_POSITION.lat}
+          lon={DEVICE_POSITION.lon}
+          subtitle="Zobacz, gdzie naprawdę jest ciemno"
+          style={styles.mapLink}
+        />
+
         <Pressable onPress={chooseGps} style={styles.gpsRow}>
           <View style={styles.gpsLeft}>
             <Ionicons name="navigate" size={18} color={colors.purple} />
@@ -195,6 +203,9 @@ const styles = StyleSheet.create({
   list: {
     paddingHorizontal: 16,
     paddingBottom: 24,
+  },
+  mapLink: {
+    marginBottom: 12,
   },
   gpsRow: {
     flexDirection: 'row',

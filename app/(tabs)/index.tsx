@@ -11,8 +11,10 @@ import {
   NightRatingCard,
   NightSkeleton,
 } from '@/components/night-cards';
+import { LightPollutionLink } from '@/components/LightPollutionLink';
 import { Card, SectionLabel } from '@/components/primitives';
 import { EVENTS } from '@/data/events';
+import { findPlaceByName } from '@/data/places';
 import { formatToday } from '@/lib/date';
 import { useNightData } from '@/lib/use-night-data';
 import { useSettings } from '@/store/settings';
@@ -21,6 +23,7 @@ import { HAIRLINE, colors, fonts, radius } from '@/theme';
 export default function NightScreen() {
   const { location } = useSettings();
   const { status, data, refresh, refreshing } = useNightData(location);
+  const place = findPlaceByName(location);
   const nextEvent = EVENTS[0];
 
   return (
@@ -69,9 +72,18 @@ export default function NightScreen() {
               />
             </View>
 
-            <View style={styles.moonGap}>
+            <View style={styles.gap}>
               <MoonPhaseCard moon={data.moon} />
             </View>
+
+            {place && (
+              <LightPollutionLink
+                lat={place.lat}
+                lon={place.lon}
+                subtitle="Znajdź ciemniejsze miejsce w okolicy"
+                style={styles.moonGap}
+              />
+            )}
 
             <SectionLabel style={styles.eventLabel}>Następny event</SectionLabel>
             <EventCard event={nextEvent} timeLabel={`Dziś · ${nextEvent.date}`} />
