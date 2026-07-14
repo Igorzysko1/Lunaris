@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Animated, StyleSheet, Text, View } from 'react-native';
+import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Card, Divider, SectionLabel } from '@/components/primitives';
@@ -110,21 +110,26 @@ export function AstroTimesRow({
   );
 }
 
-export function MoonPhaseCard({ moon }: { moon: Moon }) {
+export function MoonPhaseCard({ moon, onPress }: { moon: Moon; onPress: () => void }) {
   return (
-    <Card style={styles.moonCard}>
-      <View style={styles.moonLeft}>
-        <Text style={styles.moonGlyph}>{moon.glyph}</Text>
-        <View>
-          <Text style={styles.moonName}>{moon.name}</Text>
-          <Text style={styles.moonDetail}>{moon.detail}</Text>
+    <Pressable onPress={onPress} accessibilityRole="button">
+      <Card style={styles.moonCard}>
+        <View style={styles.moonLeft}>
+          <Text style={styles.moonGlyph}>{moon.glyph}</Text>
+          <View style={styles.moonText}>
+            <Text style={styles.moonName}>{moon.name}</Text>
+            <Text style={styles.moonDetail}>{moon.detail}</Text>
+          </View>
         </View>
-      </View>
-      <View style={styles.alignRight}>
-        <Text style={styles.moonIllumination}>{moon.illumination}%</Text>
-        <Text style={styles.metricLabel}>oświetlenia</Text>
-      </View>
-    </Card>
+        <View style={styles.moonRight}>
+          <View style={styles.alignRight}>
+            <Text style={styles.moonIllumination}>{moon.illumination}%</Text>
+            <Text style={styles.metricLabel}>oświetlenia</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+        </View>
+      </Card>
+    </Pressable>
   );
 }
 
@@ -237,9 +242,18 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   moonLeft: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
+  },
+  moonText: {
+    flex: 1,
+  },
+  moonRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   moonGlyph: {
     fontSize: 34,

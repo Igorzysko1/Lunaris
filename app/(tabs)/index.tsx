@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Animated, Easing, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { CloudCoverChart } from '@/components/CloudCoverChart';
@@ -14,12 +15,13 @@ import {
 import { LightPollutionLink } from '@/components/LightPollutionLink';
 import { Card, SectionLabel } from '@/components/primitives';
 import { EVENTS } from '@/data/events';
-import { formatToday } from '@/lib/date';
+import { formatLongDate } from '@/lib/date';
 import { useNightData } from '@/lib/use-night-data';
 import { useSettings } from '@/store/settings';
 import { HAIRLINE, colors, fonts, radius } from '@/theme';
 
 export default function NightScreen() {
+  const router = useRouter();
   const { active } = useSettings();
   const { status, data, refresh, refreshing } = useNightData(active.coords, active.bortle);
   const nextEvent = EVENTS[0];
@@ -29,7 +31,7 @@ export default function NightScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.header}>
           <View>
-            <Text style={styles.date}>{formatToday()}</Text>
+            <Text style={styles.date}>{formatLongDate()}</Text>
             <View style={styles.locationRow}>
               <Ionicons
                 name={active.source === 'gps' ? 'navigate' : 'location'}
@@ -75,7 +77,7 @@ export default function NightScreen() {
             </View>
 
             <View style={styles.gap}>
-              <MoonPhaseCard moon={data.moon} />
+              <MoonPhaseCard moon={data.moon} onPress={() => router.push('/moon')} />
             </View>
 
             <LightPollutionLink

@@ -46,6 +46,7 @@ export default function RootLayout() {
       >
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="location" />
+        <Stack.Screen name="moon" />
       </Stack>
     </SettingsProvider>
   );

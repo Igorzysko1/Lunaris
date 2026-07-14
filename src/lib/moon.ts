@@ -39,6 +39,11 @@ export type Moon = {
 
 const phaseOf = (date: Date) => SunCalc.getMoonIllumination(date).phase;
 
+/** suncalc podaje fazę jako ułamek cyklu — mapujemy ją na jedną z ośmiu nazwanych faz. */
+function phaseInfo(phase: number) {
+  return PHASES[Math.round(phase * 8) % 8];
+}
+
 function formatDate(date: Date): string {
   return `${date.getDate()} ${MONTHS_SHORT[date.getMonth()]}.`;
 }
@@ -73,11 +78,100 @@ function nextMilestone(from: Date): { label: string; when: Date } {
   throw new Error('Nie znaleziono najbliższej pełni ani nowiu');
 }
 
+/** Nów albo pełnia — jedyne zdarzenia, które wyróżniamy w kalendarzu. */
+export type MoonEvent = 'new' | 'full';
+
+export type MoonDay = {
+  /** Lokalna północ tej doby. */
+  date: Date;
+  /** Czy dzień należy do oglądanego miesiąca (siatka dobija dni z sąsiednich). */
+  inMonth: boolean;
+  /** Oświetlenie tarczy zmienia się w ciągu doby — stąd przedział, a nie jedna liczba. */
+  illuminationFrom: number;
+  illuminationTo: number;
+  illuminationMin: number;
+  illuminationMax: number;
+  name: string;
+  glyph: string;
+  /** Ustawione, gdy tej doby wypada nów albo pełnia. */
+  event: MoonEvent | null;
+  rise: Date | null;
+  set: Date | null;
+};
+
+const HOUR_MS = 3_600_000;
+
+function startOfDay(date: Date): Date {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+/**
+ * Dane o Księżycu dla jednej doby.
+ *
+ * Oświetlenie próbkujemy co godzinę, bo w ciągu doby potrafi się zmienić o kilkanaście
+ * punktów procentowych, a w okolicy nowiu i pełni **zawraca** — wtedy wartości brzegowe
+ * nie są jednocześnie minimum i maksimum.
+ */
+export function moonDay(day: Date, lat: number, lon: number, inMonth = true): MoonDay {
+  const midnight = startOfDay(day);
+
+  const illuminations: number[] = [];
+  const phases: number[] = [];
+
+  for (let h = 0; h <= 24; h++) {
+    const at = new Date(midnight.getTime() + h * HOUR_MS);
+    const { fraction, phase } = SunCalc.getMoonIllumination(at);
+    illuminations.push(fraction * 100);
+    phases.push(phase);
+  }
+
+  let event: MoonEvent | null = null;
+  for (let i = 1; i < phases.length; i++) {
+    // Nów: faza przewija się z ~1 z powrotem do ~0. Pełnia: przekracza 0.5.
+    if (phases[i] < phases[i - 1]) event = 'new';
+    else if (phases[i - 1] < 0.5 && phases[i] >= 0.5) event = 'full';
+    if (event) break;
+  }
+
+  const { name, glyph } = phaseInfo(phases[12]);
+  const times = SunCalc.getMoonTimes(midnight, lat, lon);
+
+  return {
+    date: midnight,
+    inMonth,
+    illuminationFrom: Math.round(illuminations[0]),
+    illuminationTo: Math.round(illuminations[24]),
+    illuminationMin: Math.round(Math.min(...illuminations)),
+    illuminationMax: Math.round(Math.max(...illuminations)),
+    name,
+    glyph,
+    event,
+    rise: times.rise ?? null,
+    set: times.set ?? null,
+  };
+}
+
+/**
+ * Pełna siatka kalendarza — 6 tygodni od poniedziałku, z dobitką dni z sąsiednich
+ * miesięcy, żeby wiersze były równe.
+ */
+export function moonMonth(year: number, month: number, lat: number, lon: number): MoonDay[] {
+  const first = new Date(year, month, 1);
+  // getDay(): 0 = niedziela. U nas tydzień zaczyna się w poniedziałek.
+  const offset = (first.getDay() + 6) % 7;
+  const gridStart = new Date(year, month, 1 - offset);
+
+  return Array.from({ length: 42 }, (_, i) => {
+    const day = new Date(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate() + i);
+    return moonDay(day, lat, lon, day.getMonth() === month);
+  });
+}
+
 export function moonAt(date: Date, lat: number, lon: number): Moon {
   const { fraction, phase } = SunCalc.getMoonIllumination(date);
-
-  const index = Math.round(phase * 8) % 8;
-  const { name, glyph } = PHASES[index];
+  const { name, glyph } = phaseInfo(phase);
 
   const milestone = nextMilestone(date);
   const daysAway = Math.round((milestone.when.getTime() - date.getTime()) / 86_400_000);

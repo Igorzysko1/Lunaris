@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,27 +18,35 @@ const TABS: { key: PickerTab; label: string }[] = [
   { key: 'gminy', label: 'Gminy' },
 ];
 
+/** Miejsce z policzoną odległością — liczymy ją raz, nie w komparatorze sortowania. */
+type Ranked = { place: Place; distance: number };
+
 export default function LocationScreen() {
   const router = useRouter();
-  const { placeName, autoLocation, active, selectPlace, useGps } = useSettings();
+  const { placeId, autoLocation, active, selectPlace, useGps } = useSettings();
   const [query, setQuery] = useState('');
   const [tab, setTab] = useState<PickerTab>('cities');
 
   // Sortujemy od miejsca, w którym faktycznie jesteśmy (albo które wybrano ręcznie).
   const origin = active.coords;
 
-  const places = useMemo(() => {
+  const places = useMemo<Ranked[]>(() => {
     const source = tab === 'gminy' ? GMINY : CITIES;
     const q = query.trim().toLowerCase();
-    return source
-      .filter(
-        (p) => p.name.toLowerCase().includes(q) || p.region.toLowerCase().includes(q),
-      )
-      .sort((a, b) => distanceKm(origin, a) - distanceKm(origin, b));
+
+    const matching = q
+      ? source.filter(
+          (p) => p.name.toLowerCase().includes(q) || p.region.toLowerCase().includes(q),
+        )
+      : source;
+
+    return matching
+      .map((place) => ({ place, distance: distanceKm(origin, place) }))
+      .sort((a, b) => a.distance - b.distance);
   }, [tab, query, origin]);
 
-  const choosePlace = (name: string) => {
-    selectPlace(name);
+  const choosePlace = (id: string) => {
+    selectPlace(id);
     router.back();
   };
 
@@ -80,43 +88,50 @@ export default function LocationScreen() {
         ))}
       </View>
 
-      <ScrollView contentContainerStyle={styles.list} keyboardShouldPersistTaps="handled">
-        <LightPollutionLink
-          lat={origin.lat}
-          lon={origin.lon}
-          subtitle="Zobacz, gdzie naprawdę jest ciemno"
-          style={styles.mapLink}
-        />
+      <FlatList
+        data={places}
+        keyExtractor={(item) => item.place.id}
+        contentContainerStyle={styles.list}
+        keyboardShouldPersistTaps="handled"
+        initialNumToRender={14}
+        windowSize={10}
+        ListHeaderComponent={
+          <>
+            <LightPollutionLink
+              lat={origin.lat}
+              lon={origin.lon}
+              subtitle="Zobacz, gdzie naprawdę jest ciemno"
+              style={styles.mapLink}
+            />
 
-        <Pressable onPress={chooseGps} style={styles.gpsRow}>
-          <View style={styles.gpsLeft}>
-            <Ionicons name="navigate" size={18} color={colors.purple} />
-            <View>
-              <Text style={styles.placeName}>Moja lokalizacja</Text>
-              <Text style={styles.gpsDetail}>{gpsDetail(autoLocation, active)}</Text>
-            </View>
-          </View>
-          {autoLocation && active.source === 'gps' && (
-            <Ionicons name="checkmark" size={18} color={colors.purple} />
-          )}
-        </Pressable>
-
-        {places.map((place) => (
+            <Pressable onPress={chooseGps} style={styles.gpsRow}>
+              <View style={styles.gpsLeft}>
+                <Ionicons name="navigate" size={18} color={colors.purple} />
+                <View>
+                  <Text style={styles.placeName}>Moja lokalizacja</Text>
+                  <Text style={styles.gpsDetail}>{gpsDetail(autoLocation, active)}</Text>
+                </View>
+              </View>
+              {autoLocation && active.source === 'gps' && (
+                <Ionicons name="checkmark" size={18} color={colors.purple} />
+              )}
+            </Pressable>
+          </>
+        }
+        renderItem={({ item }) => (
           <PlaceRow
-            key={`${place.name}-${place.region}`}
-            place={place}
-            origin={origin}
-            selected={!autoLocation && placeName === place.name}
-            onPress={() => choosePlace(place.name)}
+            place={item.place}
+            distance={item.distance}
+            selected={!autoLocation && placeId === item.place.id}
+            onPress={() => choosePlace(item.place.id)}
           />
-        ))}
-
-        {places.length === 0 && (
+        )}
+        ListEmptyComponent={
           <View style={styles.empty}>
             <Text style={styles.emptyText}>Brak wyników dla „{query}”</Text>
           </View>
-        )}
-      </ScrollView>
+        }
+      />
     </SafeAreaView>
   );
 }
@@ -141,17 +156,16 @@ function gpsDetail(autoLocation: boolean, active: ActiveLocation): string {
 
 function PlaceRow({
   place,
-  origin,
+  distance,
   selected,
   onPress,
 }: {
   place: Place;
-  origin: Coords;
+  distance: number;
   selected: boolean;
   onPress: () => void;
 }) {
   const bortle = bortleMeta(place.bortle);
-  const distance = formatDistance(distanceKm(origin, place));
 
   return (
     <Pressable onPress={onPress} style={styles.placeRow}>
@@ -166,7 +180,7 @@ function PlaceRow({
           <Badge label={bortle.label} color={bortle.color} />
         </View>
         <Text style={styles.placeMeta}>
-          <Text style={styles.placeDistance}>{distance}</Text>
+          <Text style={styles.placeDistance}>{formatDistance(distance)}</Text>
           <Text> · {place.region}</Text>
         </Text>
       </View>

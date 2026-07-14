@@ -1,8 +1,8 @@
 import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
 
 import {
-  FALLBACK_CITY,
-  findPlaceByName,
+  FALLBACK_POSITION,
+  findPlaceById,
   nearestPlace,
   type Coords,
 } from '@/data/places';
@@ -23,13 +23,15 @@ export type ActiveLocation = {
 };
 
 type Settings = {
-  /** Miejscowość wybrana ręcznie z listy. Ignorowana, gdy działa GPS. */
+  /** Miejscowość wybrana ręcznie z listy (po id). Ignorowana, gdy działa GPS. */
+  placeId: string;
+  /** Nazwa tej miejscowości — do wyświetlenia w ustawieniach. */
   placeName: string;
   autoLocation: boolean;
   notifications: boolean;
   leadTime: LeadTime;
   active: ActiveLocation;
-  selectPlace: (name: string) => void;
+  selectPlace: (id: string) => void;
   useGps: () => void;
   toggleAutoLocation: () => void;
   toggleNotifications: () => void;
@@ -40,7 +42,9 @@ type Settings = {
 const SettingsContext = createContext<Settings | null>(null);
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
-  const [placeName, setPlaceName] = useState('Kraków');
+  // Domyślnie: miejscowość odpowiadająca pozycji zapasowej. Realny wybór i tak
+  // przychodzi z GPS albo z listy.
+  const [placeId, setPlaceId] = useState(() => nearestPlace(FALLBACK_POSITION).id);
   const [autoLocation, setAutoLocation] = useState(false);
   const [notifications, setNotifications] = useState(true);
   const [leadTime, setLeadTime] = useState<LeadTime>('2h');
@@ -63,7 +67,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     }
 
     // Brak GPS (wyłączony, odmowa, brak sygnału) — wracamy do wyboru ręcznego.
-    const place = findPlaceByName(placeName) ?? findPlaceByName(FALLBACK_CITY)!;
+    const place = findPlaceById(placeId) ?? nearestPlace(FALLBACK_POSITION);
     return {
       label: place.name,
       coords: { lat: place.lat, lon: place.lon },
@@ -71,17 +75,18 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       source: 'manual',
       gpsStatus: device.status,
     };
-  }, [autoLocation, device.coords, device.label, device.status, placeName]);
+  }, [autoLocation, device.coords, device.label, device.status, placeId]);
 
   const value = useMemo<Settings>(
     () => ({
-      placeName,
+      placeId,
+      placeName: findPlaceById(placeId)?.name ?? '—',
       autoLocation,
       notifications,
       leadTime,
       active,
-      selectPlace: (name) => {
-        setPlaceName(name);
+      selectPlace: (id) => {
+        setPlaceId(id);
         setAutoLocation(false);
       },
       useGps: () => setAutoLocation(true),
@@ -90,7 +95,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       setLeadTime,
       retryGps: device.retry,
     }),
-    [placeName, autoLocation, notifications, leadTime, active, device.retry],
+    [placeId, autoLocation, notifications, leadTime, active, device.retry],
   );
 
   return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>;
