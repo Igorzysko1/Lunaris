@@ -165,10 +165,18 @@ export async function fetchUpcomingNights(
   const json = (await res.json()) as ApiResponse;
 
   const all = toHours(json);
-  const DAY_MS = 86_400_000;
+
+  // Kolejne doby liczone kalendarzowo, nie przez dorzucanie 24 godzin: doba
+  // zmiany czasu ma 23 albo 25 godzin i przy dodawaniu milisekund któraś noc
+  // wypadłaby dwa razy albo zniknęła z listy.
+  const dayFromNow = (days: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() + days);
+    return d;
+  };
 
   return Array.from({ length: nights }, (_, i) => {
-    const night = nightWindow(new Date(Date.now() + i * DAY_MS), coords);
+    const night = nightWindow(dayFromNow(i), coords);
     return {
       night,
       hours: all.filter((h) => h.at >= night.from && h.at <= night.to),

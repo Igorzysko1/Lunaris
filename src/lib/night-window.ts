@@ -13,7 +13,6 @@ import * as SunCalc from 'suncalc';
 import type { Coords } from '../data/places.ts';
 
 const HOUR_MS = 3_600_000;
-const DAY_MS = 86_400_000;
 
 /** Okno nocy: od zmierzchu do świtu. Poza rachunkiem nie ma sensu pytać o widoczność. */
 export type NightWindow = { from: Date; to: Date };
@@ -21,9 +20,17 @@ export type NightWindow = { from: Date; to: Date };
 const isValidDate = (d: Date | null | undefined): d is Date =>
   d instanceof Date && !isNaN(d.getTime());
 
-function noonOf(date: Date): Date {
+/**
+ * Południe danej doby, opcjonalnie przesunięte o całe dni.
+ *
+ * Dni dodajemy kalendarzowo, a nie przez dorzucenie 24 godzin: w dobie zmiany
+ * czasu na zimowy jest ich 25, więc `+ DAY_MS` zostawiało tę samą datę i noc
+ * kończyła się nad ranem tego samego dnia, w którym się zaczynała.
+ */
+function noonOf(date: Date, offsetDays = 0): Date {
   const d = new Date(date);
   d.setHours(12, 0, 0, 0);
+  d.setDate(d.getDate() + offsetDays);
   return d;
 }
 
@@ -37,7 +44,7 @@ function noonOf(date: Date): Date {
  */
 export function nightWindow(date: Date, coords: Coords): NightWindow {
   const evening = SunCalc.getTimes(noonOf(date), coords.lat, coords.lon);
-  const morning = SunCalc.getTimes(noonOf(new Date(date.getTime() + DAY_MS)), coords.lat, coords.lon);
+  const morning = SunCalc.getTimes(noonOf(date, 1), coords.lat, coords.lon);
 
   const from = [evening.night, evening.nauticalDusk, evening.sunset].find(isValidDate);
   const to = [morning.nightEnd, morning.nauticalDawn, morning.sunrise].find(isValidDate);
@@ -61,7 +68,7 @@ export function nightWindow(date: Date, coords: Coords): NightWindow {
  * i lista celów mówią o tej samej nocy.
  */
 export function currentNightWindow(now: Date, coords: Coords): NightWindow {
-  const previous = nightWindow(new Date(now.getTime() - DAY_MS), coords);
+  const previous = nightWindow(noonOf(now, -1), coords);
   return now < previous.to ? previous : nightWindow(now, coords);
 }
 
