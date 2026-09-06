@@ -9,7 +9,7 @@
  * Importy względne (nie alias @/), żeby moduł dało się uruchomić poza Metro.
  */
 
-/** Sposób trzymania sprzętu. Wpływa na próg wiatru i na realne zasięgi. */
+/** Sposób trzymania sprzętu — statyw pozwala wykorzystać większe powiększenia. */
 export type Mount = 'tripod' | 'handheld';
 
 export type Optics = {
@@ -19,15 +19,13 @@ export type Optics = {
   magnification: number;
   /** Rzeczywiste pole widzenia w stopniach. */
   fieldOfView: number;
-  mount: Mount;
 };
 
-/** Punkt wyjścia: lornetka 15x70 na statywie. Wartość domyślna, nie założenie kodu. */
+/** Punkt wyjścia: lornetka 15x70. Wartość domyślna, nie założenie kodu. */
 export const DEFAULT_OPTICS: Optics = {
   aperture: 70,
   magnification: 15,
   fieldOfView: 4.4,
-  mount: 'tripod',
 };
 
 /** Granice, w których wartości mają sens fizyczny — poza nimi rachunek przestaje cokolwiek znaczyć. */
@@ -59,7 +57,6 @@ export function clampOptics(optics: Optics): Optics {
       DEFAULT_OPTICS.magnification,
     ),
     fieldOfView: clamp(optics.fieldOfView, OPTICS_LIMITS.fieldOfView, DEFAULT_OPTICS.fieldOfView),
-    mount: optics.mount === 'handheld' ? 'handheld' : 'tripod',
   };
 }
 
@@ -115,7 +112,7 @@ export function surfaceBrightness(magnitude: number, sizeArcmin: number): number
  * Odniesieniem jest źrenica oka (7 mm) — sprzęt zbiera tyle razy więcej światła,
  * ile wynosi stosunek powierzchni obiektywów.
  */
-export function contrastGain(optics: Optics): number {
+function contrastGain(optics: Optics): number {
   const EYE_PUPIL_MM = 7;
   return 2.5 * Math.log10(optics.aperture / EYE_PUPIL_MM);
 }
@@ -141,13 +138,7 @@ export function minimumAngularSize(optics: Optics): number {
   return EYE_RESOLUTION_ARCMIN / optics.magnification;
 }
 
-/** Sprzęt z ręki drga już przy słabszym wietrze niż ustawiony na statywie. */
-export function windLimitKmh(optics: Optics): number {
-  return optics.mount === 'tripod' ? 25 : 15;
-}
-
-/** np. „15x70, statyw" — do wyświetlenia w ustawieniach. */
+/** np. „15x70" — do wyświetlenia w ustawieniach. */
 export function describeOptics(optics: Optics): string {
-  const mount = optics.mount === 'tripod' ? 'statyw' : 'z ręki';
-  return `${optics.magnification}x${optics.aperture}, ${mount}`;
+  return `${optics.magnification}x${optics.aperture}`;
 }

@@ -18,7 +18,6 @@ import {
   Illumination,
   Observer,
   SearchHourAngle,
-  SearchRiseSet,
 } from 'astronomy-engine';
 
 import { DEEP_SKY_OBJECTS, type DeepSkyObject } from '../data/deep-sky.ts';
@@ -37,7 +36,7 @@ import {
  * zjada obiekty mgławicowe, a nisko nad horyzontem prawie zawsze stoi las, dom
  * albo łuna miasta.
  */
-export const USEFUL_ALTITUDE = 15;
+const USEFUL_ALTITUDE = 15;
 
 /**
  * Planety brane pod uwagę. Które z nich trafią na listę, rozstrzyga graniczna
@@ -55,11 +54,13 @@ const PLANETS: { body: Body; name: string }[] = [
 ];
 
 /**
- * Sloty na obiekty katalogowe. Astronomy Engine daje osiem gwiazd użytkownika;
- * definicja jest globalna, więc przypisujemy ją tuż przed rachunkiem i nie
- * trzymamy między wywołaniami.
+ * Slot na obiekt katalogowy. Astronomy Engine daje osiem gwiazd użytkownika, ale
+ * wystarczy jedna: definicja jest globalna, a rachunek dla obiektu kończy się,
+ * zanim slot dostanie kolejny wpis. Dzięki temu długość katalogu nie jest niczym
+ * ograniczona — przy slocie na obiekt szósta pozycja w DEEP_SKY_OBJECTS zaczęłaby
+ * sięgać poza tablicę.
  */
-const STAR_SLOTS: Body[] = [Body.Star1, Body.Star2, Body.Star3, Body.Star4, Body.Star5];
+const STAR_SLOT: Body = Body.Star1;
 
 export type SkyTarget = {
   id: string;
@@ -73,9 +74,6 @@ export type SkyTarget = {
   /** Najwyższe położenie w samym oknie nocy i moment, w którym wypada. */
   bestAt: Date;
   maxAltitude: number;
-  /** Wschód i zachód w dobie okna. `null` dla obiektów cyrkumpolarnych i nigdy niewschodzących. */
-  riseAt: Date | null;
-  setAt: Date | null;
   /** Jasność obiektu w magnitudo — dla planet liczona na moment okna. */
   magnitude: number;
   /**
@@ -135,13 +133,7 @@ function bestInWindow(
   return best;
 }
 
-/**
- * Wspólny rachunek dla planety i obiektu katalogowego.
- *
- * Wschodu i zachodu szukamy w oknie dwóch dób od zmierzchu — obiekt cyrkumpolarny
- * nie ma ani jednego, ani drugiego, i wtedy `SearchRiseSet` zwraca `null`. To nie
- * błąd, tylko informacja, że obiekt jest nad horyzontem całą noc.
- */
+/** Wspólny rachunek dla planety i obiektu katalogowego. */
 function targetOf(
   body: Body,
   base: TargetBase,
@@ -175,8 +167,6 @@ function targetOf(
     transitAltitude: transit.hor.altitude,
     bestAt: best.at,
     maxAltitude: best.altitude,
-    riseAt: SearchRiseSet(body, observer, 1, window.from, 2)?.date ?? null,
-    setAt: SearchRiseSet(body, observer, -1, window.from, 2)?.date ?? null,
     visible: outOfReach === null,
     outOfReach,
   };
@@ -184,15 +174,14 @@ function targetOf(
 
 function dsoTarget(
   dso: DeepSkyObject,
-  slot: Body,
   window: NightWindow,
   observer: Observer,
   reach: Reach,
 ): SkyTarget {
-  DefineStar(slot, dso.raHours, dso.dec, dso.distanceLy);
+  DefineStar(STAR_SLOT, dso.raHours, dso.dec, dso.distanceLy);
 
   return targetOf(
-    slot,
+    STAR_SLOT,
     {
       id: dso.id,
       name: `${dso.designation} — ${dso.name}`,
@@ -246,9 +235,7 @@ export function nightTargets(
     );
   });
 
-  const deepSky = DEEP_SKY_OBJECTS.map((dso, i) =>
-    dsoTarget(dso, STAR_SLOTS[i], window, observer, reach),
-  );
+  const deepSky = DEEP_SKY_OBJECTS.map((dso) => dsoTarget(dso, window, observer, reach));
 
   return [...planets, ...deepSky].sort((a, b) => b.maxAltitude - a.maxAltitude);
 }

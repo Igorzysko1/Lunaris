@@ -44,7 +44,7 @@ type Settings = {
   autoLocation: boolean;
   notifications: boolean;
   leadTime: LeadTime;
-  /** Parametry sprzętu — jedno źródło prawdy dla doboru celów i progu wiatru. */
+  /** Parametry sprzętu — jedno źródło prawdy dla doboru celów. */
   optics: Optics;
   /** Czy wczytaliśmy już zapisane ustawienia — do czasu tego UI nie ma czego pokazywać. */
   hydrated: boolean;

@@ -52,6 +52,19 @@ export function nightWindow(date: Date, coords: Coords): NightWindow {
   return { from, to };
 }
 
+/**
+ * Noc **trwająca** w danym momencie.
+ *
+ * O drugiej w nocy „dziś" to wciąż noc, która zaczęła się wczoraj wieczorem —
+ * `nightWindow(new Date())` pokazałoby wtedy noc oddaloną o kolejne dwadzieścia
+ * godzin. Ten sam wybór robi prognoza w src/lib/weather.ts, więc karta oceny nocy
+ * i lista celów mówią o tej samej nocy.
+ */
+export function currentNightWindow(now: Date, coords: Coords): NightWindow {
+  const previous = nightWindow(new Date(now.getTime() - DAY_MS), coords);
+  return now < previous.to ? previous : nightWindow(now, coords);
+}
+
 /** Próbki co 15 minut w oknie nocy — gęstość wystarczająca dla pytania „czy było widać". */
 export function sampleNight(window: NightWindow): Date[] {
   const STEP_MS = 15 * 60_000;

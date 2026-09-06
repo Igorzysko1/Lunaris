@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { findPlaceById } from '@/data/places';
-import { DEFAULT_OPTICS, clampOptics, type Mount, type Optics } from '@/lib/optics';
+import { DEFAULT_OPTICS, clampOptics, type Optics } from '@/lib/optics';
 
 /**
  * Klucz jest wersjonowany, więc zmiana kształtu stanu nie wywraca aplikacji po
@@ -12,8 +12,6 @@ const STORAGE_KEY = 'lunaris.settings';
 
 /** v2 dołożyła parametry optyki. Zapisy z v1 przechodzą przez migrację, nie przez reset. */
 const CURRENT_VERSION = 2;
-
-export { DEFAULT_OPTICS, type Optics };
 
 export type LeadTime = '1h' | '2h' | '6h' | '12h';
 
@@ -52,10 +50,6 @@ function readOptics(raw: unknown, fallback: Optics): Optics {
       ? stored.magnification
       : fallback.magnification,
     fieldOfView: isFiniteNumber(stored.fieldOfView) ? stored.fieldOfView : fallback.fieldOfView,
-    mount:
-      stored.mount === 'tripod' || stored.mount === 'handheld'
-        ? (stored.mount as Mount)
-        : fallback.mount,
   });
 }
 

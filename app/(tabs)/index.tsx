@@ -17,7 +17,7 @@ import { LightPollutionLink } from '@/components/LightPollutionLink';
 import { Card, SectionLabel } from '@/components/primitives';
 import { dayBucket, formatLongDate, formatTime } from '@/lib/date';
 import { upcomingEvents } from '@/lib/events';
-import { nightWindow } from '@/lib/night-window';
+import { currentNightWindow } from '@/lib/night-window';
 import { nightTargets } from '@/lib/sky-targets';
 import { useNightData } from '@/lib/use-night-data';
 import { useSettings } from '@/store/settings';
@@ -34,7 +34,8 @@ export default function NightScreen() {
   // Cele zależą od miejsca, jakości nieba i sprzętu — nie od prognozy, więc liczą
   // się lokalnie i nie czekają na Open-Meteo.
   const targets = useMemo(
-    () => nightTargets(nightWindow(new Date(), { lat, lon }), { lat, lon }, optics, active.bortle),
+    () =>
+      nightTargets(currentNightWindow(new Date(), { lat, lon }), { lat, lon }, optics, active.bortle),
     [lat, lon, optics, active.bortle],
   );
 
@@ -102,7 +103,6 @@ export default function NightScreen() {
               subtitle="Znajdź ciemniejsze miejsce w okolicy"
               style={styles.moonGap}
             />
-
 
             {nextEvent && (
               <>

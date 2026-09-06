@@ -114,22 +114,6 @@ export default function SettingsScreen() {
             onCommit={(fieldOfView) => updateOptics({ fieldOfView })}
           />
           <Divider />
-          <View style={styles.row}>
-            <Text style={styles.rowLabel}>Montaż</Text>
-            <View style={styles.mountPills}>
-              <Pill
-                label="Statyw"
-                active={optics.mount === 'tripod'}
-                onPress={() => updateOptics({ mount: 'tripod' })}
-              />
-              <Pill
-                label="Z ręki"
-                active={optics.mount === 'handheld'}
-                onPress={() => updateOptics({ mount: 'handheld' })}
-              />
-            </View>
-          </View>
-          <Divider />
           <View style={styles.subRow}>
             <Text style={styles.subLabel}>{describeOptics(optics)}</Text>
             <Text style={styles.subValue}>źrenica {exitPupil(optics).toFixed(1)} mm</Text>
@@ -337,10 +321,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.mono,
     fontSize: 13,
     color: colors.purple,
-  },
-  mountPills: {
-    flexDirection: 'row',
-    gap: 8,
   },
   numberField: {
     flexDirection: 'row',
