@@ -1,0 +1,181 @@
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+
+import { NumberRow } from '@/components/NumberRow';
+import { Card, Divider, SectionLabel } from '@/components/primitives';
+import { CONFIG_LIMITS } from '@/lib/config';
+import { useSettings } from '@/store/settings';
+import { colors, fonts } from '@/theme';
+
+/**
+ * Progi decydujące o werdykcie nocy. Osobny ekran, bo jest ich kilkanaście —
+ * w ustawieniach przykryłyby wszystko inne, a zagląda się tu rzadko: przy
+ * strojeniu po kilku tygodniach porównywania werdyktów z rzeczywistością.
+ */
+export default function ThresholdsScreen() {
+  const router = useRouter();
+  const { config, updateConfig } = useSettings();
+  const { conditions, calendar } = config;
+  const limits = CONFIG_LIMITS;
+
+  return (
+    <SafeAreaView style={styles.safe} edges={['top']}>
+      <View style={styles.header}>
+        <Pressable onPress={() => router.back()} accessibilityLabel="Wróć" style={styles.back}>
+          <Ionicons name="chevron-back" size={22} color={colors.textPrimary} />
+        </Pressable>
+        <Text style={styles.title}>Progi warunków</Text>
+      </View>
+
+      <ScrollView contentContainerStyle={styles.content}>
+        <SectionLabel style={styles.groupLabel}>Zachmurzenie</SectionLabel>
+        <Card variant="raised" style={styles.group}>
+          <NumberRow
+            label="Całkowite, maks."
+            unit="%"
+            value={conditions.maxCloudTotal}
+            limits={limits.conditions.maxCloudTotal}
+            onCommit={(maxCloudTotal) => updateConfig('conditions', { maxCloudTotal })}
+          />
+          <Divider />
+          <NumberRow
+            label="Niskie, maks."
+            unit="%"
+            value={conditions.maxCloudLow}
+            limits={limits.conditions.maxCloudLow}
+            onCommit={(maxCloudLow) => updateConfig('conditions', { maxCloudLow })}
+          />
+          <Divider />
+          <NumberRow
+            label="Wysokie, maks."
+            unit="%"
+            value={conditions.maxCloudHigh}
+            limits={limits.conditions.maxCloudHigh}
+            onCommit={(maxCloudHigh) => updateConfig('conditions', { maxCloudHigh })}
+          />
+          <Divider />
+          <Text style={styles.note}>
+            Chmury wysokie są tolerowane wyżej niż niskie — nie zasłaniają nieba całkiem, ale
+            zabierają kontrast.
+          </Text>
+        </Card>
+
+        <SectionLabel style={styles.groupLabel}>Noc</SectionLabel>
+        <Card variant="raised" style={styles.group}>
+          <NumberRow
+            label="Porywy wiatru, maks."
+            unit="km/h"
+            value={conditions.maxWindGustKmh}
+            limits={limits.conditions.maxWindGustKmh}
+            onCommit={(maxWindGustKmh) => updateConfig('conditions', { maxWindGustKmh })}
+          />
+          <Divider />
+          <NumberRow
+            label="Faza Księżyca, maks."
+            unit="%"
+            value={conditions.maxMoonIllumination}
+            limits={limits.conditions.maxMoonIllumination}
+            onCommit={(maxMoonIllumination) => updateConfig('conditions', { maxMoonIllumination })}
+          />
+          <Divider />
+          <NumberRow
+            label="Minimalne okno"
+            unit="min"
+            value={conditions.minWindowMinutes}
+            limits={limits.conditions.minWindowMinutes}
+            onCommit={(minWindowMinutes) => updateConfig('conditions', { minWindowMinutes })}
+          />
+          <Divider />
+          <NumberRow
+            label="Ostrzeżenie o rosie"
+            unit="°C"
+            value={conditions.dewWarningSpreadC}
+            limits={limits.conditions.dewWarningSpreadC}
+            onCommit={(dewWarningSpreadC) => updateConfig('conditions', { dewWarningSpreadC })}
+          />
+          <Divider />
+          <Text style={styles.note}>
+            Przy większej fazie Księżyca okno liczy się tylko dla celów księżycowych
+            i planetarnych. Ostrzeżenie o rosie to różnica temperatury i punktu rosy.
+          </Text>
+        </Card>
+
+        <SectionLabel style={styles.groupLabel}>Kalendarz następnego dnia</SectionLabel>
+        <Card variant="raised" style={styles.group}>
+          <NumberRow
+            label="Odrzuć przed godziną"
+            unit=":00"
+            value={calendar.rejectBeforeHour}
+            limits={limits.calendar.rejectBeforeHour}
+            onCommit={(rejectBeforeHour) => updateConfig('calendar', { rejectBeforeHour })}
+          />
+          <Divider />
+          <NumberRow
+            label="Tylko dom przed"
+            unit=":00"
+            value={calendar.homeOnlyBeforeHour}
+            limits={limits.calendar.homeOnlyBeforeHour}
+            onCommit={(homeOnlyBeforeHour) => updateConfig('calendar', { homeOnlyBeforeHour })}
+          />
+          <Divider />
+          <NumberRow
+            label="Warunki wybitne: chmury"
+            unit="%"
+            value={calendar.exceptionalMaxCloud}
+            limits={limits.calendar.exceptionalMaxCloud}
+            onCommit={(exceptionalMaxCloud) => updateConfig('calendar', { exceptionalMaxCloud })}
+          />
+          <Divider />
+          <Text style={styles.note}>
+            Wcześniejsze wydarzenie odrzuca sesję, chyba że noc jest wybitna: zachmurzenie poniżej
+            progu, Księżyc pod horyzontem i zjawisko niepowtarzalne w tym miesiącu.
+          </Text>
+        </Card>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  safe: {
+    flex: 1,
+    backgroundColor: colors.bg,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    paddingBottom: 12,
+  },
+  back: {
+    padding: 4,
+  },
+  title: {
+    fontFamily: fonts.sansMedium,
+    fontSize: 20,
+    color: colors.textPrimary,
+  },
+  content: {
+    paddingHorizontal: 16,
+    paddingBottom: 32,
+  },
+  groupLabel: {
+    marginBottom: 8,
+  },
+  group: {
+    padding: 0,
+    marginBottom: 20,
+  },
+  note: {
+    fontFamily: fonts.sans,
+    fontSize: 12,
+    lineHeight: 17,
+    color: colors.textMuted,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+});

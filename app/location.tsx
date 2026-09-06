@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { LightPollutionLink } from '@/components/LightPollutionLink';
@@ -23,7 +23,12 @@ type Ranked = { place: Place; distance: number };
 
 export default function LocationScreen() {
   const router = useRouter();
-  const { placeId, autoLocation, active, selectPlace, useGps } = useSettings();
+  // Ten sam ekran wybiera miejsce obserwacji i punkt startowy (dom). Różnią się
+  // tym, gdzie ląduje wynik i czy GPS ma sens: dom jest stały, więc go nie oferuje.
+  const { target } = useLocalSearchParams<{ target?: string }>();
+  const pickingHome = target === 'home';
+  const { placeId, autoLocation, active, selectPlace, config, updateConfig, useGps } =
+    useSettings();
   const [query, setQuery] = useState('');
   const [tab, setTab] = useState<PickerTab>('cities');
 
@@ -45,8 +50,11 @@ export default function LocationScreen() {
       .sort((a, b) => a.distance - b.distance);
   }, [tab, query, origin]);
 
+  const selectedId = pickingHome ? config.observer.homePlaceId : placeId;
+
   const choosePlace = (id: string) => {
-    selectPlace(id);
+    if (pickingHome) updateConfig('observer', { homePlaceId: id });
+    else selectPlace(id);
     router.back();
   };
 
@@ -61,7 +69,9 @@ export default function LocationScreen() {
         <Pressable onPress={() => router.back()} accessibilityLabel="Wróć">
           <Ionicons name="arrow-back" size={22} color={colors.textPrimary} />
         </Pressable>
-        <Text style={styles.title}>Wybierz lokalizację</Text>
+        <Text style={styles.title}>
+          {pickingHome ? 'Punkt startowy' : 'Wybierz lokalizację'}
+        </Text>
       </View>
 
       <View style={styles.searchWrapper}>
@@ -104,25 +114,27 @@ export default function LocationScreen() {
               style={styles.mapLink}
             />
 
-            <Pressable onPress={chooseGps} style={styles.gpsRow}>
-              <View style={styles.gpsLeft}>
-                <Ionicons name="navigate" size={18} color={colors.purple} />
-                <View>
-                  <Text style={styles.placeName}>Moja lokalizacja</Text>
-                  <Text style={styles.gpsDetail}>{gpsDetail(autoLocation, active)}</Text>
+            {!pickingHome && (
+              <Pressable onPress={chooseGps} style={styles.gpsRow}>
+                <View style={styles.gpsLeft}>
+                  <Ionicons name="navigate" size={18} color={colors.purple} />
+                  <View>
+                    <Text style={styles.placeName}>Moja lokalizacja</Text>
+                    <Text style={styles.gpsDetail}>{gpsDetail(autoLocation, active)}</Text>
+                  </View>
                 </View>
-              </View>
-              {autoLocation && active.source === 'gps' && (
-                <Ionicons name="checkmark" size={18} color={colors.purple} />
-              )}
-            </Pressable>
+                {autoLocation && active.source === 'gps' && (
+                  <Ionicons name="checkmark" size={18} color={colors.purple} />
+                )}
+              </Pressable>
+            )}
           </>
         }
         renderItem={({ item }) => (
           <PlaceRow
             place={item.place}
             distance={item.distance}
-            selected={!autoLocation && placeId === item.place.id}
+            selected={(pickingHome || !autoLocation) && selectedId === item.place.id}
             onPress={() => choosePlace(item.place.id)}
           />
         )}

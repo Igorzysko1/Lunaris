@@ -25,7 +25,7 @@ import { HAIRLINE, colors, fonts, radius } from '@/theme';
 
 export default function NightScreen() {
   const router = useRouter();
-  const { active, optics } = useSettings();
+  const { active, config } = useSettings();
   const { status, data, refresh, refreshing } = useNightData(active.coords, active.bortle);
 
   const { lat, lon } = active.coords;
@@ -35,8 +35,13 @@ export default function NightScreen() {
   // się lokalnie i nie czekają na Open-Meteo.
   const targets = useMemo(
     () =>
-      nightTargets(currentNightWindow(new Date(), { lat, lon }), { lat, lon }, optics, active.bortle),
-    [lat, lon, optics, active.bortle],
+      nightTargets(
+        currentNightWindow(new Date(), { lat, lon }),
+        { lat, lon },
+        config.optics,
+        active.bortle,
+      ),
+    [lat, lon, config.optics, active.bortle],
   );
 
   return (
@@ -73,7 +78,10 @@ export default function NightScreen() {
         {status === 'ready' && data && (
           <View>
             <View style={styles.gap}>
-              <NightRatingCard data={data} />
+              <NightRatingCard
+                data={data}
+                dewWarningSpreadC={config.conditions.dewWarningSpreadC}
+              />
             </View>
 
             <Card style={styles.gap}>

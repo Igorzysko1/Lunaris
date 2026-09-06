@@ -76,9 +76,13 @@ export function cloudBarColor(cloudPct: number): string {
 /**
  * Ryzyko osiadania rosy na optyce, wg różnicy temperatury i punktu rosy (°C).
  * Im ciaśniej temperatura zbliża się do punktu rosy, tym szybciej zaparuje sprzęt.
+ *
+ * Próg ostrzeżenia przychodzi z konfiguracji, a nie jest tu zaszyty — inaczej
+ * jego zmiana w ustawieniach rozjechałaby kolor z werdyktem silnika. Strefa
+ * pośrednia to dwa i pół raza próg: tyle zapasu, żeby zdążyć zareagować.
  */
-export function dewRiskColor(spreadC: number): string {
-  if (spreadC < 2) return colors.coral;
-  if (spreadC < 5) return colors.amber;
+export function dewRiskColor(spreadC: number, warnBelowC: number): string {
+  if (spreadC < warnBelowC) return colors.coral;
+  if (spreadC < warnBelowC * 2.5) return colors.amber;
   return colors.teal;
 }

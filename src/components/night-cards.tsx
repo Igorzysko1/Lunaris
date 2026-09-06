@@ -10,7 +10,14 @@ import type { SkyTarget } from '@/lib/sky-targets';
 import type { NightData } from '@/lib/use-night-data';
 import { HAIRLINE, colors, fonts, radius } from '@/theme';
 
-export function NightRatingCard({ data }: { data: NightData }) {
+export function NightRatingCard({
+  data,
+  dewWarningSpreadC,
+}: {
+  data: NightData;
+  /** Próg ostrzeżenia o rosie z konfiguracji — patrz src/lib/config.ts. */
+  dewWarningSpreadC: number;
+}) {
   const meta = ratingMeta(data.rating);
   const { forecast } = data;
   const enter = useRef(new Animated.Value(0)).current;
@@ -54,7 +61,7 @@ export function NightRatingCard({ data }: { data: NightData }) {
         <Metric
           label="Rosa"
           value={`${forecast.minDewSpread.toFixed(1)}°`}
-          color={dewRiskColor(forecast.minDewSpread)}
+          color={dewRiskColor(forecast.minDewSpread, dewWarningSpreadC)}
         />
         <Metric label="Opady" value={`${forecast.totalPrecipitation.toFixed(1)} mm`} />
       </View>

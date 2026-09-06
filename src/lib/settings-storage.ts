@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { findPlaceById } from '@/data/places';
-import { DEFAULT_OPTICS, clampOptics, type Optics } from '@/lib/optics';
+import { DEFAULT_CONFIG, mergeConfig, type LunarisConfig } from '@/lib/config';
 
 /**
  * Klucz jest wersjonowany, więc zmiana kształtu stanu nie wywraca aplikacji po
@@ -10,8 +10,15 @@ import { DEFAULT_OPTICS, clampOptics, type Optics } from '@/lib/optics';
  */
 const STORAGE_KEY = 'lunaris.settings';
 
-/** v2 dołożyła parametry optyki. Zapisy z v1 przechodzą przez migrację, nie przez reset. */
-const CURRENT_VERSION = 2;
+/**
+ * v2 dołożyła optykę, v3 przeniosła ją do pełnej konfiguracji użytkownika.
+ * Starsze zapisy przechodzą przez migrację, nie przez reset — wybór miejscowości
+ * ma przeżyć aktualizację aplikacji.
+ */
+const CURRENT_VERSION = 3;
+
+/** Wersje, z których umiemy odczytać dane. Wszystko inne to reset do domyślnych. */
+const READABLE_VERSIONS = [1, 2, 3];
 
 export type LeadTime = '1h' | '2h' | '6h' | '12h';
 
@@ -23,34 +30,14 @@ export type PersistedSettings = {
   autoLocation: boolean;
   notifications: boolean;
   leadTime: LeadTime;
-  /** Parametry sprzętu — liczby, nie nazwa modelu. Patrz src/lib/optics.ts. */
-  optics: Optics;
+  /** Konfiguracja obserwatora: profil, optyka, tryb sesji, progi. Patrz src/lib/config.ts. */
+  config: LunarisConfig;
 };
 
 type StoredEnvelope = { version: number } & Partial<PersistedSettings>;
 
 function isLeadTime(value: unknown): value is LeadTime {
   return typeof value === 'string' && (LEAD_TIMES as string[]).includes(value);
-}
-
-const isFiniteNumber = (value: unknown): value is number =>
-  typeof value === 'number' && Number.isFinite(value);
-
-/**
- * Optyka z zapisu. Każde pole osobno, bo zepsuta apertura nie ma powodu kasować
- * zapisanego montażu; wartości spoza fizycznego sensu przycinamy do zakresu.
- */
-function readOptics(raw: unknown, fallback: Optics): Optics {
-  if (typeof raw !== 'object' || raw === null) return fallback;
-  const stored = raw as Partial<Record<keyof Optics, unknown>>;
-
-  return clampOptics({
-    aperture: isFiniteNumber(stored.aperture) ? stored.aperture : fallback.aperture,
-    magnification: isFiniteNumber(stored.magnification)
-      ? stored.magnification
-      : fallback.magnification,
-    fieldOfView: isFiniteNumber(stored.fieldOfView) ? stored.fieldOfView : fallback.fieldOfView,
-  });
 }
 
 /**
@@ -60,11 +47,16 @@ function readOptics(raw: unknown, fallback: Optics): Optics {
 function migrate(raw: unknown, defaults: PersistedSettings): PersistedSettings {
   if (typeof raw !== 'object' || raw === null) return defaults;
 
-  const stored = raw as StoredEnvelope;
+  const stored = raw as StoredEnvelope & { optics?: unknown };
 
-  // v1 nie znała optyki, ale reszta pól ma ten sam kształt — wybór miejscowości
-  // i powiadomień zostaje, sprzęt dostaje wartości domyślne.
-  if (stored.version !== CURRENT_VERSION && stored.version !== 1) return defaults;
+  if (typeof stored.version !== 'number' || !READABLE_VERSIONS.includes(stored.version)) {
+    return defaults;
+  }
+
+  // v2 trzymała optykę na wierzchu koperty, a nie w konfiguracji. Przenosimy ją
+  // w nowe miejsce zamiast gubić — reszta konfiguracji dostaje wartości domyślne.
+  const configSource =
+    stored.config ?? (stored.optics !== undefined ? { optics: stored.optics } : undefined);
 
   return {
     // Baza miejscowości może się zmienić między wydaniami — id sprzed migracji
@@ -78,7 +70,7 @@ function migrate(raw: unknown, defaults: PersistedSettings): PersistedSettings {
     notifications:
       typeof stored.notifications === 'boolean' ? stored.notifications : defaults.notifications,
     leadTime: isLeadTime(stored.leadTime) ? stored.leadTime : defaults.leadTime,
-    optics: readOptics(stored.optics, defaults.optics),
+    config: mergeConfig(configSource),
   };
 }
 
