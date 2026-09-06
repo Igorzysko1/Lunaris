@@ -127,6 +127,11 @@ export function NightTargetsCard({ targets }: { targets: SkyTarget[] }) {
   const inReach = targets.filter((t) => t.visible);
   const outOfReach = targets.length - inReach.length;
 
+  // Przy jednym zestawie nie ma czego odróżniać — podpis sprzętu tylko
+  // zaśmiecałby listę.
+  const profiles = new Set(targets.map((t) => t.profileId));
+  const showProfile = profiles.size > 1;
+
   return (
     <Card>
       <SectionLabel style={styles.targetsLabel}>Cele na tę noc</SectionLabel>
@@ -137,12 +142,17 @@ export function NightTargetsCard({ targets }: { targets: SkyTarget[] }) {
         </Text>
       ) : (
         inReach.map((target, i) => (
-          <View key={target.id} style={[styles.targetRow, i > 0 && styles.targetRowGap]}>
+          <View
+            key={`${target.profileId}-${target.id}`}
+            style={[styles.targetRow, i > 0 && styles.targetRowGap]}
+          >
             <View style={styles.targetText}>
               <Text style={styles.targetName} numberOfLines={1}>
                 {target.name}
               </Text>
-              <Text style={styles.targetDetail}>{target.detail}</Text>
+              <Text style={styles.targetDetail}>
+                {showProfile ? `${target.profileLabel} · ${target.detail}` : target.detail}
+              </Text>
             </View>
             <View style={styles.alignRight}>
               <Text style={styles.targetAltitude}>{Math.round(target.maxAltitude)}°</Text>

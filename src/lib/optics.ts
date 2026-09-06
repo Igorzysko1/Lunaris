@@ -9,7 +9,10 @@
  * Importy względne (nie alias @/), żeby moduł dało się uruchomić poza Metro.
  */
 
-/** Sposób trzymania sprzętu — statyw pozwala wykorzystać większe powiększenia. */
+/**
+ * Sposób trzymania sprzętu. Wpływa na próg wiatru: ta sama lornetka na statywie
+ * i z ręki to dwa różne zestawy, bo z ręki drga już przy słabszych porywach.
+ */
 export type Mount = 'tripod' | 'handheld';
 
 export type Optics = {
@@ -19,14 +22,39 @@ export type Optics = {
   magnification: number;
   /** Rzeczywiste pole widzenia w stopniach. */
   fieldOfView: number;
+  mount: Mount;
 };
 
-/** Punkt wyjścia: lornetka 15x70. Wartość domyślna, nie założenie kodu. */
+/** Punkt wyjścia: lornetka 15x70 na statywie. Wartość domyślna, nie założenie kodu. */
 export const DEFAULT_OPTICS: Optics = {
   aperture: 70,
   magnification: 15,
   fieldOfView: 4.4,
+  mount: 'tripod',
 };
+
+/**
+ * Zestaw sprzętu: parametry plus etykieta dla użytkownika.
+ *
+ * `label` **nie wchodzi do żadnego rachunku** — nie jest parsowana i nie wnioskujemy
+ * z niej o sprzęcie. Służy wyłącznie temu, żeby odróżnić własne zestawy na liście;
+ * pusta jest dopuszczalna, bo UI podstawia wtedy opis z samych liczb.
+ */
+export type OpticsProfile = {
+  /** Stabilny identyfikator, generowany raz. Po nim wiążemy cele z zestawem. */
+  id: string;
+  label: string;
+  optics: Optics;
+};
+
+/** Identyfikator zestawu. Nie musi być kryptograficzny — ma tylko nie kolidować. */
+export function newProfileId(): string {
+  return `opt-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+export function defaultProfile(): OpticsProfile {
+  return { id: newProfileId(), label: 'Lornetka 15x70', optics: DEFAULT_OPTICS };
+}
 
 /** Granice, w których wartości mają sens fizyczny — poza nimi rachunek przestaje cokolwiek znaczyć. */
 export const OPTICS_LIMITS = {
@@ -57,6 +85,7 @@ export function clampOptics(optics: Optics): Optics {
       DEFAULT_OPTICS.magnification,
     ),
     fieldOfView: clamp(optics.fieldOfView, OPTICS_LIMITS.fieldOfView, DEFAULT_OPTICS.fieldOfView),
+    mount: optics.mount === 'handheld' ? 'handheld' : 'tripod',
   };
 }
 
@@ -138,7 +167,28 @@ export function minimumAngularSize(optics: Optics): number {
   return EYE_RESOLUTION_ARCMIN / optics.magnification;
 }
 
-/** np. „15x70" — do wyświetlenia w ustawieniach. */
+/** np. „15x70, statyw" — do wyświetlenia w ustawieniach. */
 export function describeOptics(optics: Optics): string {
-  return `${optics.magnification}x${optics.aperture}`;
+  const mount = optics.mount === 'tripod' ? 'statyw' : 'z ręki';
+  return `${optics.magnification}x${optics.aperture}, ${mount}`;
+}
+
+/** Etykieta zestawu; gdy użytkownik jej nie nadał, opisujemy sprzęt liczbami. */
+export function profileLabel(profile: OpticsProfile): string {
+  const label = profile.label.trim();
+  return label.length > 0 ? label : describeOptics(profile.optics);
+}
+
+/**
+ * Próg porywów wiatru dla danego montażu.
+ *
+ * Obie wartości pochodzą z konfiguracji — sprzęt z ręki drga przy słabszym
+ * wietrze niż ustawiony na statywie, ale o ile słabszym, decyduje użytkownik,
+ * a nie liczba zaszyta tutaj.
+ */
+export function windLimitKmh(
+  optics: Optics,
+  limits: { tripod: number; handheld: number },
+): number {
+  return optics.mount === 'tripod' ? limits.tripod : limits.handheld;
 }

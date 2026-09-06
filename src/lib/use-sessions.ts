@@ -3,7 +3,8 @@ import * as SunCalc from 'suncalc';
 
 import { findPlaceById, type Coords } from '@/data/places';
 import type { LunarisConfig } from '@/lib/config';
-import { nightTargets, type SkyTarget } from '@/lib/sky-targets';
+import { windLimitKmh } from '@/lib/optics';
+import { nightTargetsForProfiles, type SkyTarget } from '@/lib/sky-targets';
 import { evaluateNight, type NightVerdict } from '@/lib/session-engine';
 import { fetchUpcomingNights } from '@/lib/weather';
 
@@ -20,7 +21,7 @@ export type Session = {
   verdict: NightVerdict;
   /** Najniższa temperatura w oknie obserwacyjnym — do decyzji, jak się ubrać. */
   minTemperature: number | null;
-  /** Cele w zasięgu sprzętu z konfiguracji. Puste, gdy nocy nie ma. */
+  /** Cele w zasięgu któregokolwiek z zestawów. Puste, gdy nocy nie ma. */
   targets: SkyTarget[];
   /** Prognoza na tę dobę jest już orientacyjna. */
   uncertain: boolean;
@@ -77,6 +78,18 @@ export function useSessions(coords: Coords, bortle: number, config: LunarisConfi
               SunCalc.getMoonIllumination(night.from).fraction * 100,
             );
 
+            // Okno oceniamy najłagodniejszym progiem wiatru spośród zestawów —
+            // noc dobra dla sprzętu na statywie nie ma przepadać przez to, że
+            // w konfiguracji stoi obok niego lornetka trzymana z ręki.
+            const windLimit = Math.max(
+              ...config.opticsProfiles.map((p) =>
+                windLimitKmh(p.optics, {
+                  tripod: config.conditions.maxWindGustKmh,
+                  handheld: config.conditions.maxWindGustHandheldKmh,
+                }),
+              ),
+            );
+
             const verdict = evaluateNight({
               night,
               hours,
@@ -90,6 +103,7 @@ export function useSessions(coords: Coords, bortle: number, config: LunarisConfi
               // Kalendarz zjawisk nie jest jeszcze wpięty w silnik — dopóki nie jest,
               // żadna noc nie łamie reguły wczesnego poranka.
               uniquePhenomenon: false,
+              windLimitKmh: windLimit,
               config,
             });
 
@@ -103,7 +117,9 @@ export function useSessions(coords: Coords, bortle: number, config: LunarisConfi
               minTemperature: inWindow.length
                 ? Math.min(...inWindow.map((h) => h.temperature))
                 : null,
-              targets: window ? nightTargets(window, target, config.optics, bortle) : [],
+              targets: window
+                ? nightTargetsForProfiles(window, target, config.opticsProfiles, bortle)
+                : [],
               uncertain: index >= UNCERTAIN_FROM_INDEX,
             };
           }),

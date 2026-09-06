@@ -14,6 +14,7 @@ import {
   type Coords,
 } from '@/data/places';
 import { DEFAULT_CONFIG, clampConfig, type LunarisConfig } from '@/lib/config';
+import { defaultProfile, type OpticsProfile } from '@/lib/optics';
 import {
   LEAD_TIMES,
   loadSettings,
@@ -62,6 +63,15 @@ type Settings = {
     section: K,
     patch: Partial<LunarisConfig[K]>,
   ) => void;
+  /** Dodaje zestaw sprzętu na koniec listy. */
+  addOpticsProfile: () => void;
+  /** Zmienia nazwę albo wybrane parametry jednego zestawu. */
+  updateOpticsProfile: (
+    id: string,
+    patch: { label?: string; optics?: Partial<OpticsProfile['optics']> },
+  ) => void;
+  /** Usuwa zestaw. Ostatniego nie da się usunąć — lista nie może być pusta. */
+  removeOpticsProfile: (id: string) => void;
   retryGps: () => void;
 };
 
@@ -155,6 +165,37 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
           ...s,
           config: clampConfig({ ...s.config, [section]: { ...s.config[section], ...patch } }),
         })),
+      addOpticsProfile: () =>
+        setPersisted((s) => ({
+          ...s,
+          config: clampConfig({
+            ...s.config,
+            opticsProfiles: [...s.config.opticsProfiles, { ...defaultProfile(), label: '' }],
+          }),
+        })),
+      updateOpticsProfile: (id, patch) =>
+        setPersisted((s) => ({
+          ...s,
+          config: clampConfig({
+            ...s.config,
+            opticsProfiles: s.config.opticsProfiles.map((p) =>
+              p.id === id ? { ...p, ...patch, optics: { ...p.optics, ...patch.optics } } : p,
+            ),
+          }),
+        })),
+      removeOpticsProfile: (id) =>
+        setPersisted((s) => {
+          // clampConfig przywróciłby zestaw domyślny, ale użytkownik straciłby swój —
+          // dlatego ostatniego po prostu nie usuwamy.
+          if (s.config.opticsProfiles.length <= 1) return s;
+          return {
+            ...s,
+            config: clampConfig({
+              ...s.config,
+              opticsProfiles: s.config.opticsProfiles.filter((p) => p.id !== id),
+            }),
+          };
+        }),
       retryGps: device.retry,
     }),
     [placeId, autoLocation, notifications, leadTime, config, hydrated, active, device.retry],

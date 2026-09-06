@@ -1,5 +1,5 @@
 import { Link } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -8,7 +8,13 @@ import { findPlaceById } from '@/data/places';
 import { Card, Divider, Pill, SectionLabel } from '@/components/primitives';
 import { Toggle } from '@/components/Toggle';
 import { CONFIG_LIMITS } from '@/lib/config';
-import { OPTICS_LIMITS, describeOptics, exitPupil } from '@/lib/optics';
+import {
+  OPTICS_LIMITS,
+  describeOptics,
+  exitPupil,
+  type Optics,
+  type OpticsProfile,
+} from '@/lib/optics';
 import { LEAD_TIMES, useSettings } from '@/store/settings';
 import { HAIRLINE, colors, fonts, radius } from '@/theme';
 
@@ -24,6 +30,9 @@ export default function SettingsScreen() {
     setLeadTime,
     config,
     updateConfig,
+    addOpticsProfile,
+    updateOpticsProfile,
+    removeOpticsProfile,
     retryGps,
   } = useSettings();
 
@@ -93,36 +102,19 @@ export default function SettingsScreen() {
         </Card>
 
         <SectionLabel style={styles.groupLabel}>Sprzęt</SectionLabel>
-        <Card variant="raised" style={styles.group}>
-          <NumberRow
-            label="Apertura"
-            unit="mm"
-            value={config.optics.aperture}
-            limits={OPTICS_LIMITS.aperture}
-            onCommit={(aperture) => updateConfig('optics', { aperture })}
+        {config.opticsProfiles.map((profile) => (
+          <OpticsProfileCard
+            key={profile.id}
+            profile={profile}
+            canRemove={config.opticsProfiles.length > 1}
+            onChange={(patch) => updateOpticsProfile(profile.id, patch)}
+            onRemove={() => removeOpticsProfile(profile.id)}
           />
-          <Divider />
-          <NumberRow
-            label="Powiększenie"
-            unit="x"
-            value={config.optics.magnification}
-            limits={OPTICS_LIMITS.magnification}
-            onCommit={(magnification) => updateConfig('optics', { magnification })}
-          />
-          <Divider />
-          <NumberRow
-            label="Pole widzenia"
-            unit="°"
-            value={config.optics.fieldOfView}
-            limits={OPTICS_LIMITS.fieldOfView}
-            onCommit={(fieldOfView) => updateConfig('optics', { fieldOfView })}
-          />
-          <Divider />
-          <View style={styles.subRow}>
-            <Text style={styles.subLabel}>{describeOptics(config.optics)}</Text>
-            <Text style={styles.subValue}>źrenica {exitPupil(config.optics).toFixed(1)} mm</Text>
-          </View>
-        </Card>
+        ))}
+        <Pressable onPress={addOpticsProfile} style={styles.addProfile}>
+          <Ionicons name="add" size={17} color={colors.purple} />
+          <Text style={styles.link}>Dodaj zestaw</Text>
+        </Pressable>
 
         <SectionLabel style={styles.groupLabel}>Profil obserwatora</SectionLabel>
         <Card variant="raised" style={styles.group}>
@@ -269,6 +261,87 @@ export default function SettingsScreen() {
   );
 }
 
+/**
+ * Jeden zestaw sprzętu. Nazwa jest wyłącznie etykietą — nie wchodzi do żadnego
+ * rachunku, więc pusta jest w porządku: pod spodem i tak widnieje opis z liczb.
+ */
+function OpticsProfileCard({
+  profile,
+  canRemove,
+  onChange,
+  onRemove,
+}: {
+  profile: OpticsProfile;
+  canRemove: boolean;
+  onChange: (patch: { label?: string; optics?: Partial<Optics> }) => void;
+  onRemove: () => void;
+}) {
+  return (
+    <Card variant="raised" style={styles.group}>
+      <View style={styles.profileHeader}>
+        <TextInput
+          value={profile.label}
+          onChangeText={(label) => onChange({ label })}
+          placeholder="Nazwa zestawu"
+          placeholderTextColor={colors.textMuted}
+          style={styles.profileName}
+          accessibilityLabel="Nazwa zestawu"
+        />
+        {canRemove && (
+          <Pressable onPress={onRemove} accessibilityLabel="Usuń zestaw" style={styles.remove}>
+            <Ionicons name="trash-outline" size={17} color={colors.textMuted} />
+          </Pressable>
+        )}
+      </View>
+      <Divider />
+      <NumberRow
+        label="Apertura"
+        unit="mm"
+        value={profile.optics.aperture}
+        limits={OPTICS_LIMITS.aperture}
+        onCommit={(aperture) => onChange({ optics: { aperture } })}
+      />
+      <Divider />
+      <NumberRow
+        label="Powiększenie"
+        unit="x"
+        value={profile.optics.magnification}
+        limits={OPTICS_LIMITS.magnification}
+        onCommit={(magnification) => onChange({ optics: { magnification } })}
+      />
+      <Divider />
+      <NumberRow
+        label="Pole widzenia"
+        unit="°"
+        value={profile.optics.fieldOfView}
+        limits={OPTICS_LIMITS.fieldOfView}
+        onCommit={(fieldOfView) => onChange({ optics: { fieldOfView } })}
+      />
+      <Divider />
+      <View style={styles.row}>
+        <Text style={styles.rowLabel}>Montaż</Text>
+        <View style={styles.mountPills}>
+          <Pill
+            label="Statyw"
+            active={profile.optics.mount === 'tripod'}
+            onPress={() => onChange({ optics: { mount: 'tripod' } })}
+          />
+          <Pill
+            label="Z ręki"
+            active={profile.optics.mount === 'handheld'}
+            onPress={() => onChange({ optics: { mount: 'handheld' } })}
+          />
+        </View>
+      </View>
+      <Divider />
+      <View style={styles.subRow}>
+        <Text style={styles.subLabel}>{describeOptics(profile.optics)}</Text>
+        <Text style={styles.subValue}>źrenica {exitPupil(profile.optics).toFixed(1)} mm</Text>
+      </View>
+    </Card>
+  );
+}
+
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
@@ -302,6 +375,34 @@ const styles = StyleSheet.create({
     fontFamily: fonts.sans,
     fontSize: 15,
     color: colors.textPrimary,
+  },
+  profileHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingLeft: 14,
+    paddingRight: 6,
+  },
+  profileName: {
+    flex: 1,
+    paddingVertical: 12,
+    fontFamily: fonts.sansMedium,
+    fontSize: 15,
+    color: colors.textPrimary,
+  },
+  remove: {
+    padding: 8,
+  },
+  addProfile: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    marginBottom: 20,
+  },
+  mountPills: {
+    flexDirection: 'row',
+    gap: 8,
   },
   rowText: {
     flex: 1,

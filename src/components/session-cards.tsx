@@ -78,6 +78,8 @@ function describeWarning(warning: Warning): string {
       return `Dojście od parkingu zajmuje ${Math.round(warning.walkMinutes)} min.`;
     case 'tight-sleep':
       return `Sen na styk: ${warning.sleepHours.toFixed(1)} h. Możesz odpuścić.`;
+    case 'handheld-wind':
+      return `Porywy do ${Math.round(warning.maxGustKmh)} km/h — dla sprzętu z ręki (próg ${warning.handheldLimitKmh} km/h) noc będzie trudna.`;
   }
 }
 
@@ -94,6 +96,8 @@ export function SessionCard({
   const { window, plan } = verdict;
   const go = verdict.status === 'go';
   const inReach = targets.filter((t) => t.visible);
+  // Podpis sprzętu ma sens dopiero wtedy, gdy zestawów jest więcej niż jeden.
+  const showProfile = new Set(targets.map((t) => t.profileId)).size > 1;
 
   return (
     <Card style={styles.card}>
@@ -145,7 +149,10 @@ export function SessionCard({
               <Text style={styles.targets}>
                 {inReach
                   .slice(0, 4)
-                  .map((t) => `${t.name.split(' — ')[0]} (${Math.round(t.maxAltitude)}°)`)
+                  .map((t) => {
+                    const name = `${t.name.split(' — ')[0]} (${Math.round(t.maxAltitude)}°)`;
+                    return showProfile ? `${name} — ${t.profileLabel}` : name;
+                  })
                   .join(' · ')}
               </Text>
             </>

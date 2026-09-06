@@ -38,7 +38,9 @@ export type Warning =
   | { kind: 'moon'; illumination: number }
   | { kind: 'home-only'; firstEventAt: Date }
   | { kind: 'walk-too-long'; walkMinutes: number }
-  | { kind: 'tight-sleep'; sleepHours: number };
+  | { kind: 'tight-sleep'; sleepHours: number }
+  /** Wiatr mieści się w progu dla statywu, ale nie dla sprzętu trzymanego z ręki. */
+  | { kind: 'handheld-wind'; maxGustKmh: number; handheldLimitKmh: number };
 
 /** Ciągły blok godzin spełniających kryteria. */
 export type ObservingWindow = {
@@ -93,6 +95,11 @@ export type NightInput = {
    * bez tego każda czysta bezksiężycowa noc łamałaby regułę wczesnego poranka.
    */
   uniquePhenomenon: boolean;
+  /**
+   * Próg porywów wiatru dla tej nocy. Zależy od montażu, a ten jest per zestaw,
+   * więc rozstrzygnięcie zapada wyżej — silnik dostaje jedną gotową liczbę.
+   */
+  windLimitKmh: number;
   config: LunarisConfig;
 };
 
@@ -107,7 +114,7 @@ export type NightInput = {
  * Odejmowanie jest przybliżeniem — piętra potrafią się nakładać — ale to jedyne,
  * co da się zrobić na danych, które podają każde piętro osobno.
  */
-function blockerFor(hour: NightHour, config: LunarisConfig): Blocker | null {
+function blockerFor(hour: NightHour, config: LunarisConfig, windLimit: number): Blocker | null {
   const { conditions } = config;
   const cloudBelowHigh = Math.max(0, hour.cloud - hour.cloudHigh);
 
@@ -115,7 +122,7 @@ function blockerFor(hour: NightHour, config: LunarisConfig): Blocker | null {
   if (hour.cloudLow > conditions.maxCloudLow) return 'cloud-low';
   if (hour.cloudHigh > conditions.maxCloudHigh) return 'cloud-high';
   if (cloudBelowHigh > conditions.maxCloudTotal) return 'cloud-total';
-  if (hour.windGust >= conditions.maxWindGustKmh) return 'wind';
+  if (hour.windGust >= windLimit) return 'wind';
   return null;
 }
 
@@ -130,6 +137,7 @@ function longestBlock(
   hours: NightHour[],
   night: NightWindow,
   config: LunarisConfig,
+  windLimit: number,
 ): { window: ObservingWindow | null; longestMinutes: number; blocker: Blocker | null } {
   const inNight = hours
     .filter((h) => h.at >= night.from && h.at <= night.to)
@@ -144,7 +152,7 @@ function longestBlock(
   const blockers = new Map<Blocker, number>();
 
   for (const hour of inNight) {
-    const blocker = blockerFor(hour, config);
+    const blocker = blockerFor(hour, config, windLimit);
 
     if (blocker) {
       blockers.set(blocker, (blockers.get(blocker) ?? 0) + 1);
@@ -237,7 +245,12 @@ export function evaluateNight(input: NightInput): NightVerdict {
     return { ...base, status: 'no-go', rejection: { kind: 'no-forecast' } };
   }
 
-  const { window, longestMinutes, blocker } = longestBlock(hours, night, config);
+  const { window, longestMinutes, blocker } = longestBlock(
+    hours,
+    night,
+    config,
+    input.windLimitKmh,
+  );
 
   if (!window) {
     if (longestMinutes < 0) {
@@ -261,6 +274,20 @@ export function evaluateNight(input: NightInput): NightVerdict {
   const moonTooBright = input.moon.illumination > config.conditions.maxMoonIllumination;
   const moonLimited = moonUpAll && moonTooBright;
   if (moonLimited) warnings.push({ kind: 'moon', illumination: input.moon.illumination });
+
+  // Okno liczone jest najłagodniejszym progiem; jeśli któryś zestaw jedzie z ręki,
+  // trzeba powiedzieć wprost, że dla niego ta noc jest gorsza.
+  const maxGust = Math.max(...inWindow.map((h) => h.windGust));
+  if (
+    input.windLimitKmh > config.conditions.maxWindGustHandheldKmh &&
+    maxGust >= config.conditions.maxWindGustHandheldKmh
+  ) {
+    warnings.push({
+      kind: 'handheld-wind',
+      maxGustKmh: maxGust,
+      handheldLimitKmh: config.conditions.maxWindGustHandheldKmh,
+    });
+  }
 
   const minSpread = Math.min(...inWindow.map((h) => h.dewSpread));
   if (minSpread < config.conditions.dewWarningSpreadC) {

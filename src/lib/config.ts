@@ -13,7 +13,13 @@
  * Importy względne (nie alias @/), żeby moduł dało się uruchomić poza Metro.
  */
 
-import { DEFAULT_OPTICS, clampOptics, type Optics } from './optics.ts';
+import {
+  DEFAULT_OPTICS,
+  clampOptics,
+  defaultProfile,
+  newProfileId,
+  type OpticsProfile,
+} from './optics.ts';
 
 /** Parametry obserwatora niezależne od pogody i sprzętu. */
 export type ObserverProfile = {
@@ -53,7 +59,10 @@ export type ConditionThresholds = {
   maxCloudLow: number;
   /** Chmury wysokie są tolerowane wyżej, ale kosztem kontrastu. */
   maxCloudHigh: number;
+  /** Porywy wiatru dla sprzętu na statywie. */
   maxWindGustKmh: number;
+  /** Porywy wiatru dla sprzętu trzymanego z ręki — drga wcześniej. */
+  maxWindGustHandheldKmh: number;
   /** Powyżej tej fazy okno liczy się tylko dla celów księżycowych i planetarnych. */
   maxMoonIllumination: number;
   minWindowMinutes: number;
@@ -84,7 +93,11 @@ export type CalendarThresholds = {
 
 export type LunarisConfig = {
   observer: ObserverProfile;
-  optics: Optics;
+  /**
+   * Zestawy sprzętu. Lista nigdy nie jest pusta — po skasowaniu ostatniego wraca
+   * zestaw domyślny, bo bez żadnego sprzętu dobór celów nie ma czego liczyć.
+   */
+  opticsProfiles: OpticsProfile[];
   session: SessionMode;
   conditions: ConditionThresholds;
   calendar: CalendarThresholds;
@@ -99,7 +112,7 @@ export const DEFAULT_CONFIG: LunarisConfig = {
     packUpMin: 15,
     averageSpeedKmh: 50,
   },
-  optics: DEFAULT_OPTICS,
+  opticsProfiles: [{ id: 'default', label: 'Lornetka 15x70', optics: DEFAULT_OPTICS }],
   session: {
     overnight: false,
     minDurationHours: 3,
@@ -110,6 +123,7 @@ export const DEFAULT_CONFIG: LunarisConfig = {
     maxCloudLow: 10,
     maxCloudHigh: 40,
     maxWindGustKmh: 25,
+    maxWindGustHandheldKmh: 15,
     maxMoonIllumination: 30,
     minWindowMinutes: 90,
     dewWarningSpreadC: 2,
@@ -147,6 +161,7 @@ export const CONFIG_LIMITS = {
     maxCloudLow: { min: 0, max: 100 },
     maxCloudHigh: { min: 0, max: 100 },
     maxWindGustKmh: { min: 0, max: 120 },
+    maxWindGustHandheldKmh: { min: 0, max: 120 },
     maxMoonIllumination: { min: 0, max: 100 },
     minWindowMinutes: { min: 15, max: 600 },
     dewWarningSpreadC: { min: 0, max: 15 },
@@ -158,6 +173,23 @@ export const CONFIG_LIMITS = {
     assumedFirstEventHour: { min: 0, max: 23 },
   },
 } as const;
+
+/**
+ * Każdy zestaw z osobna: liczby przycięte do zakresu, wpis, który nie jest
+ * obiektem — pominięty. Pusta lista po walidacji wraca do zestawu domyślnego,
+ * bo dobór celów musi mieć czym liczyć.
+ */
+function clampProfiles(profiles: OpticsProfile[]): OpticsProfile[] {
+  const valid = (Array.isArray(profiles) ? profiles : [])
+    .filter((p): p is OpticsProfile => typeof p === 'object' && p !== null)
+    .map((p) => ({
+      id: typeof p.id === 'string' && p.id.length > 0 ? p.id : newProfileId(),
+      label: typeof p.label === 'string' ? p.label : '',
+      optics: clampOptics({ ...DEFAULT_OPTICS, ...(p.optics ?? {}) }),
+    }));
+
+  return valid.length > 0 ? valid : [defaultProfile()];
+}
 
 /** Wartość spoza zakresu wraca do granicy, a niebędąca liczbą — do domyślnej. */
 function clampNumber(value: number, range: Range, fallback: number): number {
@@ -241,7 +273,7 @@ export function clampConfig(config: LunarisConfig): LunarisConfig {
         d.observer.averageSpeedKmh,
       ),
     },
-    optics: clampOptics(config.optics),
+    opticsProfiles: clampProfiles(config.opticsProfiles),
     session: {
       ...session,
       // Minimum dłuższe od maksimum dałoby okno, którego nie da się spełnić.
@@ -267,6 +299,11 @@ export function clampConfig(config: LunarisConfig): LunarisConfig {
         config.conditions.maxWindGustKmh,
         l.conditions.maxWindGustKmh,
         d.conditions.maxWindGustKmh,
+      ),
+      maxWindGustHandheldKmh: clampNumber(
+        config.conditions.maxWindGustHandheldKmh,
+        l.conditions.maxWindGustHandheldKmh,
+        d.conditions.maxWindGustHandheldKmh,
       ),
       maxMoonIllumination: clampNumber(
         config.conditions.maxMoonIllumination,
@@ -296,15 +333,23 @@ export function clampConfig(config: LunarisConfig): LunarisConfig {
 export function mergeConfig(stored: unknown): LunarisConfig {
   if (typeof stored !== 'object' || stored === null) return DEFAULT_CONFIG;
 
-  const raw = stored as Partial<Record<keyof LunarisConfig, object>>;
+  const raw = stored as Partial<Record<keyof LunarisConfig, object>> & { optics?: object };
   const section = <K extends keyof LunarisConfig>(key: K): LunarisConfig[K] =>
     typeof raw[key] === 'object' && raw[key] !== null
       ? ({ ...DEFAULT_CONFIG[key], ...raw[key] } as LunarisConfig[K])
       : DEFAULT_CONFIG[key];
 
+  // Zapisy sprzed wielu zestawów trzymały jedną optykę — staje się pierwszym
+  // profilem zamiast przepaść.
+  const profiles: OpticsProfile[] = Array.isArray(raw.opticsProfiles)
+    ? (raw.opticsProfiles as OpticsProfile[])
+    : raw.optics
+      ? [{ id: newProfileId(), label: '', optics: raw.optics as OpticsProfile['optics'] }]
+      : DEFAULT_CONFIG.opticsProfiles;
+
   return clampConfig({
     observer: section('observer'),
-    optics: section('optics'),
+    opticsProfiles: profiles,
     session: section('session'),
     conditions: section('conditions'),
     calendar: section('calendar'),

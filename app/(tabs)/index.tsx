@@ -19,7 +19,7 @@ import { Card, SectionLabel } from '@/components/primitives';
 import { dayBucket, formatLongDate, formatTime } from '@/lib/date';
 import { upcomingEvents } from '@/lib/events';
 import { currentNightWindow } from '@/lib/night-window';
-import { nightTargets } from '@/lib/sky-targets';
+import { nightTargetsForProfiles } from '@/lib/sky-targets';
 import { useSessions } from '@/lib/use-sessions';
 import { useNightData } from '@/lib/use-night-data';
 import { useSettings } from '@/store/settings';
@@ -38,13 +38,13 @@ export default function NightScreen() {
   // się lokalnie i nie czekają na Open-Meteo.
   const targets = useMemo(
     () =>
-      nightTargets(
+      nightTargetsForProfiles(
         currentNightWindow(new Date(), { lat, lon }),
         { lat, lon },
-        config.optics,
+        config.opticsProfiles,
         active.bortle,
       ),
-    [lat, lon, config.optics, active.bortle],
+    [lat, lon, config.opticsProfiles, active.bortle],
   );
 
   return (
