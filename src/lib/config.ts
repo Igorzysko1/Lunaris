@@ -69,6 +69,17 @@ export type CalendarThresholds = {
   homeOnlyBeforeHour: number;
   /** Zachmurzenie, przy którym noc jest na tyle wyjątkowa, że łamie regułę godzin. */
   exceptionalMaxCloud: number;
+  /**
+   * Zakładana godzina pierwszego obowiązku w dzień roboczy.
+   *
+   * Rozwiązanie zastępcze do czasu integracji z prawdziwym kalendarzem: bez
+   * jakiegokolwiek założenia logika snu w ogóle się nie uruchamia, a to ona
+   * decyduje o większości werdyktów. Po podpięciu kalendarza ta wartość zostaje
+   * awaryjna, na dni bez wpisów.
+   */
+  assumedFirstEventHour: number;
+  /** Czy sobota i niedziela liczą się jako dni wolne. */
+  weekendDaysOff: boolean;
 };
 
 export type LunarisConfig = {
@@ -107,6 +118,8 @@ export const DEFAULT_CONFIG: LunarisConfig = {
     rejectBeforeHour: 8,
     homeOnlyBeforeHour: 10,
     exceptionalMaxCloud: 10,
+    assumedFirstEventHour: 8,
+    weekendDaysOff: true,
   },
 };
 
@@ -142,6 +155,7 @@ export const CONFIG_LIMITS = {
     rejectBeforeHour: { min: 0, max: 23 },
     homeOnlyBeforeHour: { min: 0, max: 23 },
     exceptionalMaxCloud: { min: 0, max: 100 },
+    assumedFirstEventHour: { min: 0, max: 23 },
   },
 } as const;
 
@@ -193,6 +207,12 @@ export function clampConfig(config: LunarisConfig): LunarisConfig {
       l.calendar.exceptionalMaxCloud,
       d.calendar.exceptionalMaxCloud,
     ),
+    assumedFirstEventHour: clampNumber(
+      config.calendar.assumedFirstEventHour,
+      l.calendar.assumedFirstEventHour,
+      d.calendar.assumedFirstEventHour,
+    ),
+    weekendDaysOff: config.calendar.weekendDaysOff !== false,
   };
 
   return {

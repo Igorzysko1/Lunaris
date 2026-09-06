@@ -22,7 +22,7 @@ const MINUTE_MS = 60_000;
 const HOUR_MS = 3_600_000;
 
 /** Dlaczego dana godzina nie nadaje się na obserwację. */
-export type Blocker = 'cloud-total' | 'cloud-low' | 'wind' | 'precipitation';
+export type Blocker = 'cloud-total' | 'cloud-low' | 'cloud-high' | 'wind' | 'precipitation';
 
 /** Dlaczego cała noc odpada. */
 export type Rejection =
@@ -96,13 +96,25 @@ export type NightInput = {
   config: LunarisConfig;
 };
 
-/** Pierwszy próg, którego godzina nie spełnia. Kolejność od najcięższego powodu. */
+/**
+ * Pierwszy próg, którego godzina nie spełnia. Kolejność od najcięższego powodu.
+ *
+ * Chmury wysokie mają własny, łagodniejszy próg, więc próg całkowity stosujemy
+ * do zachmurzenia **po ich odjęciu**. Inaczej tolerancja dla cirrusów byłaby
+ * martwa: 40% wysokich i tak przepadłoby na progu 25% całkowitych, mimo że przez
+ * cirrusy widać gwiazdy, a przez stratusy nie.
+ *
+ * Odejmowanie jest przybliżeniem — piętra potrafią się nakładać — ale to jedyne,
+ * co da się zrobić na danych, które podają każde piętro osobno.
+ */
 function blockerFor(hour: NightHour, config: LunarisConfig): Blocker | null {
   const { conditions } = config;
+  const cloudBelowHigh = Math.max(0, hour.cloud - hour.cloudHigh);
 
   if (hour.precipitation > 0) return 'precipitation';
   if (hour.cloudLow > conditions.maxCloudLow) return 'cloud-low';
-  if (hour.cloud > conditions.maxCloudTotal) return 'cloud-total';
+  if (hour.cloudHigh > conditions.maxCloudHigh) return 'cloud-high';
+  if (cloudBelowHigh > conditions.maxCloudTotal) return 'cloud-total';
   if (hour.windGust >= conditions.maxWindGustKmh) return 'wind';
   return null;
 }
@@ -255,8 +267,10 @@ export function evaluateNight(input: NightInput): NightVerdict {
     warnings.push({ kind: 'dew', minSpreadC: minSpread });
   }
 
+  // Ostrzegamy dopiero w paśmie, w którym tolerancja wysokich faktycznie działa:
+  // powyżej progu całkowitego, ale wciąż w granicach progu dla cirrusów.
   const maxHigh = Math.max(...inWindow.map((h) => h.cloudHigh));
-  if (maxHigh > 0 && maxHigh <= config.conditions.maxCloudHigh) {
+  if (maxHigh > config.conditions.maxCloudTotal && maxHigh <= config.conditions.maxCloudHigh) {
     warnings.push({ kind: 'high-clouds', maxPercent: maxHigh });
   }
 

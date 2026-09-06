@@ -14,11 +14,13 @@ import {
   NightTargetsCard,
 } from '@/components/night-cards';
 import { LightPollutionLink } from '@/components/LightPollutionLink';
+import { SessionCard, SessionsSkeleton } from '@/components/session-cards';
 import { Card, SectionLabel } from '@/components/primitives';
 import { dayBucket, formatLongDate, formatTime } from '@/lib/date';
 import { upcomingEvents } from '@/lib/events';
 import { currentNightWindow } from '@/lib/night-window';
 import { nightTargets } from '@/lib/sky-targets';
+import { useSessions } from '@/lib/use-sessions';
 import { useNightData } from '@/lib/use-night-data';
 import { useSettings } from '@/store/settings';
 import { HAIRLINE, colors, fonts, radius } from '@/theme';
@@ -27,6 +29,7 @@ export default function NightScreen() {
   const router = useRouter();
   const { active, config } = useSettings();
   const { status, data, refresh, refreshing } = useNightData(active.coords, active.bortle);
+  const sessions = useSessions(active.coords, active.bortle, config);
 
   const { lat, lon } = active.coords;
   const nextEvent = useMemo(() => upcomingEvents(new Date(), { lat, lon })[0] ?? null, [lat, lon]);
@@ -114,7 +117,28 @@ export default function NightScreen() {
 
             {nextEvent && (
               <>
-                <SectionLabel style={styles.eventLabel}>Następny event</SectionLabel>
+                <SectionLabel style={styles.sessionsLabel}>Nadchodzące sesje</SectionLabel>
+            {sessions.status === 'loading' && <SessionsSkeleton />}
+            {sessions.status === 'error' && (
+              <Card style={styles.gap}>
+                <View style={styles.chartError}>
+                  <Text style={styles.errorText}>Nie udało się pobrać prognozy na kolejne noce.</Text>
+                  <Pressable onPress={sessions.refresh}>
+                    <Text style={styles.retry}>Spróbuj ponownie</Text>
+                  </Pressable>
+                </View>
+              </Card>
+            )}
+            {sessions.status === 'ready' &&
+              sessions.sessions.map((session) => (
+                <SessionCard
+                  key={session.verdict.night.from.toISOString()}
+                  session={session}
+                  locationLabel={active.label}
+                />
+              ))}
+
+            <SectionLabel style={styles.eventLabel}>Następny event</SectionLabel>
                 <EventCard
                   event={nextEvent}
                   timeLabel={`${dayBucket(nextEvent.at)} · ${formatTime(nextEvent.at)}`}
@@ -230,6 +254,10 @@ const styles = StyleSheet.create({
     textDecorationLine: 'underline',
   },
   eventLabel: {
+    marginBottom: 8,
+  },
+  sessionsLabel: {
+    marginTop: 4,
     marginBottom: 8,
   },
 });

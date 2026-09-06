@@ -6,6 +6,9 @@
  * zachód Słońca przesuwa się przez rok o godziny.
  */
 
+import type { Coords } from '../data/places.ts';
+import { nightWindow, type NightWindow } from './night-window.ts';
+
 const API = 'https://api.open-meteo.com/v1/forecast';
 
 /** Pojedyncza godzina wewnątrz okna nocy. */
@@ -58,7 +61,7 @@ type ApiResponse = {
 };
 
 /** Okno obserwacyjne: zachód Słońca → najbliższy wschód. */
-function nightWindow(daily: ApiResponse['daily'], now: Date) {
+function sunWindow(daily: ApiResponse['daily'], now: Date) {
   // daily = [wczoraj, dziś, jutro] — patrz past_days/forecast_days niżej.
   // Przed świtem trwa jeszcze noc, która zaczęła się wczoraj.
   const beforeSunrise = now < new Date(daily.sunrise[1]);
@@ -69,6 +72,31 @@ function nightWindow(daily: ApiResponse['daily'], now: Date) {
 
 const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
 
+const HOURLY_FIELDS = [
+  'cloud_cover',
+  'cloud_cover_low',
+  'cloud_cover_high',
+  'relative_humidity_2m',
+  'temperature_2m',
+  'dew_point_2m',
+  'precipitation',
+  'wind_gusts_10m',
+].join(',');
+
+function toHours(json: ApiResponse): NightHour[] {
+  return json.hourly.time.map((time, i) => ({
+    at: new Date(time),
+    cloud: json.hourly.cloud_cover[i] ?? 0,
+    cloudLow: json.hourly.cloud_cover_low[i] ?? 0,
+    cloudHigh: json.hourly.cloud_cover_high[i] ?? 0,
+    humidity: json.hourly.relative_humidity_2m[i] ?? 0,
+    temperature: json.hourly.temperature_2m[i] ?? 0,
+    dewSpread: (json.hourly.temperature_2m[i] ?? 0) - (json.hourly.dew_point_2m[i] ?? 0),
+    precipitation: json.hourly.precipitation[i] ?? 0,
+    windGust: json.hourly.wind_gusts_10m[i] ?? 0,
+  }));
+}
+
 export async function fetchNightForecast(
   lat: number,
   lon: number,
@@ -77,19 +105,7 @@ export async function fetchNightForecast(
   const url = new URL(API);
   url.searchParams.set('latitude', String(lat));
   url.searchParams.set('longitude', String(lon));
-  url.searchParams.set(
-    'hourly',
-    [
-      'cloud_cover',
-      'cloud_cover_low',
-      'cloud_cover_high',
-      'relative_humidity_2m',
-      'temperature_2m',
-      'dew_point_2m',
-      'precipitation',
-      'wind_gusts_10m',
-    ].join(','),
-  );
+  url.searchParams.set('hourly', HOURLY_FIELDS);
   url.searchParams.set('daily', 'sunrise,sunset');
   url.searchParams.set('timezone', 'auto');
   url.searchParams.set('past_days', '1');
@@ -99,22 +115,9 @@ export async function fetchNightForecast(
   if (!res.ok) throw new Error(`Open-Meteo: ${res.status}`);
   const json = (await res.json()) as ApiResponse;
 
-  const { from, to } = nightWindow(json.daily, new Date());
+  const { from, to } = sunWindow(json.daily, new Date());
 
-  const hours: NightHour[] = json.hourly.time
-    .map((time, i) => ({
-      at: new Date(time),
-      cloud: json.hourly.cloud_cover[i] ?? 0,
-      cloudLow: json.hourly.cloud_cover_low[i] ?? 0,
-      cloudHigh: json.hourly.cloud_cover_high[i] ?? 0,
-      humidity: json.hourly.relative_humidity_2m[i] ?? 0,
-      temperature: json.hourly.temperature_2m[i] ?? 0,
-      dewSpread:
-        (json.hourly.temperature_2m[i] ?? 0) - (json.hourly.dew_point_2m[i] ?? 0),
-      precipitation: json.hourly.precipitation[i] ?? 0,
-      windGust: json.hourly.wind_gusts_10m[i] ?? 0,
-    }))
-    .filter((h) => h.at >= from && h.at <= to);
+  const hours = toHours(json).filter((h) => h.at >= from && h.at <= to);
 
   if (hours.length === 0) throw new Error('Brak danych dla okna nocy');
 
@@ -128,4 +131,47 @@ export async function fetchNightForecast(
     totalPrecipitation: hours.reduce((sum, h) => sum + h.precipitation, 0),
     minTemperature: Math.min(...hours.map((h) => h.temperature)),
   };
+}
+
+/** Prognoza godzinowa przypisana do konkretnej nocy astronomicznej. */
+export type NightSlice = {
+  night: NightWindow;
+  hours: NightHour[];
+};
+
+/**
+ * Kolejne noce od dzisiejszego wieczora — materiał wejściowy dla silnika sesji.
+ *
+ * Okna liczymy z efemeryd (zmierzch i świt astronomiczny), a nie z zachodu Słońca
+ * zwracanego przez API: silnik ocenia ciemne niebo, a nie porę po zachodzie.
+ * Open-Meteo daje prognozę godzinową na kilka dób jednym zapytaniem, więc trzy
+ * noce nie kosztują trzech żądań.
+ */
+export async function fetchUpcomingNights(
+  coords: Coords,
+  nights: number,
+  signal?: AbortSignal,
+): Promise<NightSlice[]> {
+  const url = new URL(API);
+  url.searchParams.set('latitude', String(coords.lat));
+  url.searchParams.set('longitude', String(coords.lon));
+  url.searchParams.set('hourly', HOURLY_FIELDS);
+  url.searchParams.set('timezone', 'auto');
+  // Noc n-ta kończy się rano dnia n+1, więc dób trzeba o jedną więcej.
+  url.searchParams.set('forecast_days', String(Math.min(16, nights + 1)));
+
+  const res = await fetch(url.toString(), { signal });
+  if (!res.ok) throw new Error(`Open-Meteo: ${res.status}`);
+  const json = (await res.json()) as ApiResponse;
+
+  const all = toHours(json);
+  const DAY_MS = 86_400_000;
+
+  return Array.from({ length: nights }, (_, i) => {
+    const night = nightWindow(new Date(Date.now() + i * DAY_MS), coords);
+    return {
+      night,
+      hours: all.filter((h) => h.at >= night.from && h.at <= night.to),
+    };
+  });
 }
