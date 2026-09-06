@@ -1,4 +1,11 @@
-import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react';
 
 import {
   FALLBACK_POSITION,
@@ -6,11 +13,16 @@ import {
   nearestPlace,
   type Coords,
 } from '@/data/places';
+import {
+  LEAD_TIMES,
+  loadSettings,
+  saveSettings,
+  type LeadTime,
+  type PersistedSettings,
+} from '@/lib/settings-storage';
 import { useDeviceLocation, type LocationStatus } from '@/lib/use-device-location';
 
-export type LeadTime = '1h' | '2h' | '6h' | '12h';
-
-export const LEAD_TIMES: LeadTime[] = ['1h', '2h', '6h', '12h'];
+export { LEAD_TIMES, type LeadTime };
 
 /** Miejsce, dla którego liczymy pogodę i ocenę nocy — niezależnie od tego, skąd się wzięło. */
 export type ActiveLocation = {
@@ -30,6 +42,8 @@ type Settings = {
   autoLocation: boolean;
   notifications: boolean;
   leadTime: LeadTime;
+  /** Czy wczytaliśmy już zapisane ustawienia — do czasu tego UI nie ma czego pokazywać. */
+  hydrated: boolean;
   active: ActiveLocation;
   selectPlace: (id: string) => void;
   useGps: () => void;
@@ -41,13 +55,44 @@ type Settings = {
 
 const SettingsContext = createContext<Settings | null>(null);
 
+/** Stan na pierwsze uruchomienie: miejscowość odpowiadająca pozycji zapasowej. */
+function defaultSettings(): PersistedSettings {
+  return {
+    placeId: nearestPlace(FALLBACK_POSITION).id,
+    autoLocation: false,
+    notifications: true,
+    leadTime: '2h',
+  };
+}
+
 export function SettingsProvider({ children }: { children: ReactNode }) {
-  // Domyślnie: miejscowość odpowiadająca pozycji zapasowej. Realny wybór i tak
-  // przychodzi z GPS albo z listy.
-  const [placeId, setPlaceId] = useState(() => nearestPlace(FALLBACK_POSITION).id);
-  const [autoLocation, setAutoLocation] = useState(false);
-  const [notifications, setNotifications] = useState(true);
-  const [leadTime, setLeadTime] = useState<LeadTime>('2h');
+  const [{ placeId, autoLocation, notifications, leadTime }, setPersisted] =
+    useState<PersistedSettings>(defaultSettings);
+  const [hydrated, setHydrated] = useState(false);
+
+  const setAutoLocation = (next: boolean | ((on: boolean) => boolean)) =>
+    setPersisted((s) => ({
+      ...s,
+      autoLocation: typeof next === 'function' ? next(s.autoLocation) : next,
+    }));
+
+  useEffect(() => {
+    let active = true;
+    loadSettings(defaultSettings()).then((stored) => {
+      if (!active) return;
+      setPersisted(stored);
+      setHydrated(true);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // Zapisujemy dopiero po wczytaniu, żeby nie nadpisać dysku wartościami domyślnymi.
+  useEffect(() => {
+    if (!hydrated) return;
+    void saveSettings({ placeId, autoLocation, notifications, leadTime });
+  }, [hydrated, placeId, autoLocation, notifications, leadTime]);
 
   // Jedna instancja na całą aplikację — inaczej każdy ekran pytałby o uprawnienia osobno.
   const device = useDeviceLocation(autoLocation);
@@ -84,18 +129,16 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       autoLocation,
       notifications,
       leadTime,
+      hydrated,
       active,
-      selectPlace: (id) => {
-        setPlaceId(id);
-        setAutoLocation(false);
-      },
+      selectPlace: (id) => setPersisted((s) => ({ ...s, placeId: id, autoLocation: false })),
       useGps: () => setAutoLocation(true),
       toggleAutoLocation: () => setAutoLocation((on) => !on),
-      toggleNotifications: () => setNotifications((v) => !v),
-      setLeadTime,
+      toggleNotifications: () => setPersisted((s) => ({ ...s, notifications: !s.notifications })),
+      setLeadTime: (value) => setPersisted((s) => ({ ...s, leadTime: value })),
       retryGps: device.retry,
     }),
-    [placeId, autoLocation, notifications, leadTime, active, device.retry],
+    [placeId, autoLocation, notifications, leadTime, hydrated, active, device.retry],
   );
 
   return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>;

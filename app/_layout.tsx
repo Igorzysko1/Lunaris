@@ -14,7 +14,7 @@ import {
   IBMPlexMono_600SemiBold,
 } from '@expo-google-fonts/ibm-plex-mono';
 
-import { SettingsProvider } from '@/store/settings';
+import { SettingsProvider, useSettings } from '@/store/settings';
 import { colors } from '@/theme';
 
 SplashScreen.preventAutoHideAsync();
@@ -29,25 +29,39 @@ export default function RootLayout() {
     IBMPlexMono_600SemiBold,
   });
 
-  useEffect(() => {
-    if (fontsLoaded || fontError) SplashScreen.hideAsync();
-  }, [fontsLoaded, fontError]);
-
   if (!fontsLoaded && !fontError) return null;
 
   return (
     <SettingsProvider>
       <StatusBar style="light" />
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          contentStyle: { backgroundColor: colors.bg },
-        }}
-      >
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="location" />
-        <Stack.Screen name="moon" />
-      </Stack>
+      <AppStack />
     </SettingsProvider>
+  );
+}
+
+/**
+ * Splash zdejmujemy dopiero, gdy znamy zapisane ustawienia — inaczej pierwszy
+ * ekran mignąłby domyślną lokalizacją, zanim wczyta się wybór użytkownika.
+ */
+function AppStack() {
+  const { hydrated } = useSettings();
+
+  useEffect(() => {
+    if (hydrated) SplashScreen.hideAsync();
+  }, [hydrated]);
+
+  if (!hydrated) return null;
+
+  return (
+    <Stack
+      screenOptions={{
+        headerShown: false,
+        contentStyle: { backgroundColor: colors.bg },
+      }}
+    >
+      <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="location" />
+      <Stack.Screen name="moon" />
+    </Stack>
   );
 }
