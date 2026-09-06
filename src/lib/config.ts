@@ -27,6 +27,12 @@ export type ObserverProfile = {
   wakeBufferMin: number;
   /** Zwijanie sprzętu po sesji, przed drogą powrotną. */
   packUpMin: number;
+  /**
+   * Średnia prędkość przejazdu w km/h, liczona po odległości w linii prostej.
+   * Celowo niższa od drogowej: kompensuje krętość trasy, bo aplikacja nie zna
+   * przebiegu dróg i nie odpytuje żadnego routera.
+   */
+  averageSpeedKmh: number;
 };
 
 /**
@@ -80,6 +86,7 @@ export const DEFAULT_CONFIG: LunarisConfig = {
     minSleepHours: 5.5,
     wakeBufferMin: 40,
     packUpMin: 15,
+    averageSpeedKmh: 50,
   },
   optics: DEFAULT_OPTICS,
   session: {
@@ -116,6 +123,7 @@ export const CONFIG_LIMITS = {
     minSleepHours: { min: 0, max: 12 },
     wakeBufferMin: { min: 0, max: 240 },
     packUpMin: { min: 0, max: 120 },
+    averageSpeedKmh: { min: 10, max: 140 },
   },
   session: {
     minDurationHours: { min: 0.5, max: 12 },
@@ -207,6 +215,11 @@ export function clampConfig(config: LunarisConfig): LunarisConfig {
         d.observer.wakeBufferMin,
       ),
       packUpMin: clampNumber(config.observer.packUpMin, l.observer.packUpMin, d.observer.packUpMin),
+      averageSpeedKmh: clampNumber(
+        config.observer.averageSpeedKmh,
+        l.observer.averageSpeedKmh,
+        d.observer.averageSpeedKmh,
+      ),
     },
     optics: clampOptics(config.optics),
     session: {
