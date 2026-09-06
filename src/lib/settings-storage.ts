@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { findPlaceById } from '@/data/places';
+import { DEFAULT_OPTICS, clampOptics, type Mount, type Optics } from '@/lib/optics';
 
 /**
  * Klucz jest wersjonowany, więc zmiana kształtu stanu nie wywraca aplikacji po
@@ -8,7 +9,11 @@ import { findPlaceById } from '@/data/places';
  * po prostu wraca do wartości domyślnych.
  */
 const STORAGE_KEY = 'lunaris.settings';
-const CURRENT_VERSION = 1;
+
+/** v2 dołożyła parametry optyki. Zapisy z v1 przechodzą przez migrację, nie przez reset. */
+const CURRENT_VERSION = 2;
+
+export { DEFAULT_OPTICS, type Optics };
 
 export type LeadTime = '1h' | '2h' | '6h' | '12h';
 
@@ -20,12 +25,38 @@ export type PersistedSettings = {
   autoLocation: boolean;
   notifications: boolean;
   leadTime: LeadTime;
+  /** Parametry sprzętu — liczby, nie nazwa modelu. Patrz src/lib/optics.ts. */
+  optics: Optics;
 };
 
 type StoredEnvelope = { version: number } & Partial<PersistedSettings>;
 
 function isLeadTime(value: unknown): value is LeadTime {
   return typeof value === 'string' && (LEAD_TIMES as string[]).includes(value);
+}
+
+const isFiniteNumber = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isFinite(value);
+
+/**
+ * Optyka z zapisu. Każde pole osobno, bo zepsuta apertura nie ma powodu kasować
+ * zapisanego montażu; wartości spoza fizycznego sensu przycinamy do zakresu.
+ */
+function readOptics(raw: unknown, fallback: Optics): Optics {
+  if (typeof raw !== 'object' || raw === null) return fallback;
+  const stored = raw as Partial<Record<keyof Optics, unknown>>;
+
+  return clampOptics({
+    aperture: isFiniteNumber(stored.aperture) ? stored.aperture : fallback.aperture,
+    magnification: isFiniteNumber(stored.magnification)
+      ? stored.magnification
+      : fallback.magnification,
+    fieldOfView: isFiniteNumber(stored.fieldOfView) ? stored.fieldOfView : fallback.fieldOfView,
+    mount:
+      stored.mount === 'tripod' || stored.mount === 'handheld'
+        ? (stored.mount as Mount)
+        : fallback.mount,
+  });
 }
 
 /**
@@ -36,7 +67,10 @@ function migrate(raw: unknown, defaults: PersistedSettings): PersistedSettings {
   if (typeof raw !== 'object' || raw === null) return defaults;
 
   const stored = raw as StoredEnvelope;
-  if (stored.version !== CURRENT_VERSION) return defaults;
+
+  // v1 nie znała optyki, ale reszta pól ma ten sam kształt — wybór miejscowości
+  // i powiadomień zostaje, sprzęt dostaje wartości domyślne.
+  if (stored.version !== CURRENT_VERSION && stored.version !== 1) return defaults;
 
   return {
     // Baza miejscowości może się zmienić między wydaniami — id sprzed migracji
@@ -50,6 +84,7 @@ function migrate(raw: unknown, defaults: PersistedSettings): PersistedSettings {
     notifications:
       typeof stored.notifications === 'boolean' ? stored.notifications : defaults.notifications,
     leadTime: isLeadTime(stored.leadTime) ? stored.leadTime : defaults.leadTime,
+    optics: readOptics(stored.optics, defaults.optics),
   };
 }
 

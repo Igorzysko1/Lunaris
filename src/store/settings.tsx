@@ -13,6 +13,7 @@ import {
   nearestPlace,
   type Coords,
 } from '@/data/places';
+import { DEFAULT_OPTICS, clampOptics, type Optics } from '@/lib/optics';
 import {
   LEAD_TIMES,
   loadSettings,
@@ -23,6 +24,7 @@ import {
 import { useDeviceLocation, type LocationStatus } from '@/lib/use-device-location';
 
 export { LEAD_TIMES, type LeadTime };
+export type { Optics };
 
 /** Miejsce, dla którego liczymy pogodę i ocenę nocy — niezależnie od tego, skąd się wzięło. */
 export type ActiveLocation = {
@@ -42,6 +44,8 @@ type Settings = {
   autoLocation: boolean;
   notifications: boolean;
   leadTime: LeadTime;
+  /** Parametry sprzętu — jedno źródło prawdy dla doboru celów i progu wiatru. */
+  optics: Optics;
   /** Czy wczytaliśmy już zapisane ustawienia — do czasu tego UI nie ma czego pokazywać. */
   hydrated: boolean;
   active: ActiveLocation;
@@ -50,6 +54,8 @@ type Settings = {
   toggleAutoLocation: () => void;
   toggleNotifications: () => void;
   setLeadTime: (value: LeadTime) => void;
+  /** Zmiana pojedynczego parametru optyki; reszta zostaje bez zmian. */
+  updateOptics: (patch: Partial<Optics>) => void;
   retryGps: () => void;
 };
 
@@ -62,11 +68,12 @@ function defaultSettings(): PersistedSettings {
     autoLocation: false,
     notifications: true,
     leadTime: '2h',
+    optics: DEFAULT_OPTICS,
   };
 }
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
-  const [{ placeId, autoLocation, notifications, leadTime }, setPersisted] =
+  const [{ placeId, autoLocation, notifications, leadTime, optics }, setPersisted] =
     useState<PersistedSettings>(defaultSettings);
   const [hydrated, setHydrated] = useState(false);
 
@@ -91,8 +98,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   // Zapisujemy dopiero po wczytaniu, żeby nie nadpisać dysku wartościami domyślnymi.
   useEffect(() => {
     if (!hydrated) return;
-    void saveSettings({ placeId, autoLocation, notifications, leadTime });
-  }, [hydrated, placeId, autoLocation, notifications, leadTime]);
+    void saveSettings({ placeId, autoLocation, notifications, leadTime, optics });
+  }, [hydrated, placeId, autoLocation, notifications, leadTime, optics]);
 
   // Jedna instancja na całą aplikację — inaczej każdy ekran pytałby o uprawnienia osobno.
   const device = useDeviceLocation(autoLocation);
@@ -129,6 +136,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       autoLocation,
       notifications,
       leadTime,
+      optics,
       hydrated,
       active,
       selectPlace: (id) => setPersisted((s) => ({ ...s, placeId: id, autoLocation: false })),
@@ -136,9 +144,11 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       toggleAutoLocation: () => setAutoLocation((on) => !on),
       toggleNotifications: () => setPersisted((s) => ({ ...s, notifications: !s.notifications })),
       setLeadTime: (value) => setPersisted((s) => ({ ...s, leadTime: value })),
+      updateOptics: (patch) =>
+        setPersisted((s) => ({ ...s, optics: clampOptics({ ...s.optics, ...patch }) })),
       retryGps: device.retry,
     }),
-    [placeId, autoLocation, notifications, leadTime, hydrated, active, device.retry],
+    [placeId, autoLocation, notifications, leadTime, optics, hydrated, active, device.retry],
   );
 
   return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>;

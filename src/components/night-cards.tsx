@@ -4,7 +4,9 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { Card, Divider, SectionLabel } from '@/components/primitives';
 import { dewRiskColor, ratingMeta } from '@/lib/astro';
+import { formatTime } from '@/lib/date';
 import type { Moon } from '@/lib/moon';
+import type { SkyTarget } from '@/lib/sky-targets';
 import type { NightData } from '@/lib/use-night-data';
 import { HAIRLINE, colors, fonts, radius } from '@/theme';
 
@@ -107,6 +109,52 @@ export function AstroTimesRow({
         </View>
       ))}
     </View>
+  );
+}
+
+/**
+ * Cele na tę noc. Lista wynika ze sprzętu z konfiguracji i jakości nieba, więc po
+ * zmianie apertury albo wyjeździe w ciemniejsze miejsce zmienia się sama.
+ */
+export function NightTargetsCard({ targets }: { targets: SkyTarget[] }) {
+  const inReach = targets.filter((t) => t.visible);
+  const outOfReach = targets.length - inReach.length;
+
+  return (
+    <Card>
+      <SectionLabel style={styles.targetsLabel}>Cele na tę noc</SectionLabel>
+
+      {inReach.length === 0 ? (
+        <Text style={styles.targetsEmpty}>
+          Żaden z celów nie wznosi się tej nocy dość wysoko dla tego sprzętu.
+        </Text>
+      ) : (
+        inReach.map((target, i) => (
+          <View key={target.id} style={[styles.targetRow, i > 0 && styles.targetRowGap]}>
+            <View style={styles.targetText}>
+              <Text style={styles.targetName} numberOfLines={1}>
+                {target.name}
+              </Text>
+              <Text style={styles.targetDetail}>{target.detail}</Text>
+            </View>
+            <View style={styles.alignRight}>
+              <Text style={styles.targetAltitude}>{Math.round(target.maxAltitude)}°</Text>
+              <Text style={styles.targetTime}>góruje {formatTime(target.transitAt)}</Text>
+            </View>
+          </View>
+        ))
+      )}
+
+      {outOfReach > 0 && (
+        <>
+          <Divider style={styles.targetsDivider} />
+          <Text style={styles.targetsFooter}>
+            {outOfReach} {outOfReach === 1 ? 'obiekt poza zasięgiem' : 'obiektów poza zasięgiem'} tej
+            nocy — za nisko albo za słabe dla tej optyki pod tym niebem.
+          </Text>
+        </>
+      )}
+    </Card>
   );
 }
 
@@ -235,6 +283,58 @@ const styles = StyleSheet.create({
     fontFamily: fonts.monoMedium,
     fontSize: 13,
     color: colors.textPrimary,
+  },
+  targetsLabel: {
+    marginBottom: 12,
+  },
+  targetsEmpty: {
+    fontFamily: fonts.sans,
+    fontSize: 13,
+    color: colors.textMuted,
+  },
+  targetRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  targetRowGap: {
+    marginTop: 12,
+  },
+  targetText: {
+    flex: 1,
+  },
+  targetName: {
+    fontFamily: fonts.sansMedium,
+    fontSize: 14,
+    color: colors.textPrimary,
+  },
+  targetDetail: {
+    fontFamily: fonts.sans,
+    fontSize: 12,
+    color: colors.textMuted,
+    marginTop: 2,
+  },
+  targetAltitude: {
+    fontFamily: fonts.monoMedium,
+    fontSize: 14,
+    color: colors.teal,
+  },
+  targetTime: {
+    fontFamily: fonts.mono,
+    fontSize: 11,
+    color: colors.textMuted,
+    marginTop: 2,
+  },
+  targetsDivider: {
+    marginTop: 14,
+    marginBottom: 10,
+  },
+  targetsFooter: {
+    fontFamily: fonts.sans,
+    fontSize: 12,
+    color: colors.textMuted,
+    lineHeight: 17,
   },
   moonCard: {
     flexDirection: 'row',
