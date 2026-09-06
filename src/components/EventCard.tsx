@@ -2,6 +2,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { Badge } from '@/components/primitives';
 import { TYPE_META, type AstroEvent } from '@/data/events';
+import { formatTime } from '@/lib/date';
 import { HAIRLINE, colors, fonts, radius } from '@/theme';
 
 type Props = {
@@ -21,7 +22,7 @@ export function EventCard({ event, timeLabel, clampDescription }: Props) {
       <View style={styles.body}>
         <View style={styles.topRow}>
           <Badge label={meta.label} color={meta.color} />
-          <Text style={styles.time}>{timeLabel ?? event.date}</Text>
+          <Text style={styles.time}>{timeLabel ?? formatTime(event.at)}</Text>
         </View>
 
         <View style={styles.titleRow}>

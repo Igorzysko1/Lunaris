@@ -4,26 +4,37 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EventCard } from '@/components/EventCard';
 import { Pill } from '@/components/primitives';
-import {
-  BUCKET_ORDER,
-  EVENTS,
-  EVENT_FILTERS,
-  type EventCategory,
-} from '@/data/events';
+import { EVENT_FILTERS, type AstroEvent, type EventCategory } from '@/data/events';
+import { dayBucket } from '@/lib/date';
+import { upcomingEvents } from '@/lib/events';
+import { useSettings } from '@/store/settings';
 import { colors, fonts } from '@/theme';
 
 type Filter = EventCategory | 'all';
 
 export default function EventsScreen() {
   const [filter, setFilter] = useState<Filter>('all');
+  const { active } = useSettings();
+  const { lat, lon } = active.coords;
+
+  // Eventy zależą od miejsca (widoczność radiantu, wschód Księżyca), więc
+  // przeliczamy je po zmianie lokalizacji, a nie raz na starcie aplikacji.
+  const events = useMemo(() => upcomingEvents(new Date(), { lat, lon }), [lat, lon]);
 
   const sections = useMemo(() => {
-    const matching = EVENTS.filter((e) => filter === 'all' || e.cat === filter);
-    return BUCKET_ORDER.map((bucket) => ({
-      title: bucket,
-      events: matching.filter((e) => e.bucket === bucket),
-    })).filter((section) => section.events.length > 0);
-  }, [filter]);
+    const now = new Date();
+    const matching = events.filter((e) => filter === 'all' || e.cat === filter);
+
+    // Nagłówki wynikają z dat — kolejność bierze się z sortowania w upcomingEvents().
+    const grouped: { title: string; events: AstroEvent[] }[] = [];
+    for (const event of matching) {
+      const title = dayBucket(event.at, now);
+      const last = grouped[grouped.length - 1];
+      if (last?.title === title) last.events.push(event);
+      else grouped.push({ title, events: [event] });
+    }
+    return grouped;
+  }, [events, filter]);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>

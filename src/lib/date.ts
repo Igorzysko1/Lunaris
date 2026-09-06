@@ -13,6 +13,13 @@ const MONTHS_NOMINATIVE = [
   'Lipiec', 'Sierpień', 'Wrzesień', 'Październik', 'Listopad', 'Grudzień',
 ];
 
+const WEEKDAYS_ABBR = ['niedz.', 'pon.', 'wt.', 'śr.', 'czw.', 'pt.', 'sob.'];
+
+const MONTHS_SHORT = [
+  'sty', 'lut', 'mar', 'kwi', 'maj', 'cze',
+  'lip', 'sie', 'wrz', 'paź', 'lis', 'gru',
+];
+
 /** Skróty dni tygodnia w nagłówku kalendarza, od poniedziałku. */
 export const WEEKDAYS_SHORT = ['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'So', 'Nd'];
 
@@ -32,4 +39,28 @@ export function isSameDay(a: Date, b: Date): boolean {
     a.getMonth() === b.getMonth() &&
     a.getDate() === b.getDate()
   );
+}
+
+/** np. „22:40". Doba 24-godzinna, bez sekund. */
+export function formatTime(date: Date): string {
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+}
+
+/** np. „śr., 15 lip.". */
+export function formatShortDate(date: Date): string {
+  return `${WEEKDAYS_ABBR[date.getDay()]}, ${date.getDate()} ${MONTHS_SHORT[date.getMonth()]}.`;
+}
+
+function addDays(date: Date, days: number): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate() + days);
+}
+
+/**
+ * Nagłówek dnia na liście eventów: „Dziś", „Jutro", dalej data.
+ * Liczony względem `now`, więc lista nie zastyga na dacie builda.
+ */
+export function dayBucket(date: Date, now: Date = new Date()): string {
+  if (isSameDay(date, now)) return 'Dziś';
+  if (isSameDay(date, addDays(now, 1))) return 'Jutro';
+  return formatShortDate(date);
 }

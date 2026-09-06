@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { Animated, Easing, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -14,8 +14,8 @@ import {
 } from '@/components/night-cards';
 import { LightPollutionLink } from '@/components/LightPollutionLink';
 import { Card, SectionLabel } from '@/components/primitives';
-import { EVENTS } from '@/data/events';
-import { formatLongDate } from '@/lib/date';
+import { dayBucket, formatLongDate, formatTime } from '@/lib/date';
+import { upcomingEvents } from '@/lib/events';
 import { useNightData } from '@/lib/use-night-data';
 import { useSettings } from '@/store/settings';
 import { HAIRLINE, colors, fonts, radius } from '@/theme';
@@ -24,7 +24,9 @@ export default function NightScreen() {
   const router = useRouter();
   const { active } = useSettings();
   const { status, data, refresh, refreshing } = useNightData(active.coords, active.bortle);
-  const nextEvent = EVENTS[0];
+
+  const { lat, lon } = active.coords;
+  const nextEvent = useMemo(() => upcomingEvents(new Date(), { lat, lon })[0] ?? null, [lat, lon]);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -88,8 +90,15 @@ export default function NightScreen() {
             />
 
 
-            <SectionLabel style={styles.eventLabel}>Następny event</SectionLabel>
-            <EventCard event={nextEvent} timeLabel={`Dziś · ${nextEvent.date}`} />
+            {nextEvent && (
+              <>
+                <SectionLabel style={styles.eventLabel}>Następny event</SectionLabel>
+                <EventCard
+                  event={nextEvent}
+                  timeLabel={`${dayBucket(nextEvent.at)} · ${formatTime(nextEvent.at)}`}
+                />
+              </>
+            )}
           </View>
         )}
       </ScrollView>
