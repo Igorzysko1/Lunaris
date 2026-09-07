@@ -118,10 +118,18 @@ function plainRejection(rejection: Rejection | null): Record<string, unknown> | 
     : { ...rejection };
 }
 
+/**
+ * Ostrzeżenia niosą różne pola i część z nich to daty — `firstEventAt`
+ * w regule kalendarza, `at` przy zjawiskach. Zamiast wyliczać je po nazwie
+ * i gubić następne przy dopisaniu nowego rodzaju, zamieniamy każdą datę.
+ */
 function plainWarning(warning: Warning): Record<string, unknown> {
-  return warning.kind === 'home-only'
-    ? { ...warning, firstEventAt: iso(warning.firstEventAt) }
-    : { ...warning };
+  return Object.fromEntries(
+    Object.entries(warning).map(([key, value]) => [
+      key,
+      value instanceof Date ? iso(value) : value,
+    ]),
+  );
 }
 
 function plainPlan(plan: SessionPlan | null): BriefNight['plan'] {

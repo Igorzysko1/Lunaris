@@ -9,6 +9,7 @@ import {
   markAttempt,
   markFailure,
   markSuccess,
+  planAppFetch,
 } from '@/lib/daily-cycle';
 import { loadCycleState, loadForecast, saveCycleState, saveForecast } from '@/lib/forecast-cache';
 import { assumedNextDay } from '@/lib/session-engine';
@@ -120,21 +121,15 @@ export function useSiteReview(config: LunarisConfig) {
       const now = new Date();
       const decision = decideRefresh(now, stored, hour);
 
-      // Rezygnacja z pobrania nie może zostawić ekranu w wiecznym ładowaniu:
-      // bez zapisu i bez pobrania nie ma czego pokazać i trzeba to powiedzieć.
-      const giveUp = () => {
+      // Ta sama reguła co w cyklu prognozy — patrz `planAppFetch`. Przegląd
+      // pobiera też wtedy, gdy zapis jest niepełny: część miejsc bez danych
+      // znaczy, że porównanie i tak byłoby ułomne.
+      const plan = planAppFetch(decision, complete, force);
+      if (plan === 'give-up') {
         if (cached.size === 0) setStatus('error');
-      };
-
-      if (decision.reason === 'in-flight') return giveUp();
-      // Poza terminem pobieramy tylko wtedy, gdy zapisu brakuje — albo brakuje
-      // go dla części miejsc, bo wtedy przegląd i tak jest niepełny.
-      if (!decision.run && complete && !force) return;
-      if (!decision.run && !force && decision.reason !== 'due' && cached.size === 0) {
-        // Próby na ten termin wyczerpane, a zapisu nie ma — dobijanie się do
-        // serwera co wejście na ekran niczego nie naprawi.
-        return giveUp();
+        return;
       }
+      if (plan === 'skip') return;
 
       const attempted = markAttempt(stored, now, decision.term);
       void saveCycleState(SOURCE, attempted);

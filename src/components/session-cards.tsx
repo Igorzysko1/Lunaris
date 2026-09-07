@@ -88,6 +88,12 @@ function describeWarning(warning: Warning): string {
       return warning.reason === 'phenomenon'
         ? `Zjawisko, które się nie powtórzy — nie skracam nocy. Zostanie ${warning.sleepHours.toFixed(1)} h snu.`
         : `Noc wyjątkowo dobra — nie skracam jej. Zostanie ${warning.sleepHours.toFixed(1)} h snu.`;
+    case 'event-in-window':
+      return `${warning.title} o ${formatTime(warning.at)} — wypada w trakcie sesji.`;
+    case 'session-stretched':
+      return `Sesja przedłużona o ${formatDuration(warning.extraMinutes)}, żeby złapać: ${warning.title} o ${formatTime(warning.at)}.`;
+    case 'event-after-window':
+      return `${warning.title} o ${formatTime(warning.at)} — ${formatDuration(warning.minutesAfter)} po końcu sesji. Zostań dłużej albo odpuść świadomie.`;
   }
 }
 

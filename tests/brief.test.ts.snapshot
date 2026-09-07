@@ -23,7 +23,13 @@ exports[`snapshoty zamrożonych zestawów > noc czysta 1`] = `
       "status": "go",
       "uncertain": false,
       "rejection": null,
-      "warnings": [],
+      "warnings": [
+        {
+          "kind": "event-in-window",
+          "title": "Koniunkcja testowa",
+          "at": "2026-01-16T21:30:00.000Z"
+        }
+      ],
       "window": {
         "from": "2026-01-16T17:00:00.000Z",
         "to": "2026-01-17T05:00:00.000Z",
@@ -191,7 +197,13 @@ exports[`snapshoty zamrożonych zestawów > trzy noce razem 1`] = `
       "status": "go",
       "uncertain": false,
       "rejection": null,
-      "warnings": [],
+      "warnings": [
+        {
+          "kind": "event-in-window",
+          "title": "Koniunkcja testowa",
+          "at": "2026-01-16T21:30:00.000Z"
+        }
+      ],
       "window": {
         "from": "2026-01-16T17:00:00.000Z",
         "to": "2026-01-17T05:00:00.000Z",

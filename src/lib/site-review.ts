@@ -159,9 +159,10 @@ export function reviewNights(input: ReviewInput): NightReview[] {
         home,
         nextDay: input.nextDay(slice.night),
         // Przegląd porównuje miejsca, a nie zjawiska: to samo zaćmienie widać
-        // z każdego z nich, więc wyjątek „zjawisko nie do powtórzenia" niczego
-        // tu nie różnicuje. Skracanie sesji dla snu rozstrzyga sama ocena nocy.
-        uniquePhenomenon: false,
+        // z każdego z nich, więc ani wyjątek „nie do powtórzenia", ani wzmianka
+        // o koniunkcji niczego tu nie różnicują. Skracanie sesji dla snu
+        // rozstrzyga sama ocena nocy.
+        events: [],
         rating,
         windLimitKmh: windLimit,
         walkMinutes: site.walkMinutes,

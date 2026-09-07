@@ -16,6 +16,14 @@ const KATOWICE = { lat: 50.259, lon: 19.021 };
 /** Noc 15/16 stycznia 2026, 18:00 → 00:00. Sześć godzin, siedem próbek. */
 const NIGHT = { from: new Date(2026, 0, 15, 18, 0), to: new Date(2026, 0, 16, 0, 0) };
 
+/** Zjawisko, które w tym miesiącu się nie powtórzy — łamie regułę poranka. */
+const UNIQUE_EVENT = {
+  id: 'eclipse-test',
+  title: 'Zaćmienie testowe',
+  at: new Date(2026, 0, 15, 22, 0),
+  unique: true,
+};
+
 /**
  * Prawdziwa styczniowa noc: 18:00 → 06:00, dwanaście godzin ciemności.
  *
@@ -86,7 +94,7 @@ function input(over: Partial<NightInput> = {}): NightInput {
     home: KATOWICE,
     // Pierwsze wydarzenie o 9:00 — sen wychodzi, a reguła „tylko dom" jeszcze działa.
     nextDay: { firstEventAt: new Date(2026, 0, 16, 9, 0), dayOff: false },
-    uniquePhenomenon: false,
+    events: [],
     // Ocena poniżej progu wyjątku: domyślnie noc podlega skracaniu dla snu.
     rating: 50,
     windLimitKmh: DEFAULT_CONFIG.conditions.maxWindGustKmh,
@@ -248,6 +256,78 @@ describe('evaluateNight — ostrzeżenia', () => {
   });
 });
 
+describe('evaluateNight — zjawiska w sesji', () => {
+  const event = (at: Date, unique = false) => ({
+    id: 'conj',
+    title: 'Koniunkcja Księżyca i Jowisza',
+    at,
+    unique,
+  });
+
+  it('zjawisko w trakcie sesji jest wymienione z godziną', () => {
+    // 23:30 wieczorem tej samej doby, w której noc się zaczyna.
+    const verdict = evaluateNight(sleepBound({ events: [event(new Date(2026, 0, 15, 23, 30))] }));
+
+    const mention = verdict.warnings.find((w) => w.kind === 'event-in-window');
+    assert.ok(mention, 'brak wzmianki o zjawisku w oknie');
+  });
+
+  it('zjawisko tuż za końcem sesji przeciąga ją do siebie', () => {
+    // Przypadek z terenu: sesja kończy się o 4:00, koniunkcja wypada o 4:08.
+    // Granica sesji jest umowna, godzina koniunkcji nie.
+    const withoutEvent = evaluateNight(sleepBound());
+    const end = withoutEvent.window!.to;
+    const justAfter = new Date(end.getTime() + 8 * 60_000);
+
+    const verdict = evaluateNight(
+      sleepBound({ events: [{ id: 'c', title: 'Koniunkcja', at: justAfter, unique: false }] }),
+    );
+
+    assert.ok(verdict.window!.to > end, 'sesja nie została przedłużona');
+    assert.ok(verdict.window!.to >= justAfter, 'przedłużenie nie sięga zjawiska');
+    assert.ok(verdict.warnings.some((w) => w.kind === 'session-stretched'));
+  });
+
+  it('przedłużenie nie wychodzi poza pogodę i ciemność', () => {
+    // Zjawisko po końcu bloku dobrych godzin: przeciąganie tam niczego nie da.
+    const beyond = new Date(LONG_NIGHT.to.getTime() + 30 * 60_000);
+
+    const verdict = evaluateNight(
+      sleepBound({ events: [{ id: 'c', title: 'Koniunkcja', at: beyond, unique: false }] }),
+    );
+
+    assert.ok(verdict.window!.to <= LONG_NIGHT.to);
+    assert.ok(!verdict.warnings.some((w) => w.kind === 'session-stretched'));
+  });
+
+  it('zjawiska poza zasięgiem przedłużenia nie milczą, tylko są wymienione', () => {
+    // Milczenie byłoby najgorsze: sprzęt spakowany kwadrans przed koniunkcją.
+    const config = configWith();
+    config.session.maxDurationMinutes = 180;
+
+    const verdict = evaluateNight(
+      sleepBound({
+        config,
+        events: [
+          { id: 'c', title: 'Koniunkcja', at: new Date(2026, 0, 15, 22, 30), unique: false },
+        ],
+      }),
+    );
+
+    const mentioned = verdict.warnings.some(
+      (w) => w.kind === 'event-in-window' || w.kind === 'event-after-window',
+    );
+    assert.ok(mentioned, 'zjawisko przepadło bez słowa');
+  });
+
+  it('zjawisko niewidoczne w oknie nocy nie przedłuża niczego', () => {
+    const verdict = evaluateNight(sleepBound({ events: [] }));
+
+    assert.ok(!verdict.warnings.some((w) => w.kind === 'session-stretched'));
+    assert.ok(!verdict.warnings.some((w) => w.kind === 'event-in-window'));
+  });
+});
+
 describe('evaluateNight — kalendarz i sen', () => {
   it('wydarzenie przed godziną odrzucenia przekreśla wyjazd', () => {
     const verdict = evaluateNight(
@@ -265,7 +345,7 @@ describe('evaluateNight — kalendarz i sen', () => {
     const verdict = evaluateNight(
       input({
         nextDay: { firstEventAt: new Date(2026, 0, 16, 7, 0), dayOff: false },
-        uniquePhenomenon: true,
+        events: [UNIQUE_EVENT],
       }),
     );
 
@@ -278,7 +358,7 @@ describe('evaluateNight — kalendarz i sen', () => {
     const verdict = evaluateNight(
       input({
         nextDay: { firstEventAt: new Date(2026, 0, 16, 7, 0), dayOff: false },
-        uniquePhenomenon: false,
+        events: [],
       }),
     );
 
@@ -335,7 +415,7 @@ describe('evaluateNight — kalendarz i sen', () => {
   });
 
   it('zjawisko nie do powtórzenia też wstrzymuje skracanie', () => {
-    const verdict = evaluateNight(sleepBound({ rating: 40, uniquePhenomenon: true }));
+    const verdict = evaluateNight(sleepBound({ rating: 40, events: [UNIQUE_EVENT] }));
 
     assert.equal(verdict.window?.durationMinutes, 720);
     assert.ok(

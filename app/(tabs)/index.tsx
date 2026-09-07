@@ -25,6 +25,7 @@ import { currentNightWindow } from '@/lib/night-window';
 import { nightTargetsForProfiles } from '@/lib/sky-targets';
 import { useSessions } from '@/lib/use-sessions';
 import { useNightData } from '@/lib/use-night-data';
+import { useForecast } from '@/store/forecast';
 import { useSettings } from '@/store/settings';
 import { HAIRLINE, colors, fonts, radius } from '@/theme';
 
@@ -36,6 +37,7 @@ export default function NightScreen() {
     active.bortle,
   );
   const sessions = useSessions(active.coords, active.bortle, config, active.walkMinutes);
+  const { cycle } = useForecast();
 
   const { lat, lon } = active.coords;
   const nextEvent = useMemo(() => upcomingEvents(new Date(), { lat, lon })[0] ?? null, [lat, lon]);
@@ -85,11 +87,19 @@ export default function NightScreen() {
         {status === 'error' && (
           <Card style={styles.gap}>
             <View style={styles.chartError}>
+              {/* Trzy różne stany, nie dwa. Brak `failure` znaczy, że żadne
+                  żądanie nie doszło do skutku — obwinianie o to serwisu
+                  pogodowego wysyłało szukających w złą stronę. */}
               <Text style={styles.errorText}>
                 {failure === 'offline'
                   ? 'Brak połączenia, a nie mam zapisanej prognozy dla tego miejsca.'
-                  : 'Serwis pogodowy nie odpowiedział poprawnie.'}
+                  : failure === 'api'
+                    ? 'Serwis pogodowy nie odpowiedział poprawnie.'
+                    : 'Nie mam jeszcze prognozy dla tego miejsca.'}
               </Text>
+              {/* Prawdziwy powód, a nie jego streszczenie: bez niego nie da się
+                  odróżnić awarii sieci od błędu w samej aplikacji. */}
+              {cycle.lastError && <Text style={styles.errorDetail}>{cycle.lastError}</Text>}
               <Pressable onPress={refresh}>
                 <Text style={styles.retry}>Spróbuj ponownie</Text>
               </Pressable>
@@ -320,6 +330,12 @@ const styles = StyleSheet.create({
     fontFamily: fonts.sans,
     fontSize: 13,
     color: colors.coral,
+    textAlign: 'center',
+  },
+  errorDetail: {
+    fontFamily: fonts.mono,
+    fontSize: 11,
+    color: colors.textMuted,
     textAlign: 'center',
   },
   retry: {

@@ -18,6 +18,7 @@ import {
   RETRY_DELAY_MINUTES,
   decideRefresh,
   lastScheduledRefresh,
+  planAppFetch,
   markAttempt,
   markFailure,
   markSuccess,
@@ -168,5 +169,62 @@ describe('znaczniki stanu', () => {
     const failed = markFailure(markAttempt(EMPTY_CYCLE_STATE, now, term), 'offline');
 
     assert.equal(markSuccess(failed, now).lastError, null);
+  });
+});
+
+describe('planAppFetch', () => {
+  const now = new Date(2026, 4, 12, 20, 0);
+  const term = lastScheduledRefresh(now, HOUR);
+  const plan = (state: CycleState, hasCache: boolean, forced = false) =>
+    planAppFetch(decideRefresh(now, state, HOUR), hasCache, forced);
+
+  it('własna, przerwana próba nie blokuje jej powtórzenia', () => {
+    // To był błąd, przez który przy działającej sieci pokazywał się ekran
+    // „serwis pogodowy nie odpowiedział": powrót do aplikacji przerywał
+    // pobranie, a kolejny przebieg widział na dysku własny znacznik próby
+    // i uznawał go za cudzy.
+    const justStarted = markAttempt(EMPTY_CYCLE_STATE, minutesBefore(now, 1), term);
+
+    assert.equal(decideRefresh(now, justStarted, HOUR).reason, 'in-flight');
+    assert.equal(plan(justStarted, false), 'fetch');
+    assert.equal(plan(justStarted, true), 'fetch');
+  });
+
+  it('świeże dane w zapisie nie ruszają sieci', () => {
+    const fresh: CycleState = {
+      ...EMPTY_CYCLE_STATE,
+      lastSuccessAt: new Date(term.getTime() + 60_000),
+    };
+
+    assert.equal(plan(fresh, true), 'skip');
+  });
+
+  it('bez zapisu pobieramy nawet po zamkniętym terminie', () => {
+    const fresh: CycleState = {
+      ...EMPTY_CYCLE_STATE,
+      lastSuccessAt: new Date(term.getTime() + 60_000),
+    };
+
+    assert.equal(plan(fresh, false), 'fetch');
+  });
+
+  it('po wyczerpaniu prób i bez zapisu przyznajemy się, zamiast dobijać serwer', () => {
+    let state = EMPTY_CYCLE_STATE;
+    for (let i = MAX_ATTEMPTS_PER_TERM; i > 0; i--) {
+      state = markFailure(markAttempt(state, minutesBefore(now, i * 30), term), 'offline');
+    }
+
+    assert.equal(plan(state, false), 'give-up');
+    // Z zapisem nie ma o czym mówić: pokazujemy, co mamy.
+    assert.equal(plan(state, true), 'skip');
+  });
+
+  it('ręczne odświeżenie przebija wszystko', () => {
+    let state = EMPTY_CYCLE_STATE;
+    for (let i = MAX_ATTEMPTS_PER_TERM; i > 0; i--) {
+      state = markFailure(markAttempt(state, minutesBefore(now, i * 30), term), 'offline');
+    }
+
+    assert.equal(plan(state, false, true), 'fetch');
   });
 });

@@ -51,7 +51,17 @@ export type Warning =
    * Noc na tyle dobra, że nie skracamy jej dla snu — użytkownik ma o niej
    * wiedzieć mimo wszystko, razem z ceną, którą za nią zapłaci.
    */
-  | { kind: 'sleep-sacrifice'; sleepHours: number; reason: 'rating' | 'phenomenon' };
+  | { kind: 'sleep-sacrifice'; sleepHours: number; reason: 'rating' | 'phenomenon' }
+  /** Zjawisko wypada w trakcie sesji — warto wiedzieć, o której podnieść głowę. */
+  | { kind: 'event-in-window'; title: string; at: Date }
+  /** Sesja przedłużona, żeby zjawisko się w niej zmieściło. */
+  | { kind: 'session-stretched'; title: string; at: Date; extraMinutes: number }
+  /**
+   * Zjawisko wypada tuż po końcu sesji i nie dało się jej przeciągnąć — pogoda
+   * albo noc kończą się wcześniej. Milczenie byłoby tu najgorsze: użytkownik
+   * spakowałby sprzęt kwadrans przed koniunkcją, nie wiedząc o niej.
+   */
+  | { kind: 'event-after-window'; title: string; at: Date; minutesAfter: number };
 
 /** Ciągły blok godzin spełniających kryteria. */
 export type ObservingWindow = {
@@ -84,6 +94,19 @@ export type NightVerdict = {
   warnings: Warning[];
 };
 
+/** Zjawisko wypadające w oknie nocy. */
+export type NightEvent = {
+  id: string;
+  title: string;
+  at: Date;
+  /**
+   * Czy w tym miesiącu się nie powtórzy. Tylko takie łamią regułę wczesnego
+   * poranka — koniunkcja Księżyca z planetą wraca co kilka tygodni i nie jest
+   * powodem do zarywania nocy, choć jest powodem, żeby o niej wspomnieć.
+   */
+  unique: boolean;
+};
+
 /** Kalendarz następnego dnia. Silnik go nie pobiera — dostaje gotowy. */
 export type NextDay = {
   /** Pierwsze wydarzenie następnego dnia; `null`, gdy kalendarz jest pusty. */
@@ -101,11 +124,14 @@ export type NightInput = {
   home: Coords | null;
   nextDay: NextDay;
   /**
-   * Czy tej nocy wypada zjawisko niepowtarzalne w danym miesiącu — trzeci warunek
-   * nocy wybitnej. Silnik nie zna kalendarza zjawisk, więc dostaje to z zewnątrz;
-   * bez tego każda czysta bezksiężycowa noc łamałaby regułę wczesnego poranka.
+   * Zjawiska wypadające tej nocy — widoczne z tego miejsca, z godziną.
+   *
+   * Silnik nie zna kalendarza, więc dostaje gotową listę. Wcześniej dostawał
+   * z niej sam bit „coś niepowtarzalnego jest", co wystarczało regule nocy
+   * wybitnej, ale gubiło rzecz najprostszą: **kiedy**. Sesja kończyła się
+   * o 4:00, koniunkcja wypadała o 4:08 i nikt o niej nie wspominał.
    */
-  uniquePhenomenon: boolean;
+  events: NightEvent[];
   /**
    * Próg porywów wiatru dla tej nocy. Zależy od montażu, a ten jest per zestaw,
    * więc rozstrzygnięcie zapada wyżej — silnik dostaje jedną gotową liczbę.
@@ -245,7 +271,7 @@ function planFor(window: ObservingWindow, input: NightInput): SessionPlan {
  * sama czysta pogoda zdarza się zbyt często, żeby uzasadniać nieprzespaną noc.
  */
 function isExceptional(hours: NightHour[], input: NightInput, window: ObservingWindow): boolean {
-  if (!input.uniquePhenomenon) return false;
+  if (!input.events.some((e) => e.unique)) return false;
 
   const inWindow = hours.filter((h) => h.at >= window.from && h.at <= window.to);
   const clearEnough =
@@ -257,6 +283,18 @@ function isExceptional(hours: NightHour[], input: NightInput, window: ObservingW
 }
 
 /**
+ * O ile wolno przeciągnąć sesję, żeby złapać zjawisko tuż za jej końcem.
+ * Godzina to granica, poza którą „jeszcze chwilę" przestaje być chwilą.
+ */
+const EVENT_REACH_MS = 60 * MINUTE_MS;
+
+/** Ile zostawiamy po momencie zjawiska — patrzenie wtedy się zaczyna. */
+const EVENT_TAIL_MS = 10 * MINUTE_MS;
+
+/** Jak długo po sesji zjawisko jest jeszcze warte wzmianki. */
+const EVENT_MENTION_MS = 90 * MINUTE_MS;
+
+/**
  * Czy noc jest warta nieprzespanej nocy.
  *
  * To osobne pojęcie niż `isExceptional`, i celowo łagodniejsze. Tamto rozstrzyga,
@@ -266,7 +304,7 @@ function isExceptional(hours: NightHour[], input: NightInput, window: ObservingW
  * sam zdecyduje, ile z niej weźmie.
  */
 function worthLosingSleep(input: NightInput): 'rating' | 'phenomenon' | null {
-  if (input.uniquePhenomenon) return 'phenomenon';
+  if (input.events.some((e) => e.unique)) return 'phenomenon';
   if (input.rating >= input.config.conditions.exceptionalRating) return 'rating';
   return null;
 }
@@ -414,7 +452,45 @@ export function evaluateNight(input: NightInput): NightVerdict {
     .sort((a, b) => a.at.getTime() - b.at.getTime())[0];
 
   const trimmedTo = binding ? binding.at : window.to;
-  const trimmedMinutes = (trimmedTo.getTime() - window.from.getTime()) / MINUTE_MS;
+
+  /**
+   * Zjawisko tuż za końcem sesji przeciąga ją do siebie.
+   *
+   * Sesja kończy się tam, gdzie każe sen albo własny limit długości — obie te
+   * granice są umowne, a koniunkcja o 4:08 nie jest. Skoro ciemność trzyma
+   * dłużej, dziesięć minut snu mniej to uczciwa cena za jedyny moment, w którym
+   * to zjawisko widać.
+   *
+   * Granicą jest **koniec nocy astronomicznej**, a nie koniec bloku dobrych
+   * godzin. Blok kończy się na ostatniej próbce prognozy, a te są co godzinę:
+   * przy nocy do 4:12 blok urywa się o 4:00 i zjawisko o 4:07 przepadało przez
+   * sposób próbkowania danych, a nie przez pogodę. Pogody pilnujemy osobno —
+   * jeśli po końcu bloku stoi godzina odrzucona przez progi, nie przeciągamy
+   * tam niczego.
+   */
+  const candidateEvents = input.events.filter((e) => e.at >= night.from && e.at <= night.to);
+
+  const weatherHoldsUntil = (until: Date) =>
+    !hours.some(
+      (h) =>
+        h.at > window.to && h.at <= until && blockerFor(h, config, input.windLimitKmh) !== null,
+    );
+
+  const reachable = candidateEvents
+    .filter((e) => e.at > trimmedTo && e.at.getTime() - trimmedTo.getTime() <= EVENT_REACH_MS)
+    .filter((e) =>
+      weatherHoldsUntil(new Date(Math.min(night.to.getTime(), e.at.getTime() + EVENT_TAIL_MS))),
+    )
+    .sort((a, b) => b.at.getTime() - a.at.getTime())[0];
+
+  // Po samym momencie zjawiska zostawiamy chwilę — patrzenie zaczyna się wtedy,
+  // a nie kończy.
+  const stretchedTo = reachable
+    ? new Date(Math.min(night.to.getTime(), reachable.at.getTime() + EVENT_TAIL_MS))
+    : trimmedTo;
+
+  const sessionTo = stretchedTo > trimmedTo ? stretchedTo : trimmedTo;
+  const trimmedMinutes = (sessionTo.getTime() - window.from.getTime()) / MINUTE_MS;
 
   // Jedyny test długości w całym silniku, i to na tym, co użytkownik faktycznie
   // dostanie: na sesji po przycięciu, a nie na oknie pogodowym przed nim.
@@ -443,17 +519,43 @@ export function evaluateNight(input: NightInput): NightVerdict {
     };
   }
 
-  if (binding) {
+  if (reachable) {
+    warnings.push({
+      kind: 'session-stretched',
+      title: reachable.title,
+      at: reachable.at,
+      extraMinutes: Math.round((sessionTo.getTime() - trimmedTo.getTime()) / MINUTE_MS),
+    });
+  } else if (binding) {
     warnings.push({
       kind: 'session-trimmed',
       reason: binding.reason,
-      droppedMinutes: Math.round((window.to.getTime() - trimmedTo.getTime()) / MINUTE_MS),
+      droppedMinutes: Math.round((window.to.getTime() - sessionTo.getTime()) / MINUTE_MS),
     });
+  }
+
+  // Zjawiska w samej sesji: nie zmieniają werdyktu, ale mówią, o której podnieść
+  // głowę. Te tuż za jej końcem — o ile nie dało się jej przeciągnąć.
+  for (const event of candidateEvents) {
+    // Zjawisko, dla którego sesję przedłużono, jest już nazwane w tamtym
+    // ostrzeżeniu — druga wzmianka o tej samej koniunkcji to szum.
+    if (event.id === reachable?.id) continue;
+
+    if (event.at >= window.from && event.at <= sessionTo) {
+      warnings.push({ kind: 'event-in-window', title: event.title, at: event.at });
+    } else if (event.at.getTime() - sessionTo.getTime() <= EVENT_MENTION_MS) {
+      warnings.push({
+        kind: 'event-after-window',
+        title: event.title,
+        at: event.at,
+        minutesAfter: Math.round((event.at.getTime() - sessionTo.getTime()) / MINUTE_MS),
+      });
+    }
   }
 
   const observing: ObservingWindow = {
     ...window,
-    to: trimmedTo,
+    to: sessionTo,
     durationMinutes: trimmedMinutes,
     moonLimited,
   };

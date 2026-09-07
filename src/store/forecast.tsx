@@ -18,6 +18,7 @@ import {
   markAttempt,
   markFailure,
   markSuccess,
+  planAppFetch,
   type CycleState,
 } from '@/lib/daily-cycle';
 import { reviewEvents } from '@/lib/event-review';
@@ -147,6 +148,9 @@ export function ForecastProvider({ children }: { children: ReactNode }) {
   const [attempt, setAttempt] = useState(0);
   const [notices, setNotices] = useState<StoredNotice[]>([]);
 
+  /** Czy pobranie właśnie trwa — po to, żeby powrót do aplikacji go nie przerywał. */
+  const fetching = useRef(false);
+
   /**
    * Wejście przeglądu zjawisk trzymamy w ref, a nie w zależnościach efektu:
    * zmiana Bortle, sprzętu czy wyprzedzenia zmienia to, o czym powiadamiamy,
@@ -216,19 +220,16 @@ export function ForecastProvider({ children }: { children: ReactNode }) {
         if (!hit) setState((s) => ({ ...s, status: 'error' }));
       };
 
-      // Dwa uruchomienia cyklu naraz to podwójny koszt tego samego żądania.
-      // Blokady próby nie przebija nawet ręczne odświeżenie.
-      if (decision.reason === 'in-flight') return giveUp();
-
-      // Brak zapisu jest jedynym powodem, dla którego pobieramy poza terminem.
-      if (!decision.run && hit && !force) return;
-      if (!decision.run && !hit && !force && decision.reason === 'exhausted') return giveUp();
+      const plan = planAppFetch(decision, hit !== null, force);
+      if (plan === 'give-up') return giveUp();
+      if (plan === 'skip') return;
 
       // 3. Pobranie. Znacznik próby zapisujemy PRZED żądaniem — to on blokuje drugie.
       const attempted = markAttempt(stored, now, decision.term);
       setCycle(attempted);
       void saveCycleState(SCOPE, attempted);
       setRefreshing(true);
+      fetching.current = true;
 
       try {
         const bundle = await fetchForecastBundle(coords, CYCLE_NIGHTS, controller.signal);
@@ -278,6 +279,7 @@ export function ForecastProvider({ children }: { children: ReactNode }) {
           status: s.bundle ? 'ready' : 'error',
         }));
       } finally {
+        fetching.current = false;
         if (active) setRefreshing(false);
       }
     };
@@ -304,7 +306,9 @@ export function ForecastProvider({ children }: { children: ReactNode }) {
   // pominąć tego, że użytkownik otworzył aplikację.
   useEffect(() => {
     const sub = AppState.addEventListener('change', (next) => {
-      if (next === 'active') setAttempt((n) => n + 1);
+      // Powrót do aplikacji w trakcie pobrania nie ma go przerywać: przerwane
+      // żądanie kosztuje tyle samo co dokończone, a jego wynik i tak przepada.
+      if (next === 'active' && !fetching.current) setAttempt((n) => n + 1);
     });
     return () => sub.remove();
   }, []);

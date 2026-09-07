@@ -153,3 +153,36 @@ export function markSuccess(state: CycleState, now: Date): CycleState {
 export function markFailure(state: CycleState, reason: string): CycleState {
   return { ...state, lastError: reason };
 }
+
+/**
+ * Co zrobić w aplikacji: pobrać, odpuścić po cichu, czy przyznać się do porażki.
+ *
+ * Ta reguła mieszkała wcześniej w nieprzetestowanym warunku wewnątrz providera
+ * i miała w sobie błąd, który kosztował ekran błędu przy działającej sieci:
+ * blokadę `in-flight` traktowała jak cudzą próbę. W aplikacji cudzej próby nie
+ * ma — jest jedno źródło pobrań, a znacznik na dysku pochodzi od niego samego,
+ * z przebiegu, który właśnie został przerwany. Odmowa pobrania znaczyła wtedy,
+ * że nikt nie pobierze niczego, a ekran pokaże awarię, której nie było.
+ *
+ * `give-up` jest zarezerwowane dla sytuacji, w której naprawdę nie ma czego
+ * pokazać i nie ma sensu próbować: próby na ten termin wyczerpane, a zapisu brak.
+ */
+export type FetchPlan = 'fetch' | 'skip' | 'give-up';
+
+export function planAppFetch(
+  decision: RefreshDecision,
+  hasCache: boolean,
+  forced: boolean,
+): FetchPlan {
+  if (forced) return 'fetch';
+
+  // Własna, przerwana próba nie może blokować jej powtórzenia.
+  if (decision.run || decision.reason === 'in-flight') return 'fetch';
+
+  // Termin zamknięty albo backoff, ale dane są — nie ruszamy sieci.
+  if (hasCache) return 'skip';
+
+  // Bez zapisu: dobijanie się do serwera po wyczerpaniu prób niczego nie naprawi,
+  // ale użytkownik musi zobaczyć, że nie ma czego pokazać.
+  return decision.reason === 'exhausted' || decision.reason === 'backoff' ? 'give-up' : 'fetch';
+}

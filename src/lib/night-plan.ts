@@ -110,9 +110,17 @@ export function planNights({
       bortle,
     });
 
-    const uniquePhenomenon = events.some(
-      (e) => e.visible && UNIQUE_TYPES.includes(e.type) && e.at >= night.from && e.at <= night.to,
-    );
+    // Silnik dostaje zdarzenia tej nocy z godzinami, nie sam bit „coś jest".
+    // Widoczność liczy generator zjawisk; niewidoczne z tego miejsca nie mają
+    // po co przedłużać sesji ani zajmować miejsca w ostrzeżeniach.
+    const nightEvents = events
+      .filter((e) => e.visible && e.at >= night.from && e.at <= night.to)
+      .map((e) => ({
+        id: e.id,
+        title: e.title,
+        at: e.at,
+        unique: UNIQUE_TYPES.includes(e.type),
+      }));
 
     const verdict = evaluateNight({
       night,
@@ -124,7 +132,7 @@ export function planNights({
       target,
       home,
       nextDay: assumedNextDay(night, config),
-      uniquePhenomenon,
+      events: nightEvents,
       rating,
       windLimitKmh: windLimit,
       walkMinutes,
