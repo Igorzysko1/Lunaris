@@ -1,18 +1,6 @@
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-  type ReactNode,
-} from 'react';
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
-import {
-  FALLBACK_POSITION,
-  findPlaceById,
-  nearestPlace,
-  type Coords,
-} from '@/data/places';
+import { FALLBACK_POSITION, findPlaceById, nearestPlace, type Coords } from '@/data/places';
 import { DEFAULT_CONFIG, clampConfig, type LunarisConfig } from '@/lib/config';
 import { defaultProfile, type OpticsProfile } from '@/lib/optics';
 import {
@@ -51,7 +39,8 @@ type Settings = {
   hydrated: boolean;
   active: ActiveLocation;
   selectPlace: (id: string) => void;
-  useGps: () => void;
+  /** Nie hook, tylko akcja: przełącza źródło pozycji na GPS. */
+  enableGps: () => void;
   toggleAutoLocation: () => void;
   toggleNotifications: () => void;
   setLeadTime: (value: LeadTime) => void;
@@ -156,7 +145,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       hydrated,
       active,
       selectPlace: (id) => setPersisted((s) => ({ ...s, placeId: id, autoLocation: false })),
-      useGps: () => setAutoLocation(true),
+      enableGps: () => setAutoLocation(true),
       toggleAutoLocation: () => setAutoLocation((on) => !on),
       toggleNotifications: () => setPersisted((s) => ({ ...s, notifications: !s.notifications })),
       setLeadTime: (value) => setPersisted((s) => ({ ...s, leadTime: value })),

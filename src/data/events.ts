@@ -4,12 +4,7 @@ import { colors } from '../theme.ts';
 
 export type EventCategory = 'moon' | 'planets' | 'meteor';
 
-export type EventType =
-  | 'conjunction'
-  | 'moon_phase'
-  | 'opposition'
-  | 'meteor_shower'
-  | 'eclipse';
+export type EventType = 'conjunction' | 'moon_phase' | 'opposition' | 'meteor_shower' | 'eclipse';
 
 export type AstroEvent = {
   id: string;

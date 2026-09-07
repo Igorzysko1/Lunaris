@@ -8,6 +8,7 @@
 
 import * as SunCalc from 'suncalc';
 
+// prettier-ignore
 const MONTHS_SHORT = [
   'sty', 'lut', 'mar', 'kwi', 'maj', 'cze',
   'lip', 'sie', 'wrz', 'paź', 'lis', 'gru',

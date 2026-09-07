@@ -100,10 +100,7 @@ describe('zasięg sprzętu', () => {
 describe('etykieta zestawu', () => {
   it('opis z liczb, gdy nazwy nie ma', () => {
     assert.equal(describeOptics(DEFAULT_OPTICS), '15x70, statyw');
-    assert.equal(
-      profileLabel({ id: 'a', label: '   ', optics: DEFAULT_OPTICS }),
-      '15x70, statyw',
-    );
+    assert.equal(profileLabel({ id: 'a', label: '   ', optics: DEFAULT_OPTICS }), '15x70, statyw');
   });
 
   it('nadana nazwa wygrywa', () => {

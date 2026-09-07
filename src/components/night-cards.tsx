@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -20,7 +20,7 @@ export function NightRatingCard({
 }) {
   const meta = ratingMeta(data.rating);
   const { forecast } = data;
-  const enter = useRef(new Animated.Value(0)).current;
+  const [enter] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
     enter.setValue(0);
@@ -166,8 +166,8 @@ export function NightTargetsCard({ targets }: { targets: SkyTarget[] }) {
         <>
           <Divider style={styles.targetsDivider} />
           <Text style={styles.targetsFooter}>
-            {outOfReach} {outOfReach === 1 ? 'obiekt poza zasięgiem' : 'obiektów poza zasięgiem'} tej
-            nocy — za nisko albo za słabe dla tej optyki pod tym niebem.
+            {outOfReach} {outOfReach === 1 ? 'obiekt poza zasięgiem' : 'obiektów poza zasięgiem'}{' '}
+            tej nocy — za nisko albo za słabe dla tej optyki pod tym niebem.
           </Text>
         </>
       )}

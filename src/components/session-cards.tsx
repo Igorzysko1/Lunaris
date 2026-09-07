@@ -54,7 +54,7 @@ function describeRejection(rejection: Rejection): string {
         case 'wind':
           return 'Porywy wiatru powyżej progu — sprzęt nie ustoi.';
       }
-    // eslint-disable-next-line no-fallthrough -- każdy blocker wyżej kończy się return
+    // Świadome przejście do kolejnego case: każdy blocker wyżej kończy się return.
     case 'window-too-short':
       return `Najdłuższe pogodne okno to ${formatDuration(rejection.longestMinutes)} — za krótko.`;
     case 'not-enough-sleep':
@@ -106,10 +106,7 @@ export function SessionCard({
           <Text style={styles.night}>{nightLabel(verdict.night.from, now)}</Text>
           <Text style={styles.location}>{locationLabel}</Text>
         </View>
-        <Badge
-          label={go ? 'JEDZIEMY' : 'ODPUŚĆ'}
-          color={go ? colors.teal : colors.textMuted}
-        />
+        <Badge label={go ? 'JEDZIEMY' : 'ODPUŚĆ'} color={go ? colors.teal : colors.textMuted} />
       </View>
 
       {go && window && plan ? (
@@ -127,10 +124,7 @@ export function SessionCard({
           <View style={styles.planGrid}>
             <PlanCell label="Wyjazd" value={formatTime(plan.departAt)} />
             <PlanCell label="Powrót" value={formatTime(plan.returnAt)} />
-            <PlanCell
-              label="Pobudka"
-              value={plan.wakeAt ? formatTime(plan.wakeAt) : '—'}
-            />
+            <PlanCell label="Pobudka" value={plan.wakeAt ? formatTime(plan.wakeAt) : '—'} />
             <PlanCell
               label="Sen"
               value={plan.sleepHours !== null ? `${plan.sleepHours.toFixed(1)} h` : '—'}

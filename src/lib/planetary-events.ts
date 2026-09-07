@@ -68,13 +68,7 @@ const CONJUNCTION_BODIES: Body[] = [
 ];
 
 /** Planety zewnętrzne — tylko one wchodzą w opozycję do Słońca. */
-const OUTER_PLANETS: Body[] = [
-  Body.Mars,
-  Body.Jupiter,
-  Body.Saturn,
-  Body.Uranus,
-  Body.Neptune,
-];
+const OUTER_PLANETS: Body[] = [Body.Mars, Body.Jupiter, Body.Saturn, Body.Uranus, Body.Neptune];
 
 /** Próg koniunkcji: separacja poniżej 5° to zbliżenie widoczne gołym okiem jako para. */
 const CONJUNCTION_MAX_SEPARATION = 5;
@@ -94,9 +88,7 @@ function altitudeOf(body: Body, at: Date, coords: Coords): number {
 /** Największa wysokość ciała nad horyzontem tej nocy — do opisu eventu. */
 function peakAltitudeAtNight(body: Body, at: Date, coords: Coords): number {
   return Math.max(
-    ...sampleNight(nightWindow(at, coords)).map((sample) =>
-      altitudeOf(body, sample, coords),
-    ),
+    ...sampleNight(nightWindow(at, coords)).map((sample) => altitudeOf(body, sample, coords)),
   );
 }
 
@@ -164,16 +156,10 @@ function refineConjunction(a: Body, b: Body, from: number, to: number): Date {
     else lo = m1.getTime();
   }
 
-  return new Date(Math.round(((lo + hi) / 2) / 60_000) * 60_000);
+  return new Date(Math.round((lo + hi) / 2 / 60_000) * 60_000);
 }
 
-function conjunctionDescription(
-  a: Body,
-  b: Body,
-  gap: number,
-  altitude: number,
-  at: Date,
-): string {
+function conjunctionDescription(a: Body, b: Body, gap: number, altitude: number, at: Date): string {
   const pair = `${NOMINATIVE[a]} i ${NOMINATIVE[b]}`;
   const where =
     altitude > 0
@@ -219,7 +205,12 @@ export function conjunctionEvents(from: Date, to: Date, coords: Coords): AstroEv
       const past = history.get(key);
 
       // Minimum lokalne: separacja malała, a teraz rośnie.
-      if (past && past.prev <= past.prevPrev && past.prev < gap && past.prev < CONJUNCTION_MAX_SEPARATION) {
+      if (
+        past &&
+        past.prev <= past.prevPrev &&
+        past.prev < gap &&
+        past.prev < CONJUNCTION_MAX_SEPARATION
+      ) {
         const peak = refineConjunction(a, b, past.prevTime - SCAN_STEP_MS, t);
 
         if (peak >= from && peak <= to) {

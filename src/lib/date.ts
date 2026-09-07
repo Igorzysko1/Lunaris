@@ -1,13 +1,16 @@
+// prettier-ignore
 const WEEKDAYS = [
   'Niedziela', 'Poniedziałek', 'Wtorek', 'Środa',
   'Czwartek', 'Piątek', 'Sobota',
 ];
 
+// prettier-ignore
 const MONTHS_GENITIVE = [
   'stycznia', 'lutego', 'marca', 'kwietnia', 'maja', 'czerwca',
   'lipca', 'sierpnia', 'września', 'października', 'listopada', 'grudnia',
 ];
 
+// prettier-ignore
 const MONTHS_NOMINATIVE = [
   'Styczeń', 'Luty', 'Marzec', 'Kwiecień', 'Maj', 'Czerwiec',
   'Lipiec', 'Sierpień', 'Wrzesień', 'Październik', 'Listopad', 'Grudzień',
@@ -15,6 +18,7 @@ const MONTHS_NOMINATIVE = [
 
 const WEEKDAYS_ABBR = ['niedz.', 'pon.', 'wt.', 'śr.', 'czw.', 'pt.', 'sob.'];
 
+// prettier-ignore
 const MONTHS_SHORT = [
   'sty', 'lut', 'mar', 'kwi', 'maj', 'cze',
   'lip', 'sie', 'wrz', 'paź', 'lis', 'gru',

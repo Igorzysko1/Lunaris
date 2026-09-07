@@ -16,7 +16,7 @@ import {
   type OpticsProfile,
 } from '@/lib/optics';
 import { LEAD_TIMES, useSettings } from '@/store/settings';
-import { HAIRLINE, colors, fonts, radius } from '@/theme';
+import { colors, fonts } from '@/theme';
 
 export default function SettingsScreen() {
   const {
@@ -59,9 +59,7 @@ export default function SettingsScreen() {
                 <Text style={styles.subLabel}>
                   {active.gpsStatus === 'loading' ? 'Ustalam pozycję…' : 'Wykryto automatycznie'}
                 </Text>
-                <Text style={styles.subValue}>
-                  {active.source === 'gps' ? active.label : '—'}
-                </Text>
+                <Text style={styles.subValue}>{active.source === 'gps' ? active.label : '—'}</Text>
               </View>
             </>
           )}

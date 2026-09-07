@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { findPlaceById } from '@/data/places';
-import { DEFAULT_CONFIG, mergeConfig, type LunarisConfig } from '@/lib/config';
+import { mergeConfig, type LunarisConfig } from '@/lib/config';
 
 /**
  * Klucz jest wersjonowany, więc zmiana kształtu stanu nie wywraca aplikacji po

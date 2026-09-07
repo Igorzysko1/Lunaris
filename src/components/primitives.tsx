@@ -23,7 +23,13 @@ export function Card({ children, variant = 'default', style }: CardProps) {
   );
 }
 
-export function SectionLabel({ children, style }: { children: string; style?: StyleProp<ViewStyle> }) {
+export function SectionLabel({
+  children,
+  style,
+}: {
+  children: string;
+  style?: StyleProp<ViewStyle>;
+}) {
   return (
     <View style={style}>
       <Text style={styles.sectionLabel}>{children.toUpperCase()}</Text>

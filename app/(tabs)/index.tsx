@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Animated, Easing, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -118,27 +118,29 @@ export default function NightScreen() {
             {nextEvent && (
               <>
                 <SectionLabel style={styles.sessionsLabel}>Nadchodzące sesje</SectionLabel>
-            {sessions.status === 'loading' && <SessionsSkeleton />}
-            {sessions.status === 'error' && (
-              <Card style={styles.gap}>
-                <View style={styles.chartError}>
-                  <Text style={styles.errorText}>Nie udało się pobrać prognozy na kolejne noce.</Text>
-                  <Pressable onPress={sessions.refresh}>
-                    <Text style={styles.retry}>Spróbuj ponownie</Text>
-                  </Pressable>
-                </View>
-              </Card>
-            )}
-            {sessions.status === 'ready' &&
-              sessions.sessions.map((session) => (
-                <SessionCard
-                  key={session.verdict.night.from.toISOString()}
-                  session={session}
-                  locationLabel={active.label}
-                />
-              ))}
+                {sessions.status === 'loading' && <SessionsSkeleton />}
+                {sessions.status === 'error' && (
+                  <Card style={styles.gap}>
+                    <View style={styles.chartError}>
+                      <Text style={styles.errorText}>
+                        Nie udało się pobrać prognozy na kolejne noce.
+                      </Text>
+                      <Pressable onPress={sessions.refresh}>
+                        <Text style={styles.retry}>Spróbuj ponownie</Text>
+                      </Pressable>
+                    </View>
+                  </Card>
+                )}
+                {sessions.status === 'ready' &&
+                  sessions.sessions.map((session) => (
+                    <SessionCard
+                      key={session.verdict.night.from.toISOString()}
+                      session={session}
+                      locationLabel={active.label}
+                    />
+                  ))}
 
-            <SectionLabel style={styles.eventLabel}>Następny event</SectionLabel>
+                <SectionLabel style={styles.eventLabel}>Następny event</SectionLabel>
                 <EventCard
                   event={nextEvent}
                   timeLabel={`${dayBucket(nextEvent.at)} · ${formatTime(nextEvent.at)}`}
@@ -153,7 +155,7 @@ export default function NightScreen() {
 }
 
 function RefreshButton({ spinning, onPress }: { spinning: boolean; onPress: () => void }) {
-  const spin = useRef(new Animated.Value(0)).current;
+  const [spin] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
     if (!spinning) {

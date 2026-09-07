@@ -8,6 +8,10 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "test": "TZ=Europe/Warsaw node --experimental-strip-types --no-warnings --test tests/*.test.ts",
     "weather": "node --experimental-strip-types --no-warnings scripts/check-weather.ts",
     "build:places": "node --experimental-strip-types --no-warnings scripts/build-places.ts"
@@ -37,6 +41,10 @@
   },
   "devDependencies": {
     "@types/react": "~19.1.0",
+    "eslint": "^9.39.5",
+    "eslint-config-expo": "^57.0.2",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.9.6",
     "typescript": "~5.9.2"
   },
   "private": true

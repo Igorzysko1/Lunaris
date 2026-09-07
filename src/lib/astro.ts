@@ -52,8 +52,7 @@ export function computeNightRating(input: RatingInputs): number {
   const moonPenalty = 0.15 * input.moonIllumination;
   const bortlePenalty = 2 * (input.bortle - 1);
 
-  const score =
-    100 - cloudPenalty - humidityPenalty - precipPenalty - moonPenalty - bortlePenalty;
+  const score = 100 - cloudPenalty - humidityPenalty - precipPenalty - moonPenalty - bortlePenalty;
 
   return Math.round(Math.min(100, Math.max(0, score)));
 }

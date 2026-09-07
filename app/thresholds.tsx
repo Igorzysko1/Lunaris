@@ -97,8 +97,8 @@ export default function ThresholdsScreen() {
           />
           <Divider />
           <Text style={styles.note}>
-            Przy większej fazie Księżyca okno liczy się tylko dla celów księżycowych
-            i planetarnych. Ostrzeżenie o rosie to różnica temperatury i punktu rosy.
+            Przy większej fazie Księżyca okno liczy się tylko dla celów księżycowych i planetarnych.
+            Ostrzeżenie o rosie to różnica temperatury i punktu rosy.
           </Text>
         </Card>
 

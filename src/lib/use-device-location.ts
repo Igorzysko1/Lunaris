@@ -28,6 +28,8 @@ export function useDeviceLocation(enabled: boolean): DeviceLocation & { retry: (
 
   useEffect(() => {
     if (!enabled) {
+      // Wyłączony GPS ma natychmiast wyczyścić pozycję, a nie zostawić starą.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setState({ status: 'idle', coords: null, label: null });
       return;
     }

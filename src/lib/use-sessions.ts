@@ -56,15 +56,16 @@ export function useSessions(coords: Coords, bortle: number, config: LunarisConfi
   const refresh = useCallback(() => setAttempt((n) => n + 1), []);
 
   const { lat, lon } = coords;
-  const homePlace = config.observer.homePlaceId
-    ? findPlaceById(config.observer.homePlaceId)
-    : null;
+  const homePlace = config.observer.homePlaceId ? findPlaceById(config.observer.homePlaceId) : null;
   const home = homePlace ? { lat: homePlace.lat, lon: homePlace.lon } : null;
 
   useEffect(() => {
     const controller = new AbortController();
     let active = true;
 
+    // Reset stanu przy zmianie wejścia jest tu celowy: zanim odpowie sieć, widok ma
+    // pokazywać ładowanie dla NOWEJ lokalizacji, a nie dane dla poprzedniej.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setStatus('loading');
 
     fetchUpcomingNights({ lat, lon }, SESSION_NIGHTS, controller.signal)
@@ -74,9 +75,7 @@ export function useSessions(coords: Coords, bortle: number, config: LunarisConfi
         setSessions(
           slices.map(({ night, hours }, index) => {
             const target = { lat, lon };
-            const illumination = Math.round(
-              SunCalc.getMoonIllumination(night.from).fraction * 100,
-            );
+            const illumination = Math.round(SunCalc.getMoonIllumination(night.from).fraction * 100);
 
             // Okno oceniamy najłagodniejszym progiem wiatru spośród zestawów —
             // noc dobra dla sprzętu na statywie nie ma przepadać przez to, że
@@ -135,7 +134,9 @@ export function useSessions(coords: Coords, bortle: number, config: LunarisConfi
       controller.abort();
     };
     // `config` i `home` zmieniają się razem z konfiguracją — przeliczenie widoku
-    // po zmianie progu jest tu zamierzone.
+    // po zmianie progu jest tu zamierzone. `home` rozbite na współrzędne, bo obiekt
+    // dostaje nową tożsamość przy każdym renderze store'u, a liczy się sama pozycja.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lat, lon, bortle, config, home?.lat, home?.lon, attempt]);
 
   return { status, sessions, refresh };

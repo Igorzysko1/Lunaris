@@ -1,0 +1,6 @@
+node_modules/
+.expo/
+dist/
+package-lock.json
+# Wygenerowana baza miejscowości — formatuje ją generator, nie człowiek.
+src/data/places.generated.ts

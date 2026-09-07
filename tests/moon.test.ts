@@ -54,7 +54,11 @@ describe('moonMonth', () => {
     const days = moonMonth(2026, 9, KATOWICE.lat, KATOWICE.lon);
     for (let i = 1; i < days.length; i++) {
       const previous = days[i - 1].date;
-      const expected = new Date(previous.getFullYear(), previous.getMonth(), previous.getDate() + 1);
+      const expected = new Date(
+        previous.getFullYear(),
+        previous.getMonth(),
+        previous.getDate() + 1,
+      );
       assert.equal(days[i].date.getTime(), expected.getTime());
     }
   });

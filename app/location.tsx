@@ -6,10 +6,10 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { LightPollutionLink } from '@/components/LightPollutionLink';
 import { Badge, Pill } from '@/components/primitives';
-import { CITIES, GMINY, type Coords, type Place } from '@/data/places';
+import { CITIES, GMINY, type Place } from '@/data/places';
 import { bortleMeta, distanceKm, formatDistance } from '@/lib/astro';
 import { useSettings, type ActiveLocation } from '@/store/settings';
-import { HAIRLINE, colors, fonts, radius } from '@/theme';
+import { HAIRLINE, colors, fonts } from '@/theme';
 
 type PickerTab = 'cities' | 'gminy';
 
@@ -27,7 +27,7 @@ export default function LocationScreen() {
   // tym, gdzie ląduje wynik i czy GPS ma sens: dom jest stały, więc go nie oferuje.
   const { target } = useLocalSearchParams<{ target?: string }>();
   const pickingHome = target === 'home';
-  const { placeId, autoLocation, active, selectPlace, config, updateConfig, useGps } =
+  const { placeId, autoLocation, active, selectPlace, config, updateConfig, enableGps } =
     useSettings();
   const [query, setQuery] = useState('');
   const [tab, setTab] = useState<PickerTab>('cities');
@@ -40,9 +40,7 @@ export default function LocationScreen() {
     const q = query.trim().toLowerCase();
 
     const matching = q
-      ? source.filter(
-          (p) => p.name.toLowerCase().includes(q) || p.region.toLowerCase().includes(q),
-        )
+      ? source.filter((p) => p.name.toLowerCase().includes(q) || p.region.toLowerCase().includes(q))
       : source;
 
     return matching
@@ -59,7 +57,7 @@ export default function LocationScreen() {
   };
 
   const chooseGps = () => {
-    useGps();
+    enableGps();
     router.back();
   };
 
@@ -69,9 +67,7 @@ export default function LocationScreen() {
         <Pressable onPress={() => router.back()} accessibilityLabel="Wróć">
           <Ionicons name="arrow-back" size={22} color={colors.textPrimary} />
         </Pressable>
-        <Text style={styles.title}>
-          {pickingHome ? 'Punkt startowy' : 'Wybierz lokalizację'}
-        </Text>
+        <Text style={styles.title}>{pickingHome ? 'Punkt startowy' : 'Wybierz lokalizację'}</Text>
       </View>
 
       <View style={styles.searchWrapper}>
@@ -89,12 +85,7 @@ export default function LocationScreen() {
 
       <View style={styles.tabs}>
         {TABS.map((t) => (
-          <Pill
-            key={t.key}
-            label={t.label}
-            active={tab === t.key}
-            onPress={() => setTab(t.key)}
-          />
+          <Pill key={t.key} label={t.label} active={tab === t.key} onPress={() => setTab(t.key)} />
         ))}
       </View>
 
@@ -183,10 +174,7 @@ function PlaceRow({
     <Pressable onPress={onPress} style={styles.placeRow}>
       <View style={styles.placeLeft}>
         <View style={styles.placeNameRow}>
-          <Text
-            style={[styles.placeName, selected && { color: colors.purple }]}
-            numberOfLines={1}
-          >
+          <Text style={[styles.placeName, selected && { color: colors.purple }]} numberOfLines={1}>
             {place.name}
           </Text>
           <Badge label={bortle.label} color={bortle.color} />

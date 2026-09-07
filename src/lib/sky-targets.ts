@@ -170,11 +170,7 @@ function geometryOf(
   };
 }
 
-function dsoGeometry(
-  dso: DeepSkyObject,
-  window: NightWindow,
-  observer: Observer,
-): TargetGeometry {
+function dsoGeometry(dso: DeepSkyObject, window: NightWindow, observer: Observer): TargetGeometry {
   DefineStar(STAR_SLOT, dso.raHours, dso.dec, dso.distanceLy);
 
   return geometryOf(

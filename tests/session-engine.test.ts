@@ -142,16 +142,16 @@ describe('evaluateNight — warunki', () => {
 
 describe('evaluateNight — ostrzeżenia', () => {
   it('ostrzega o rosie, gdy spread schodzi poniżej progu', () => {
-    const verdict = evaluateNight(input({ hours: hours((i) => (i === 5 ? { dewSpread: 1 } : {})) }));
+    const verdict = evaluateNight(
+      input({ hours: hours((i) => (i === 5 ? { dewSpread: 1 } : {})) }),
+    );
 
     assert.equal(verdict.status, 'go');
     assert.ok(verdict.warnings.some((w) => w.kind === 'dew' && w.minSpreadC === 1));
   });
 
   it('jasny Księżyc nad horyzontem zawęża cele, ale nie unieważnia nocy', () => {
-    const verdict = evaluateNight(
-      input({ moon: { illumination: 80, upAt: () => true } }),
-    );
+    const verdict = evaluateNight(input({ moon: { illumination: 80, upAt: () => true } }));
 
     assert.equal(verdict.status, 'go');
     assert.equal(verdict.window?.moonLimited, true);

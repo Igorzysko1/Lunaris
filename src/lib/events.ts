@@ -36,25 +36,18 @@ function localSiderealTime(date: Date, lon: number): number {
   const jd = date.getTime() / DAY_MS + 2440587.5;
   const d = jd - 2451545.0;
   const t = d / 36525;
-  const gmst =
-    280.46061837 + 360.98564736629 * d + 0.000387933 * t * t - (t * t * t) / 38710000;
-  return ((gmst + lon) % 360 + 360) % 360;
+  const gmst = 280.46061837 + 360.98564736629 * d + 0.000387933 * t * t - (t * t * t) / 38710000;
+  return (((gmst + lon) % 360) + 360) % 360;
 }
 
 /** Wysokość obiektu o stałych współrzędnych równikowych nad horyzontem, w stopniach. */
-export function equatorialAltitude(
-  ra: number,
-  dec: number,
-  date: Date,
-  coords: Coords,
-): number {
+export function equatorialAltitude(ra: number, dec: number, date: Date, coords: Coords): number {
   const hourAngle = toRad(localSiderealTime(date, coords.lon) - ra);
   const decRad = toRad(dec);
   const latRad = toRad(coords.lat);
 
   const sinAlt =
-    Math.sin(decRad) * Math.sin(latRad) +
-    Math.cos(decRad) * Math.cos(latRad) * Math.cos(hourAngle);
+    Math.sin(decRad) * Math.sin(latRad) + Math.cos(decRad) * Math.cos(latRad) * Math.cos(hourAngle);
 
   return toDeg(Math.asin(Math.max(-1, Math.min(1, sinAlt))));
 }
@@ -198,9 +191,7 @@ export function meteorShowerEvents(from: Date, to: Date, coords: Coords): AstroE
 
       if (best.at < from || best.at > to) continue;
 
-      const moonIllumination = Math.round(
-        SunCalc.getMoonIllumination(best.at).fraction * 100,
-      );
+      const moonIllumination = Math.round(SunCalc.getMoonIllumination(best.at).fraction * 100);
 
       events.push({
         id: `meteor-${shower.id}-${year}`,

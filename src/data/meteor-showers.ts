@@ -25,6 +25,8 @@ export type MeteorShower = {
   dec: number;
 };
 
+// Tabela danych — jeden rój w linii czyta się jak katalog, więc Prettier jej nie dotyka.
+// prettier-ignore
 export const METEOR_SHOWERS: MeteorShower[] = [
   { id: 'qua', name: 'Kwadrantydy', constellation: 'Wolarz', peakMonth: 1, peakDay: 3, zhr: 110, ra: 230, dec: 49 },
   { id: 'lyr', name: 'Lirydy', constellation: 'Lutnia', peakMonth: 4, peakDay: 22, zhr: 18, ra: 271, dec: 34 },

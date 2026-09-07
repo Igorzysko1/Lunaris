@@ -169,14 +169,17 @@ function longestBlock(
   const longestMinutes = best ? (best.to.getTime() - best.from.getTime()) / MINUTE_MS : 0;
 
   // Najczęstsza przyczyna blokowania — to ona tłumaczy, dlaczego nocy nie ma.
-  const blocker =
-    [...blockers.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+  const blocker = [...blockers.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
 
   if (!best || longestMinutes < config.conditions.minWindowMinutes) {
     return { window: null, longestMinutes, blocker };
   }
 
-  return { window: { ...best, durationMinutes: longestMinutes, moonLimited: false }, longestMinutes, blocker };
+  return {
+    window: { ...best, durationMinutes: longestMinutes, moonLimited: false },
+    longestMinutes,
+    blocker,
+  };
 }
 
 /** Czas przejazdu w minutach. Bez punktu startowego nie ma czego liczyć. */
@@ -197,9 +200,7 @@ function planFor(window: ObservingWindow, input: NightInput): SessionPlan {
   const travel = travelMinutes(input.home, input.target, config);
 
   const departAt = new Date(window.from.getTime() - travel * MINUTE_MS);
-  const returnAt = new Date(
-    window.to.getTime() + (config.observer.packUpMin + travel) * MINUTE_MS,
-  );
+  const returnAt = new Date(window.to.getTime() + (config.observer.packUpMin + travel) * MINUTE_MS);
 
   if (config.session.overnight || !nextDay.firstEventAt) {
     return { departAt, returnAt, wakeAt: null, sleepHours: null, travelMinutes: travel };
@@ -336,10 +337,7 @@ export function evaluateNight(input: NightInput): NightVerdict {
 
   // Sen „na styk" musi być widoczny — to jedyny moment, w którym użytkownik
   // może sam odpuścić, zanim wyjedzie.
-  if (
-    plan.sleepHours !== null &&
-    plan.sleepHours < config.observer.minSleepHours + 0.5
-  ) {
+  if (plan.sleepHours !== null && plan.sleepHours < config.observer.minSleepHours + 0.5) {
     warnings.push({ kind: 'tight-sleep', sleepHours: plan.sleepHours });
   }
 

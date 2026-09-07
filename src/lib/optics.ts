@@ -71,11 +71,8 @@ export const OPTICS_LIMITS = {
  * porównanie z NaN jest fałszywe i wszystkie cele wyszłyby „w zasięgu".
  */
 export function clampOptics(optics: Optics): Optics {
-  const clamp = (
-    value: number,
-    { min, max }: { min: number; max: number },
-    fallback: number,
-  ) => (Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : fallback);
+  const clamp = (value: number, { min, max }: { min: number; max: number }, fallback: number) =>
+    Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : fallback;
 
   return {
     aperture: clamp(optics.aperture, OPTICS_LIMITS.aperture, DEFAULT_OPTICS.aperture),
@@ -186,9 +183,6 @@ export function profileLabel(profile: OpticsProfile): string {
  * wietrze niż ustawiony na statywie, ale o ile słabszym, decyduje użytkownik,
  * a nie liczba zaszyta tutaj.
  */
-export function windLimitKmh(
-  optics: Optics,
-  limits: { tripod: number; handheld: number },
-): number {
+export function windLimitKmh(optics: Optics, limits: { tripod: number; handheld: number }): number {
   return optics.mount === 'tripod' ? limits.tripod : limits.handheld;
 }

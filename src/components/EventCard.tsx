@@ -28,10 +28,7 @@ export function EventCard({ event, timeLabel, clampDescription }: Props) {
         <View style={styles.titleRow}>
           <Text style={styles.title}>{event.title}</Text>
           <Text
-            style={[
-              styles.visibility,
-              { color: event.visible ? colors.teal : colors.textMuted },
-            ]}
+            style={[styles.visibility, { color: event.visible ? colors.teal : colors.textMuted }]}
           >
             {event.visible ? 'WIDOCZNY' : 'NIEWIDOCZNY'}
           </Text>

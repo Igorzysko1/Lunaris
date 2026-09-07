@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { Animated, Pressable, StyleSheet } from 'react-native';
 
 import { colors } from '@/theme';
@@ -7,7 +7,7 @@ const KNOB_OFF = 3;
 const KNOB_ON = 21;
 
 export function Toggle({ value, onPress }: { value: boolean; onPress: () => void }) {
-  const knobLeft = useRef(new Animated.Value(value ? KNOB_ON : KNOB_OFF)).current;
+  const [knobLeft] = useState(() => new Animated.Value(value ? KNOB_ON : KNOB_OFF));
 
   useEffect(() => {
     Animated.timing(knobLeft, {

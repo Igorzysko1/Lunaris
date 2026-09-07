@@ -40,11 +40,7 @@ type Forecast = {
 
 /** „Żywiec" i „zywiec" mają trafiać w to samo — polskie znaki nie mogą blokować wyszukiwania. */
 function normalize(s: string): string {
-  return s
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .replace(/ł/g, 'l');
+  return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ł/g, 'l');
 }
 
 function findPlace(query: string): Place | undefined {
@@ -119,13 +115,17 @@ function main(argv: string[]) {
   } else if (name) {
     place = findPlace(name);
     if (!place) {
-      console.error(`Nie znam miejscowości „${name}". Użyj --lat/--lon albo nazwy z src/data/places.ts.`);
+      console.error(
+        `Nie znam miejscowości „${name}". Użyj --lat/--lon albo nazwy z src/data/places.ts.`,
+      );
       process.exit(1);
     }
     coords = { lat: place.lat, lon: place.lon };
     title = place.name;
   } else {
-    console.error('Podaj miejscowość albo --lat/--lon.\n  npm run weather -- Zawoja\n  npm run weather -- --lat 49.63 --lon 19.53');
+    console.error(
+      'Podaj miejscowość albo --lat/--lon.\n  npm run weather -- Zawoja\n  npm run weather -- --lat 49.63 --lon 19.53',
+    );
     process.exit(1);
   }
 
@@ -147,14 +147,19 @@ const rows = forecast.hourly.time
   }))
   .filter((r) => r.at >= night.from && r.at <= night.to);
 
-const subtitle = place ? `Bortle ${place.bortle} · ${place.region}` : `${coords.lat}, ${coords.lon}`;
+const subtitle = place
+  ? `Bortle ${place.bortle} · ${place.region}`
+  : `${coords.lat}, ${coords.lon}`;
 console.log(`\n${BOLD}${title}${RESET} ${DIM}${subtitle}${RESET}`);
-console.log(`${DIM}${night.label}: ${hhmm(night.from)} → ${hhmm(night.to)} · ${forecast.timezone}${RESET}\n`);
+console.log(
+  `${DIM}${night.label}: ${hhmm(night.from)} → ${hhmm(night.to)} · ${forecast.timezone}${RESET}\n`,
+);
 
 console.log(`${DIM}godz.  chmury                     wilg.  widocz.  opady${RESET}`);
 for (const r of rows) {
   const cloud = r.cloud ?? 0;
-  const vis = r.visibility === null ? '   —  ' : `${(r.visibility / 1000).toFixed(0).padStart(3)} km`;
+  const vis =
+    r.visibility === null ? '   —  ' : `${(r.visibility / 1000).toFixed(0).padStart(3)} km`;
   const hum = r.humidity === null ? ' — ' : `${String(r.humidity).padStart(3)}%`;
   const precip = `${(r.precip ?? 0).toFixed(1).padStart(4)} mm`;
   console.log(
@@ -169,7 +174,9 @@ const totalPrecip = rows.reduce((sum, r) => sum + (r.precip ?? 0), 0);
 const visibilities = rows.map((r) => r.visibility).filter((v): v is number => v !== null);
 
 console.log(`\n${BOLD}Podsumowanie nocy${RESET}`);
-console.log(`  zachmurzenie   śr. ${avg(clouds)}%, min ${Math.min(...clouds)}%, maks ${Math.max(...clouds)}%`);
+console.log(
+  `  zachmurzenie   śr. ${avg(clouds)}%, min ${Math.min(...clouds)}%, maks ${Math.max(...clouds)}%`,
+);
 console.log(`  godziny czyste ${clearHours} z ${rows.length} (zachmurzenie < 20%)`);
 console.log(`  wilgotność     śr. ${avg(rows.map((r) => r.humidity ?? 0))}%`);
 console.log(
@@ -198,5 +205,7 @@ if (place) {
   console.log(`  ${DIM}wschód Ks. ${moonRise} · zachód Ks. ${moonSet} · ${moon.detail}${RESET}`);
   console.log(`  ${DIM}Ten sam wzór, którego używa aplikacja (src/lib/astro.ts).${RESET}\n`);
 } else {
-  console.log(`\n${DIM}Ocena nocy wymaga Bortle — podaj nazwę miejscowości zamiast --lat/--lon.${RESET}\n`);
+  console.log(
+    `\n${DIM}Ocena nocy wymaga Bortle — podaj nazwę miejscowości zamiast --lat/--lon.${RESET}\n`,
+  );
 }
