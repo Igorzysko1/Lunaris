@@ -16,7 +16,11 @@ export function SessionCard({
   locationLabel: string;
   now?: Date;
 }) {
-  const { verdict, minTemperature, targets, uncertain } = session;
+  const { verdict, minTemperature, feltTemperature, targets, uncertain } = session;
+  // Odczuwalną pokazujemy tylko wtedy, gdy wiatr faktycznie coś zmienia —
+  // inaczej byłaby to ta sama liczba dwa razy.
+  const colderByWind =
+    minTemperature !== null && feltTemperature !== null && minTemperature - feltTemperature >= 1;
   const { window, plan } = verdict;
   const go = verdict.status === 'go';
   const inReach = targets.filter((t) => t.visible);
@@ -56,7 +60,13 @@ export function SessionCard({
             />
             <PlanCell
               label="Min. temp."
-              value={minTemperature !== null ? `${Math.round(minTemperature)}°C` : '—'}
+              value={
+                minTemperature === null
+                  ? '—'
+                  : colderByWind
+                    ? `${Math.round(minTemperature)}°C (odczuw. ${Math.round(feltTemperature!)}°C)`
+                    : `${Math.round(minTemperature)}°C`
+              }
             />
           </View>
 

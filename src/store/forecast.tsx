@@ -57,7 +57,7 @@ export type ForecastState = {
   savedAt: Date | null;
   /** Zapis starszy niż jeden cykl: dane wciąż użyteczne, ale coś nie zadziałało. */
   stale: boolean;
-  failure: 'offline' | 'api' | null;
+  failure: 'offline' | 'api' | 'rate-limit' | null;
 };
 
 type ForecastStore = ForecastState & {
@@ -267,7 +267,7 @@ export function ForecastProvider({ children }: { children: ReactNode }) {
         const kind = error instanceof ForecastError ? error.kind : 'api';
         const reason = error instanceof Error ? error.message : 'Nieznany błąd pobierania prognozy';
 
-        const failed = markFailure(attempted, reason);
+        const failed = markFailure(attempted, reason, kind === 'rate-limit');
         setCycle(failed);
         void saveCycleState(SCOPE, failed);
 

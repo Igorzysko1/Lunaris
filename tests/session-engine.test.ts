@@ -58,12 +58,14 @@ function hour(at: Date, over: Partial<NightHour> = {}): NightHour {
     at,
     cloud: 0,
     cloudLow: 0,
+    cloudMid: 0,
     cloudHigh: 0,
     humidity: 60,
     temperature: 5,
     dewSpread: 6,
     precipitation: 0,
     windGust: 8,
+    windSpeed: 5,
     windJet: 20,
     windMid: 20,
     temp850: 0,
@@ -146,6 +148,24 @@ describe('evaluateNight — warunki', () => {
     const verdict = evaluateNight(input({ hours: hours(() => ({ cloud: 20, cloudLow: 20 })) }));
 
     assert.deepEqual(verdict.rejection, { kind: 'conditions', blocker: 'cloud-low' });
+  });
+
+  it('gęste piętro średnie nie przechodzi jako cirrusy', () => {
+    // Luka przybliżenia: przy 100% całkowitych i 100% wysokich odejmowanie
+    // dawało zero, więc pełna warstwa altostratusa mieściła się w tolerancji
+    // dla chmur wysokich. Altostratus zasłania gwiazdy tak samo jak stratus.
+    const config = configWith();
+    config.conditions.maxCloudHigh = 100;
+
+    const verdict = evaluateNight(
+      input({
+        config,
+        hours: hours(() => ({ cloud: 100, cloudHigh: 100, cloudMid: 95, cloudLow: 0 })),
+      }),
+    );
+
+    assert.equal(verdict.status, 'no-go');
+    assert.deepEqual(verdict.rejection, { kind: 'conditions', blocker: 'cloud-total' });
   });
 
   it('chmury wysokie są tolerowane powyżej progu całkowitego', () => {

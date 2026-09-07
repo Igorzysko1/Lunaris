@@ -15,7 +15,7 @@ import { loadCycleState, loadForecast, saveCycleState, saveForecast } from '@/li
 import { assumedNextDay } from '@/lib/session-engine';
 import { reviewNights, type NightReview } from '@/lib/site-review';
 import { skyQualityAt } from '@/lib/sky-map';
-import { fetchUpcomingNightsForPoints, type NightSlice } from '@/lib/weather';
+import { ForecastError, fetchUpcomingNightsForPoints, type NightSlice } from '@/lib/weather';
 
 /** Tyle nocy naprzód, ile ma sens porównywać — dalej prognoza jest zgadywanką. */
 const REVIEW_NIGHTS = 3;
@@ -156,7 +156,8 @@ export function useSiteReview(config: LunarisConfig) {
         if (!active || (error instanceof Error && error.name === 'AbortError')) return;
 
         const reason = error instanceof Error ? error.message : 'Nieznany błąd pobierania';
-        void saveCycleState(SOURCE, markFailure(attempted, reason));
+        const rateLimited = error instanceof ForecastError && error.kind === 'rate-limit';
+        void saveCycleState(SOURCE, markFailure(attempted, reason, rateLimited));
 
         // Nieudane pobranie nie kasuje tego, co już mamy z dysku.
         if (cached.size === 0) setStatus('error');

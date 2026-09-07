@@ -93,9 +93,11 @@ export default function NightScreen() {
               <Text style={styles.errorText}>
                 {failure === 'offline'
                   ? 'Brak połączenia, a nie mam zapisanej prognozy dla tego miejsca.'
-                  : failure === 'api'
-                    ? 'Serwis pogodowy nie odpowiedział poprawnie.'
-                    : 'Nie mam jeszcze prognozy dla tego miejsca.'}
+                  : failure === 'rate-limit'
+                    ? 'Za dużo zapytań do serwisu pogodowego — spróbuję ponownie za pół godziny.'
+                    : failure === 'api'
+                      ? 'Serwis pogodowy nie odpowiedział poprawnie.'
+                      : 'Nie mam jeszcze prognozy dla tego miejsca.'}
               </Text>
               {/* Prawdziwy powód, a nie jego streszczenie: bez niego nie da się
                   odróżnić awarii sieci od błędu w samej aplikacji. */}
@@ -120,9 +122,11 @@ export default function NightScreen() {
             <Text style={styles.staleText}>
               {failure === 'offline'
                 ? 'Brak sieci'
-                : failure
-                  ? 'Serwis nie odpowiada'
-                  : 'Dane nie odświeżyły się o porze'}{' '}
+                : failure === 'rate-limit'
+                  ? 'Limit zapytań'
+                  : failure
+                    ? 'Serwis nie odpowiada'
+                    : 'Dane nie odświeżyły się o porze'}{' '}
               — {formatAge(savedAt)}
             </Text>
             <Text style={styles.staleRetry}>Odśwież</Text>

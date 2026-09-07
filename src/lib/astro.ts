@@ -85,3 +85,22 @@ export function dewRiskColor(spreadC: number, warnBelowC: number): string {
   if (spreadC < warnBelowC * 2.5) return colors.amber;
   return colors.teal;
 }
+
+/**
+ * Temperatura odczuwalna przy wietrze, w stopniach Celsjusza.
+ *
+ * Wzór kanadyjskiego wskaźnika wychłodzenia (Environment Canada, 2001) — ten
+ * sam, którego używają serwisy pogodowe. Obowiązuje poniżej 10°C i powyżej
+ * 4,8 km/h; poza tym zakresem wiatr nie zmienia odczucia na tyle, żeby liczyć
+ * cokolwiek poza samą temperaturą.
+ *
+ * Ma to znaczenie praktyczne, nie ozdobne: przy stanowisku stoi się bez ruchu
+ * przez kilka godzin, a różnica między −2°C a odczuwalnymi −9°C to różnica
+ * między jedną a dwiema parami skarpet.
+ */
+export function feltTemperature(celsius: number, windKmh: number): number {
+  if (celsius > 10 || windKmh < 4.8) return celsius;
+
+  const v = Math.pow(windKmh, 0.16);
+  return 13.12 + 0.6215 * celsius - 11.37 * v + 0.3965 * celsius * v;
+}

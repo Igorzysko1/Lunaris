@@ -10,7 +10,12 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { computeNightRating, distanceKm, formatDistance } from '../src/lib/astro.ts';
+import {
+  computeNightRating,
+  distanceKm,
+  feltTemperature,
+  formatDistance,
+} from '../src/lib/astro.ts';
 import { CITIES, nearestPlace } from '../src/data/places.ts';
 
 const perfect = {
@@ -128,5 +133,28 @@ describe('nearestPlace', () => {
     const place = nearestPlace({ lat: 41.9, lon: 12.5 });
     assert.ok(place.id.length > 0);
     assert.ok(place.bortle >= 1 && place.bortle <= 9);
+  });
+});
+
+describe('feltTemperature', () => {
+  it('mróz z wiatrem jest zimniejszy, niż pokazuje termometr', () => {
+    // −5°C przy 20 km/h to około −12°C odczuwalnych.
+    const felt = feltTemperature(-5, 20);
+
+    assert.ok(felt < -10 && felt > -14, `${felt}`);
+  });
+
+  it('bez wiatru nie ma czego poprawiać', () => {
+    assert.equal(feltTemperature(-5, 0), -5);
+  });
+
+  it('powyżej dziesięciu stopni wzór nie obowiązuje', () => {
+    // Wzór kanadyjski jest określony tylko dla chłodu; poza zakresem zwraca
+    // samą temperaturę, zamiast ekstrapolować w miejsce, którego nie opisuje.
+    assert.equal(feltTemperature(15, 30), 15);
+  });
+
+  it('silniejszy wiatr wychładza mocniej', () => {
+    assert.ok(feltTemperature(0, 40) < feltTemperature(0, 10));
   });
 });

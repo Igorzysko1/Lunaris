@@ -164,7 +164,16 @@ export type NightInput = {
  */
 function blockerFor(hour: NightHour, config: LunarisConfig, windLimit: number): Blocker | null {
   const { conditions } = config;
-  const cloudBelowHigh = Math.max(0, hour.cloud - hour.cloudHigh);
+
+  // Zachmurzenie nieprzejrzyste: wszystko poza cirrusami.
+  //
+  // Odejmowanie `całkowite − wysokie` było przybliżeniem tej wielkości, bo
+  // piętra bywają liczone osobno i nakładają się. Przybliżenie miało lukę:
+  // przy 100% całkowitych i 100% wysokich wychodziło zero, choć piętro średnie
+  // stało wtedy pełne — a altostratus zasłania gwiazdy tak samo jak stratus.
+  // Znając piętro średnie wprost, bierzemy większą z dwóch ocen. To ta sama
+  // wielkość i ten sam próg, tylko liczone bez dziury.
+  const cloudBelowHigh = Math.max(0, hour.cloud - hour.cloudHigh, hour.cloudMid);
 
   if (hour.precipitation > 0) return 'precipitation';
   if (hour.cloudLow > conditions.maxCloudLow) return 'cloud-low';

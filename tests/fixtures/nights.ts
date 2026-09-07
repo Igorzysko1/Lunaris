@@ -17,12 +17,14 @@ function hours(from: Date, count: number, shape: HourShape): NightHour[] {
     at: new Date(from.getTime() + i * 3_600_000),
     cloud: 0,
     cloudLow: 0,
+    cloudMid: 0,
     cloudHigh: 0,
     humidity: 70,
     temperature: 8,
     dewSpread: 4,
     precipitation: 0,
     windGust: 10,
+    windSpeed: 6,
     // Atmosfera spokojna: seeing nie jest przedmiotem tych fikstur, a niezerowe
     // wartości zaciemniałyby to, co sprawdzają.
     windJet: 20,

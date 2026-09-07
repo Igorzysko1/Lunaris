@@ -21,6 +21,20 @@ import { useForecast } from '@/store/forecast';
 import { LEAD_TIMES, useSettings } from '@/store/settings';
 import { colors, fonts } from '@/theme';
 
+/**
+ * Źródła danych, na których stoi każdy werdykt.
+ *
+ * Nie jest to ozdoba ekranu „o aplikacji": Open-Meteo daje dane na CC BY 4.0,
+ * a World Atlas i GUGiK to osobne opracowania z własnymi warunkami. Kto po
+ * miesiącu zapyta „skąd wiadomo, że tam jest Bortle 4", znajdzie odpowiedź tu.
+ */
+const DATA_SOURCES = [
+  { name: 'Open-Meteo', use: 'prognoza pogody · CC BY 4.0' },
+  { name: 'World Atlas 2024', use: 'jasność nieba, skala Bortle’a' },
+  { name: 'GUGiK', use: 'model terenu pod maskę horyzontu' },
+  { name: 'Astronomy Engine, suncalc', use: 'efemerydy liczone lokalnie' },
+] as const;
+
 export default function SettingsScreen() {
   const {
     placeName,
@@ -280,6 +294,17 @@ export default function SettingsScreen() {
             <Text style={styles.rowLabel}>Lunaris</Text>
             <Text style={styles.aboutValue}>Aplikacja astronomiczna</Text>
           </View>
+          <Divider />
+          {/* Skąd biorą się liczby, na których zapada decyzja o wyjeździe.
+              Open-Meteo udostępnia dane na CC BY 4.0, a atrybucja jest
+              warunkiem tej licencji — nie uprzejmością. */}
+          <Text style={styles.sourcesLabel}>Dane</Text>
+          {DATA_SOURCES.map((source) => (
+            <View key={source.name} style={styles.sourceRow}>
+              <Text style={styles.sourceName}>{source.name}</Text>
+              <Text style={styles.sourceUse}>{source.use}</Text>
+            </View>
+          ))}
         </Card>
       </ScrollView>
     </SafeAreaView>
@@ -553,6 +578,32 @@ const styles = StyleSheet.create({
     fontFamily: fonts.sans,
     fontSize: 13,
     color: colors.textMuted,
+  },
+  sourcesLabel: {
+    fontFamily: fonts.sansMedium,
+    fontSize: 12,
+    color: colors.textSecondary,
+    paddingTop: 12,
+    paddingBottom: 6,
+  },
+  sourceRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    gap: 12,
+    paddingVertical: 3,
+  },
+  sourceName: {
+    fontFamily: fonts.sans,
+    fontSize: 12,
+    color: colors.textPrimary,
+  },
+  sourceUse: {
+    flex: 1,
+    fontFamily: fonts.sans,
+    fontSize: 11,
+    color: colors.textMuted,
+    textAlign: 'right',
   },
   aboutValue: {
     fontFamily: fonts.sans,

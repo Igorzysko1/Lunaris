@@ -18,15 +18,22 @@ const API = 'https://api.open-meteo.com/v1/forecast';
  * a nie awaria, i wtedy sensownie jest pokazać ostatnie zapisane dane. `api`
  * znaczy, że serwer odpowiedział czymś innym niż prognozą; to problem po drugiej
  * stronie i użytkownik nie naprawi go wejściem na wzgórze po zasięg.
+ *
+ * `rate-limit` jest trzecim przypadkiem i celowo nie jest wrzucony do `api`:
+ * nic się nie zepsuło, po prostu trzeba odczekać. Darmowe Open-Meteo daje
+ * 600 wywołań na minutę i 10 000 na dobę — przy jednym odświeżeniu dziennie to
+ * margines trzech rzędów wielkości, więc 429 znaczy zwykle pętlę w kodzie,
+ * a nie realne zużycie limitu. Tym bardziej nie wolno go zamiatać pod „awarię
+ * serwisu": ponawianie co minutę tylko pogłębia blokadę.
  */
 export class ForecastError extends Error {
   // Pola zadeklarowane jawnie, a nie jako parametry konstruktora: parametry
   // z modyfikatorem generują kod, którego zdejmowanie typów w Node nie obsłuży,
   // a ten moduł uruchamia się także poza Metro (skrypt scripts/check-weather.ts).
-  kind: 'offline' | 'api';
+  kind: 'offline' | 'api' | 'rate-limit';
   status?: number;
 
-  constructor(kind: 'offline' | 'api', message: string, status?: number) {
+  constructor(kind: 'offline' | 'api' | 'rate-limit', message: string, status?: number) {
     super(message);
     this.name = 'ForecastError';
     this.kind = kind;
@@ -51,6 +58,10 @@ async function getJson(url: URL, signal?: AbortSignal): Promise<unknown> {
     throw new ForecastError('offline', 'Brak połączenia z siecią');
   }
 
+  if (res.status === 429) {
+    throw new ForecastError('rate-limit', 'Open-Meteo: limit zapytań (429)', 429);
+  }
+
   if (!res.ok) {
     throw new ForecastError('api', `Open-Meteo: ${res.status}`, res.status);
   }
@@ -67,6 +78,12 @@ export type NightHour = {
    * wysokie tylko zabierają kontrast i są tolerowane wyżej.
    */
   cloudLow: number;
+  /**
+   * Piętro średnie. Nie ma własnego progu w silniku — przypisanie mu jednego
+   * jest decyzją do wystrojenia na realnych obserwacjach, a nie do zgadnięcia.
+   * Zapisujemy je, bo bez danych nie ma czego stroić.
+   */
+  cloudMid: number;
   cloudHigh: number;
   humidity: number;
   temperature: number;
@@ -75,6 +92,12 @@ export type NightHour = {
   precipitation: number;
   /** Porywy wiatru (km/h) — to one trzęsą sprzętem, nie średnia prędkość. */
   windGust: number;
+  /**
+   * Średnia prędkość wiatru (km/h). Sprzętem trzęsą porywy, ale to średnia
+   * decyduje o tym, jak szybko wychładza — a stoi się w miejscu przez kilka
+   * godzin, nocą, w listopadzie.
+   */
+  windSpeed: number;
   /**
    * Wiatr na 250 hPa (km/h) — wysokość prądu strumieniowego, około 10 km.
    * Główny sprawca drgania obrazu: turbulencja na granicy szybkich warstw
@@ -112,12 +135,14 @@ type ApiResponse = {
     time: string[];
     cloud_cover: (number | null)[];
     cloud_cover_low: (number | null)[];
+    cloud_cover_mid: (number | null)[];
     cloud_cover_high: (number | null)[];
     relative_humidity_2m: (number | null)[];
     temperature_2m: (number | null)[];
     dew_point_2m: (number | null)[];
     precipitation: (number | null)[];
     wind_gusts_10m: (number | null)[];
+    wind_speed_10m: (number | null)[];
     wind_speed_250hPa: (number | null)[];
     wind_speed_500hPa: (number | null)[];
     temperature_850hPa: (number | null)[];
@@ -143,12 +168,14 @@ const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.le
 const HOURLY_FIELDS = [
   'cloud_cover',
   'cloud_cover_low',
+  'cloud_cover_mid',
   'cloud_cover_high',
   'relative_humidity_2m',
   'temperature_2m',
   'dew_point_2m',
   'precipitation',
   'wind_gusts_10m',
+  'wind_speed_10m',
   // Pola pod ocenę seeingu — patrz src/lib/seeing.ts. Idą tym samym żądaniem,
   // więc nie kosztują ani jednego wywołania więcej.
   'wind_speed_250hPa',
@@ -164,12 +191,14 @@ function toHours(json: ApiResponse): NightHour[] {
     at: new Date(time),
     cloud: json.hourly.cloud_cover[i] ?? 0,
     cloudLow: json.hourly.cloud_cover_low[i] ?? 0,
+    cloudMid: json.hourly.cloud_cover_mid[i] ?? 0,
     cloudHigh: json.hourly.cloud_cover_high[i] ?? 0,
     humidity: json.hourly.relative_humidity_2m[i] ?? 0,
     temperature: json.hourly.temperature_2m[i] ?? 0,
     dewSpread: (json.hourly.temperature_2m[i] ?? 0) - (json.hourly.dew_point_2m[i] ?? 0),
     precipitation: json.hourly.precipitation[i] ?? 0,
     windGust: json.hourly.wind_gusts_10m[i] ?? 0,
+    windSpeed: json.hourly.wind_speed_10m[i] ?? 0,
     windJet: json.hourly.wind_speed_250hPa[i] ?? 0,
     windMid: json.hourly.wind_speed_500hPa[i] ?? 0,
     temp850: json.hourly.temperature_850hPa[i] ?? 0,

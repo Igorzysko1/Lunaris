@@ -60,6 +60,8 @@ export type BriefNight = {
     travelMinutes: number;
   } | null;
   minTemperature: number | null;
+  /** Najniższa odczuwalna — temperatura z poprawką na wiatr. */
+  feltTemperature: number | null;
   /** Spokój atmosfery: 1–5 i to, co go psuje. `null`, gdy nocy nie ma. */
   seeing: { index: number; label: string; driver: string; usableMagnification: number } | null;
   /** Tylko cele w zasięgu — brief ma mówić, co robić, a nie czego się nie da. */
@@ -190,7 +192,7 @@ export function buildBrief(input: BriefInput): BriefResult {
   });
 
   const briefNights: BriefNight[] = planned.map(
-    ({ verdict, minTemperature, targets, uncertain, seeing }) => ({
+    ({ verdict, minTemperature, feltTemperature, targets, uncertain, seeing }) => ({
       from: iso(verdict.night.from),
       to: iso(verdict.night.to),
       status: verdict.status,
@@ -207,6 +209,7 @@ export function buildBrief(input: BriefInput): BriefResult {
         : null,
       plan: plainPlan(verdict.plan),
       minTemperature,
+      feltTemperature: feltTemperature === null ? null : Math.round(feltTemperature * 10) / 10,
       seeing,
       // Pełna lista, ale w kolejności od najefektowniejszych: odbiorcą jest cron,
       // który zwykle weźmie z niej kilka pierwszych pozycji.

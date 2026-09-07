@@ -32,6 +32,15 @@ export const ATTEMPT_LOCK_MINUTES = 2;
 export const RETRY_DELAY_MINUTES = 5;
 
 /**
+ * Po odbiciu się od limitu zapytań czekamy dłużej.
+ *
+ * 429 to jedyne niepowodzenie, które ponawianie **pogłębia**: każde kolejne
+ * żądanie przedłuża blokadę. Pięć minut wystarcza przy zwykłej awarii serwera,
+ * tutaj jest ponawianiem w to samo miejsce.
+ */
+export const RATE_LIMIT_DELAY_MINUTES = 30;
+
+/**
  * Ile razy w obrębie jednego terminu wolno spróbować. Po wyczerpaniu — cisza do
  * następnego terminu albo do ręcznego odświeżenia. Brak sieci o 17:00 to
  * sytuacja normalna, a nie powód, żeby dobijać się do serwera co minutę.
@@ -50,6 +59,8 @@ export type CycleState = {
   lastSuccessAt: Date | null;
   /** Powód ostatniego niepowodzenia, do pokazania w ustawieniach. */
   lastError: string | null;
+  /** Czy ostatnie niepowodzenie było odbiciem się od limitu zapytań. */
+  rateLimited: boolean;
   /** Termin, do którego liczą się poniższe próby — po jego zmianie licznik zeruje się sam. */
   attemptTerm: Date | null;
   attemptsThisTerm: number;
@@ -59,6 +70,7 @@ export const EMPTY_CYCLE_STATE: CycleState = {
   lastAttemptAt: null,
   lastSuccessAt: null,
   lastError: null,
+  rateLimited: false,
   attemptTerm: null,
   attemptsThisTerm: 0,
 };
@@ -120,7 +132,8 @@ export function decideRefresh(now: Date, state: CycleState, hour: number): Refre
       return { run: false, reason: 'exhausted', term };
     }
 
-    if (sameTerm && sinceAttemptMin < RETRY_DELAY_MINUTES) {
+    const wait = state.rateLimited ? RATE_LIMIT_DELAY_MINUTES : RETRY_DELAY_MINUTES;
+    if (sameTerm && sinceAttemptMin < wait) {
       return { run: false, reason: 'backoff', term };
     }
   }
@@ -142,7 +155,13 @@ export function markAttempt(state: CycleState, now: Date, term: Date): CycleStat
 
 /** Stan po udanym pobraniu. Licznik prób zeruje się, bo termin został zamknięty. */
 export function markSuccess(state: CycleState, now: Date): CycleState {
-  return { ...state, lastSuccessAt: now, lastError: null, attemptsThisTerm: 0 };
+  return {
+    ...state,
+    lastSuccessAt: now,
+    lastError: null,
+    rateLimited: false,
+    attemptsThisTerm: 0,
+  };
 }
 
 /**
@@ -150,8 +169,8 @@ export function markSuccess(state: CycleState, now: Date): CycleState {
  * unieważnia poprzednich danych, bo cykl, który po awarii kasuje zapis, jest
  * gorszy niż jego brak.
  */
-export function markFailure(state: CycleState, reason: string): CycleState {
-  return { ...state, lastError: reason };
+export function markFailure(state: CycleState, reason: string, rateLimited = false): CycleState {
+  return { ...state, lastError: reason, rateLimited };
 }
 
 /**

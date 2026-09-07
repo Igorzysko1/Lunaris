@@ -15,6 +15,7 @@ import {
   ATTEMPT_LOCK_MINUTES,
   EMPTY_CYCLE_STATE,
   MAX_ATTEMPTS_PER_TERM,
+  RATE_LIMIT_DELAY_MINUTES,
   RETRY_DELAY_MINUTES,
   decideRefresh,
   lastScheduledRefresh,
@@ -169,6 +170,47 @@ describe('znaczniki stanu', () => {
     const failed = markFailure(markAttempt(EMPTY_CYCLE_STATE, now, term), 'offline');
 
     assert.equal(markSuccess(failed, now).lastError, null);
+  });
+});
+
+describe('limit zapytań', () => {
+  const now = new Date(2026, 4, 12, 20, 0);
+  const term = lastScheduledRefresh(now, HOUR);
+
+  it('po 429 czekamy dłużej niż po zwykłej awarii', () => {
+    // Ponawianie jest tu jedynym niepowodzeniem, które pogłębia problem:
+    // każde kolejne żądanie przedłuża blokadę.
+    const attemptedAt = minutesBefore(now, RETRY_DELAY_MINUTES + 1);
+    const limited = markFailure(
+      markAttempt(EMPTY_CYCLE_STATE, attemptedAt, term),
+      'Open-Meteo: limit zapytań (429)',
+      true,
+    );
+
+    assert.equal(decideRefresh(now, limited, HOUR).reason, 'backoff');
+
+    // Zwykła awaria po tym samym czasie już się ponawia.
+    const ordinary = markFailure(
+      markAttempt(EMPTY_CYCLE_STATE, attemptedAt, term),
+      'Open-Meteo: 503',
+    );
+    assert.equal(decideRefresh(now, ordinary, HOUR).run, true);
+  });
+
+  it('po odczekaniu pełnej kary ponawiamy', () => {
+    const limited = markFailure(
+      markAttempt(EMPTY_CYCLE_STATE, minutesBefore(now, RATE_LIMIT_DELAY_MINUTES + 1), term),
+      'Open-Meteo: limit zapytań (429)',
+      true,
+    );
+
+    assert.equal(decideRefresh(now, limited, HOUR).run, true);
+  });
+
+  it('udane pobranie kasuje pamięć o limicie', () => {
+    const limited = markFailure(EMPTY_CYCLE_STATE, '429', true);
+
+    assert.equal(markSuccess(limited, now).rateLimited, false);
   });
 });
 

@@ -17,7 +17,7 @@ import * as SunCalc from 'suncalc';
 
 import type { AstroEvent, EventType } from '../data/events.ts';
 import type { Coords } from '../data/places.ts';
-import { computeNightRating } from './astro.ts';
+import { computeNightRating, feltTemperature } from './astro.ts';
 import type { LunarisConfig } from './config.ts';
 import { windLimitKmh } from './optics.ts';
 import { seeingOver, type Seeing } from './seeing.ts';
@@ -35,6 +35,11 @@ export type PlannedNight = {
   verdict: NightVerdict;
   /** Najniższa temperatura w oknie obserwacyjnym — do decyzji, jak się ubrać. */
   minTemperature: number | null;
+  /**
+   * Ta sama godzina, ale z poprawką na wiatr. Stoi się bez ruchu przez kilka
+   * godzin, więc to ona mówi, jak naprawdę będzie zimno.
+   */
+  feltTemperature: number | null;
   /** Cele w zasięgu któregokolwiek z zestawów. Puste, gdy nocy nie ma. */
   targets: SkyTarget[];
   /** Prognoza na tę dobę jest już orientacyjna. */
@@ -146,6 +151,9 @@ export function planNights({
       verdict,
       seeing: seeingOver(inWindow),
       minTemperature: inWindow.length ? Math.min(...inWindow.map((h) => h.temperature)) : null,
+      feltTemperature: inWindow.length
+        ? Math.min(...inWindow.map((h) => feltTemperature(h.temperature, h.windSpeed)))
+        : null,
       targets: window ? nightTargetsForProfiles(window, target, config.opticsProfiles, bortle) : [],
       uncertain: index >= UNCERTAIN_FROM_INDEX,
     };
