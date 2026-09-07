@@ -18,6 +18,7 @@ import { SessionCard, SessionsSkeleton } from '@/components/session-cards';
 import { Card, SectionLabel } from '@/components/primitives';
 import { dayBucket, formatLongDate, formatTime } from '@/lib/date';
 import { upcomingEvents } from '@/lib/events';
+import { formatAge } from '@/lib/forecast-cache';
 import { currentNightWindow } from '@/lib/night-window';
 import { nightTargetsForProfiles } from '@/lib/sky-targets';
 import { useSessions } from '@/lib/use-sessions';
@@ -28,7 +29,10 @@ import { HAIRLINE, colors, fonts, radius } from '@/theme';
 export default function NightScreen() {
   const router = useRouter();
   const { active, config } = useSettings();
-  const { status, data, refresh, refreshing } = useNightData(active.coords, active.bortle);
+  const { status, data, savedAt, failure, refresh, refreshing } = useNightData(
+    active.coords,
+    active.bortle,
+  );
   const sessions = useSessions(active.coords, active.bortle, config, active.walkMinutes);
 
   const { lat, lon } = active.coords;
@@ -70,12 +74,32 @@ export default function NightScreen() {
         {status === 'error' && (
           <Card style={styles.gap}>
             <View style={styles.chartError}>
-              <Text style={styles.errorText}>Nie udało się pobrać prognozy na tę noc.</Text>
+              <Text style={styles.errorText}>
+                {failure === 'offline'
+                  ? 'Brak połączenia, a nie mam zapisanej prognozy dla tego miejsca.'
+                  : 'Serwis pogodowy nie odpowiedział poprawnie.'}
+              </Text>
               <Pressable onPress={refresh}>
                 <Text style={styles.retry}>Spróbuj ponownie</Text>
               </Pressable>
             </View>
           </Card>
+        )}
+
+        {/* Dane z zapisu nie mogą udawać świeżych — stąd pasek nad wszystkim. */}
+        {status === 'ready' && savedAt && (
+          <Pressable onPress={refresh} style={[styles.staleBar, styles.gap]}>
+            <Ionicons
+              name={failure === 'offline' ? 'cloud-offline-outline' : 'warning-outline'}
+              size={15}
+              color={colors.amber}
+            />
+            <Text style={styles.staleText}>
+              {failure === 'offline' ? 'Brak sieci' : 'Serwis nie odpowiada'} — dane{' '}
+              {formatAge(savedAt)}
+            </Text>
+            <Text style={styles.staleRetry}>Odśwież</Text>
+          </Pressable>
         )}
 
         {status === 'ready' && data && (
@@ -117,7 +141,11 @@ export default function NightScreen() {
 
             {nextEvent && (
               <>
-                <SectionLabel style={styles.sessionsLabel}>Nadchodzące sesje</SectionLabel>
+                <SectionLabel style={styles.sessionsLabel}>
+                  {sessions.savedAt
+                    ? `Nadchodzące sesje · z prognozy ${formatAge(sessions.savedAt)}`
+                    : 'Nadchodzące sesje'}
+                </SectionLabel>
                 {sessions.status === 'loading' && <SessionsSkeleton />}
                 {sessions.status === 'error' && (
                   <Card style={styles.gap}>
@@ -254,6 +282,28 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.purple,
     textDecorationLine: 'underline',
+  },
+  staleBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceRaised,
+    borderWidth: HAIRLINE,
+    borderColor: colors.amber,
+  },
+  staleText: {
+    flex: 1,
+    fontFamily: fonts.sans,
+    fontSize: 12,
+    color: colors.textSecondary,
+  },
+  staleRetry: {
+    fontFamily: fonts.sansMedium,
+    fontSize: 12,
+    color: colors.purple,
   },
   eventLabel: {
     marginBottom: 8,

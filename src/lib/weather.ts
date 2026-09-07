@@ -11,6 +11,53 @@ import { nightWindow, type NightWindow } from './night-window.ts';
 
 const API = 'https://api.open-meteo.com/v1/forecast';
 
+/**
+ * Błąd pobierania prognozy, z rozróżnieniem powodu.
+ *
+ * `offline` znaczy, że żądanie w ogóle nie wyszło — w terenie to normalny stan,
+ * a nie awaria, i wtedy sensownie jest pokazać ostatnie zapisane dane. `api`
+ * znaczy, że serwer odpowiedział czymś innym niż prognozą; to problem po drugiej
+ * stronie i użytkownik nie naprawi go wejściem na wzgórze po zasięg.
+ */
+export class ForecastError extends Error {
+  // Pola zadeklarowane jawnie, a nie jako parametry konstruktora: parametry
+  // z modyfikatorem generują kod, którego zdejmowanie typów w Node nie obsłuży,
+  // a ten moduł uruchamia się także poza Metro (skrypt scripts/check-weather.ts).
+  kind: 'offline' | 'api';
+  status?: number;
+
+  constructor(kind: 'offline' | 'api', message: string, status?: number) {
+    super(message);
+    this.name = 'ForecastError';
+    this.kind = kind;
+    this.status = status;
+  }
+}
+
+/**
+ * Jedno miejsce, w którym rozstrzyga się „nie ma sieci" kontra „serwer odmówił".
+ * `fetch` odrzuca obietnicę tylko wtedy, gdy żądanie nie doszło; odpowiedź 500
+ * jest z jego punktu widzenia sukcesem, więc status trzeba sprawdzić osobno.
+ */
+async function getJson(url: URL, signal?: AbortSignal): Promise<unknown> {
+  let res: Response;
+
+  try {
+    res = await fetch(url.toString(), { signal });
+  } catch (error) {
+    // Przerwanie przez AbortController to nie awaria sieci — puszczamy dalej,
+    // bo wywołujący i tak porzuca wynik.
+    if (error instanceof Error && error.name === 'AbortError') throw error;
+    throw new ForecastError('offline', 'Brak połączenia z siecią');
+  }
+
+  if (!res.ok) {
+    throw new ForecastError('api', `Open-Meteo: ${res.status}`, res.status);
+  }
+
+  return res.json();
+}
+
 /** Pojedyncza godzina wewnątrz okna nocy. */
 export type NightHour = {
   at: Date;
@@ -111,15 +158,13 @@ export async function fetchNightForecast(
   url.searchParams.set('past_days', '1');
   url.searchParams.set('forecast_days', '2');
 
-  const res = await fetch(url.toString(), { signal });
-  if (!res.ok) throw new Error(`Open-Meteo: ${res.status}`);
-  const json = (await res.json()) as ApiResponse;
+  const json = (await getJson(url, signal)) as ApiResponse;
 
   const { from, to } = sunWindow(json.daily, new Date());
 
   const hours = toHours(json).filter((h) => h.at >= from && h.at <= to);
 
-  if (hours.length === 0) throw new Error('Brak danych dla okna nocy');
+  if (hours.length === 0) throw new ForecastError('api', 'Brak danych dla okna nocy');
 
   return {
     from,
@@ -160,9 +205,7 @@ export async function fetchUpcomingNights(
   // Noc n-ta kończy się rano dnia n+1, więc dób trzeba o jedną więcej.
   url.searchParams.set('forecast_days', String(Math.min(16, nights + 1)));
 
-  const res = await fetch(url.toString(), { signal });
-  if (!res.ok) throw new Error(`Open-Meteo: ${res.status}`);
-  const json = (await res.json()) as ApiResponse;
+  const json = (await getJson(url, signal)) as ApiResponse;
 
   const all = toHours(json);
 

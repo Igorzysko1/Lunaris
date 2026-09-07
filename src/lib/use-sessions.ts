@@ -6,7 +6,8 @@ import type { LunarisConfig } from '@/lib/config';
 import { windLimitKmh } from '@/lib/optics';
 import { nightTargetsForProfiles, type SkyTarget } from '@/lib/sky-targets';
 import { evaluateNight, type NightVerdict } from '@/lib/session-engine';
-import { fetchUpcomingNights } from '@/lib/weather';
+import { loadForecast, saveForecast } from '@/lib/forecast-cache';
+import { fetchUpcomingNights, type NightSlice } from '@/lib/weather';
 
 /** Ile nocy pokazuje sekcja. Trzecia doba jest już orientacyjna — patrz `uncertain`. */
 export const SESSION_NIGHTS = 3;
@@ -56,6 +57,8 @@ export function useSessions(
 ) {
   const [status, setStatus] = useState<SessionsStatus>('loading');
   const [sessions, setSessions] = useState<Session[]>([]);
+  /** Ustawione tylko wtedy, gdy werdykty policzono z zapisanej prognozy. */
+  const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [attempt, setAttempt] = useState(0);
 
   const refresh = useCallback(() => setAttempt((n) => n + 1), []);
@@ -72,66 +75,88 @@ export function useSessions(
     // pokazywać ładowanie dla NOWEJ lokalizacji, a nie dane dla poprzedniej.
     setStatus('loading');
 
+    // Werdykty liczymy z prognozy, ale nie z sieci — dzięki temu ta sama funkcja
+    // obsługuje świeże dane i te odtworzone z zapisu.
+    const present = (slices: NightSlice[]) => {
+      setSessions(
+        slices.map(({ night, hours }, index) => {
+          const target = { lat, lon };
+          const illumination = Math.round(SunCalc.getMoonIllumination(night.from).fraction * 100);
+
+          // Okno oceniamy najłagodniejszym progiem wiatru spośród zestawów —
+          // noc dobra dla sprzętu na statywie nie ma przepadać przez to, że
+          // w konfiguracji stoi obok niego lornetka trzymana z ręki.
+          const windLimit = Math.max(
+            ...config.opticsProfiles.map((p) =>
+              windLimitKmh(p.optics, {
+                tripod: config.conditions.maxWindGustKmh,
+                handheld: config.conditions.maxWindGustHandheldKmh,
+              }),
+            ),
+          );
+
+          const verdict = evaluateNight({
+            night,
+            hours,
+            moon: {
+              illumination,
+              upAt: (at) => SunCalc.getMoonPosition(at, lat, lon).altitude > 0,
+            },
+            target,
+            home,
+            nextDay: assumedNextDay(night, config),
+            // Kalendarz zjawisk nie jest jeszcze wpięty w silnik — dopóki nie jest,
+            // żadna noc nie łamie reguły wczesnego poranka.
+            uniquePhenomenon: false,
+            windLimitKmh: windLimit,
+            walkMinutes,
+            config,
+          });
+
+          const window = verdict.window;
+          const inWindow = window
+            ? hours.filter((h) => h.at >= window.from && h.at <= window.to)
+            : [];
+
+          return {
+            verdict,
+            minTemperature: inWindow.length
+              ? Math.min(...inWindow.map((h) => h.temperature))
+              : null,
+            targets: window
+              ? nightTargetsForProfiles(window, target, config.opticsProfiles, bortle)
+              : [],
+            uncertain: index >= UNCERTAIN_FROM_INDEX,
+          };
+        }),
+      );
+      setStatus('ready');
+    };
+
     fetchUpcomingNights({ lat, lon }, SESSION_NIGHTS, controller.signal)
       .then((slices) => {
         if (!active) return;
-
-        setSessions(
-          slices.map(({ night, hours }, index) => {
-            const target = { lat, lon };
-            const illumination = Math.round(SunCalc.getMoonIllumination(night.from).fraction * 100);
-
-            // Okno oceniamy najłagodniejszym progiem wiatru spośród zestawów —
-            // noc dobra dla sprzętu na statywie nie ma przepadać przez to, że
-            // w konfiguracji stoi obok niego lornetka trzymana z ręki.
-            const windLimit = Math.max(
-              ...config.opticsProfiles.map((p) =>
-                windLimitKmh(p.optics, {
-                  tripod: config.conditions.maxWindGustKmh,
-                  handheld: config.conditions.maxWindGustHandheldKmh,
-                }),
-              ),
-            );
-
-            const verdict = evaluateNight({
-              night,
-              hours,
-              moon: {
-                illumination,
-                upAt: (at) => SunCalc.getMoonPosition(at, lat, lon).altitude > 0,
-              },
-              target,
-              home,
-              nextDay: assumedNextDay(night, config),
-              // Kalendarz zjawisk nie jest jeszcze wpięty w silnik — dopóki nie jest,
-              // żadna noc nie łamie reguły wczesnego poranka.
-              uniquePhenomenon: false,
-              windLimitKmh: windLimit,
-              walkMinutes,
-              config,
-            });
-
-            const window = verdict.window;
-            const inWindow = window
-              ? hours.filter((h) => h.at >= window.from && h.at <= window.to)
-              : [];
-
-            return {
-              verdict,
-              minTemperature: inWindow.length
-                ? Math.min(...inWindow.map((h) => h.temperature))
-                : null,
-              targets: window
-                ? nightTargetsForProfiles(window, target, config.opticsProfiles, bortle)
-                : [],
-              uncertain: index >= UNCERTAIN_FROM_INDEX,
-            };
-          }),
-        );
-        setStatus('ready');
+        setSavedAt(null);
+        present(slices);
+        void saveForecast('sessions', { lat, lon }, slices);
       })
-      .catch(() => {
-        if (active) setStatus('error');
+      .catch(async (error: unknown) => {
+        if (!active || (error instanceof Error && error.name === 'AbortError')) return;
+
+        // Brak sieci w terenie jest normalny — wtedy lepiej pokazać werdykty
+        // z ostatniej prognozy niż nic. Przy błędzie API robimy to samo: dane są
+        // te same, a powód rozróżnia ekran Noc, gdzie widać go w jednym miejscu.
+        const cached = await loadForecast<NightSlice[]>('sessions', { lat, lon });
+        if (!active) return;
+
+        if (cached) {
+          setSavedAt(cached.savedAt);
+          present(cached.payload);
+          return;
+        }
+
+        setSavedAt(null);
+        setStatus('error');
       });
 
     return () => {
@@ -144,5 +169,5 @@ export function useSessions(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lat, lon, bortle, config, home?.lat, home?.lon, walkMinutes, attempt]);
 
-  return { status, sessions, refresh };
+  return { status, sessions, savedAt, refresh };
 }
