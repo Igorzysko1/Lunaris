@@ -1,0 +1,435 @@
+exports[`snapshoty zamrożonych zestawów > noc czysta 1`] = `
+{
+  "version": 1,
+  "generatedAt": "2026-01-16T16:00:00.000Z",
+  "site": {
+    "id": "site-bledowska",
+    "name": "Pustynia Błędowska",
+    "lat": 50.35,
+    "lon": 19.53,
+    "bortle": 4,
+    "walkMinutes": 15
+  },
+  "summary": {
+    "headline": "Dziś można jechać na Pustynia Błędowska, okno 18:00–06:00.",
+    "nights": 1,
+    "go": 1,
+    "firstGo": "2026-01-16T17:00:00.000Z"
+  },
+  "nights": [
+    {
+      "from": "2026-01-16T17:00:00.000Z",
+      "to": "2026-01-17T05:00:00.000Z",
+      "status": "go",
+      "uncertain": false,
+      "rejection": null,
+      "warnings": [],
+      "window": {
+        "from": "2026-01-16T17:00:00.000Z",
+        "to": "2026-01-17T05:00:00.000Z",
+        "durationMinutes": 720,
+        "moonLimited": false
+      },
+      "plan": {
+        "departAt": "2026-01-16T16:15:23.537Z",
+        "returnAt": "2026-01-17T05:59:36.462Z",
+        "wakeAt": null,
+        "sleepHours": null,
+        "travelMinutes": 44.607711636654926
+      },
+      "minTemperature": 8,
+      "targets": [
+        {
+          "id": "hchi",
+          "name": "h+χ Persei — Podwójna Gromada w Perseuszu",
+          "detail": "gromada otwarta, 4.3 mag",
+          "kind": "dso",
+          "bestAt": "2026-01-16T17:15:00.000Z",
+          "maxAltitude": 83.1,
+          "bestAzimuth": 5,
+          "magnitude": 4.3
+        },
+        {
+          "id": "m31",
+          "name": "M31 — Galaktyka Andromedy",
+          "detail": "galaktyka, 3.4 mag",
+          "kind": "dso",
+          "bestAt": "2026-01-16T17:00:00.000Z",
+          "maxAltitude": 73.8,
+          "bestAzimuth": 244,
+          "magnitude": 3.4
+        },
+        {
+          "id": "m45",
+          "name": "M45 — Plejady",
+          "detail": "gromada otwarta, 1.6 mag",
+          "kind": "dso",
+          "bestAt": "2026-01-16T18:45:00.000Z",
+          "maxAltitude": 63.9,
+          "bestAzimuth": 180,
+          "magnitude": 1.6
+        },
+        {
+          "id": "planet-Jupiter",
+          "name": "Jowisz",
+          "detail": "planeta, -2.7 mag",
+          "kind": "planet",
+          "bestAt": "2026-01-16T22:15:00.000Z",
+          "maxAltitude": 62,
+          "bestAzimuth": 178,
+          "magnitude": -2.668659875240305
+        },
+        {
+          "id": "planet-Uranus",
+          "name": "Uran",
+          "detail": "planeta, 5.7 mag",
+          "kind": "planet",
+          "bestAt": "2026-01-16T18:45:00.000Z",
+          "maxAltitude": 59.1,
+          "bestAzimuth": 183,
+          "magnitude": 5.654345397880651
+        },
+        {
+          "id": "m13",
+          "name": "M13 — Gromada Herkulesa",
+          "detail": "gromada kulista, 5.8 mag",
+          "kind": "dso",
+          "bestAt": "2026-01-17T05:00:00.000Z",
+          "maxAltitude": 58.6,
+          "bestAzimuth": 101,
+          "magnitude": 5.8
+        },
+        {
+          "id": "m42",
+          "name": "M42 — Wielka Mgławica w Orionie",
+          "detail": "mgławica, 4.0 mag",
+          "kind": "dso",
+          "bestAt": "2026-01-16T20:30:00.000Z",
+          "maxAltitude": 34.3,
+          "bestAzimuth": 179,
+          "magnitude": 4
+        },
+        {
+          "id": "planet-Neptune",
+          "name": "Neptun",
+          "detail": "planeta, 7.9 mag",
+          "kind": "planet",
+          "bestAt": "2026-01-16T17:00:00.000Z",
+          "maxAltitude": 32.2,
+          "bestAzimuth": 217,
+          "magnitude": 7.915599611709488
+        },
+        {
+          "id": "planet-Saturn",
+          "name": "Saturn",
+          "detail": "planeta, 1.0 mag",
+          "kind": "planet",
+          "bestAt": "2026-01-16T17:00:00.000Z",
+          "maxAltitude": 29.8,
+          "bestAzimuth": 218,
+          "magnitude": 1.0420456623562266
+        }
+      ]
+    }
+  ],
+  "notices": [
+    {
+      "eventId": "conj-test",
+      "title": "Koniunkcja testowa",
+      "body": "Dziś, 22:30 — noc się nadaje, okno 18:00–06:00.",
+      "reason": "new",
+      "notifyAt": "2026-01-16T16:00:00.000Z",
+      "withVerdict": true
+    },
+    {
+      "eventId": "eclipse-test",
+      "title": "Zaćmienie testowe",
+      "body": "pt., 20 lut., 21:00 — zapowiedź, bez prognozy na tę noc (35 dni).",
+      "reason": "preview",
+      "notifyAt": "2026-02-13T16:00:00.000Z",
+      "withVerdict": false
+    }
+  ]
+}
+`;
+
+exports[`snapshoty zamrożonych zestawów > noc pod chmurami 1`] = `
+{
+  "version": 1,
+  "generatedAt": "2026-01-16T16:00:00.000Z",
+  "site": {
+    "id": "site-bledowska",
+    "name": "Pustynia Błędowska",
+    "lat": 50.35,
+    "lon": 19.53,
+    "bortle": 4,
+    "walkMinutes": 15
+  },
+  "summary": {
+    "headline": "Brak nocy do wyjazdu w najbliższych 1 dobach.",
+    "nights": 1,
+    "go": 0,
+    "firstGo": null
+  },
+  "nights": [
+    {
+      "from": "2026-01-17T17:00:00.000Z",
+      "to": "2026-01-18T05:00:00.000Z",
+      "status": "no-go",
+      "uncertain": false,
+      "rejection": {
+        "kind": "conditions",
+        "blocker": "cloud-low"
+      },
+      "warnings": [],
+      "window": null,
+      "plan": null,
+      "minTemperature": null,
+      "targets": []
+    }
+  ],
+  "notices": [
+    {
+      "eventId": "eclipse-test",
+      "title": "Zaćmienie testowe",
+      "body": "pt., 20 lut., 21:00 — zapowiedź, bez prognozy na tę noc (35 dni).",
+      "reason": "preview",
+      "notifyAt": "2026-02-13T16:00:00.000Z",
+      "withVerdict": false
+    }
+  ]
+}
+`;
+
+exports[`snapshoty zamrożonych zestawów > noc wietrzna 1`] = `
+{
+  "version": 1,
+  "generatedAt": "2026-01-16T16:00:00.000Z",
+  "site": {
+    "id": "site-bledowska",
+    "name": "Pustynia Błędowska",
+    "lat": 50.35,
+    "lon": 19.53,
+    "bortle": 4,
+    "walkMinutes": 15
+  },
+  "summary": {
+    "headline": "Brak nocy do wyjazdu w najbliższych 1 dobach.",
+    "nights": 1,
+    "go": 0,
+    "firstGo": null
+  },
+  "nights": [
+    {
+      "from": "2026-01-18T17:00:00.000Z",
+      "to": "2026-01-19T05:00:00.000Z",
+      "status": "no-go",
+      "uncertain": false,
+      "rejection": {
+        "kind": "conditions",
+        "blocker": "wind"
+      },
+      "warnings": [],
+      "window": null,
+      "plan": null,
+      "minTemperature": null,
+      "targets": []
+    }
+  ],
+  "notices": [
+    {
+      "eventId": "eclipse-test",
+      "title": "Zaćmienie testowe",
+      "body": "pt., 20 lut., 21:00 — zapowiedź, bez prognozy na tę noc (35 dni).",
+      "reason": "preview",
+      "notifyAt": "2026-02-13T16:00:00.000Z",
+      "withVerdict": false
+    }
+  ]
+}
+`;
+
+exports[`snapshoty zamrożonych zestawów > trzy noce razem 1`] = `
+{
+  "version": 1,
+  "generatedAt": "2026-01-16T16:00:00.000Z",
+  "site": {
+    "id": "site-bledowska",
+    "name": "Pustynia Błędowska",
+    "lat": 50.35,
+    "lon": 19.53,
+    "bortle": 4,
+    "walkMinutes": 15
+  },
+  "summary": {
+    "headline": "Dziś można jechać na Pustynia Błędowska, okno 18:00–06:00.",
+    "nights": 3,
+    "go": 1,
+    "firstGo": "2026-01-16T17:00:00.000Z"
+  },
+  "nights": [
+    {
+      "from": "2026-01-16T17:00:00.000Z",
+      "to": "2026-01-17T05:00:00.000Z",
+      "status": "go",
+      "uncertain": false,
+      "rejection": null,
+      "warnings": [],
+      "window": {
+        "from": "2026-01-16T17:00:00.000Z",
+        "to": "2026-01-17T05:00:00.000Z",
+        "durationMinutes": 720,
+        "moonLimited": false
+      },
+      "plan": {
+        "departAt": "2026-01-16T16:15:23.537Z",
+        "returnAt": "2026-01-17T05:59:36.462Z",
+        "wakeAt": null,
+        "sleepHours": null,
+        "travelMinutes": 44.607711636654926
+      },
+      "minTemperature": 8,
+      "targets": [
+        {
+          "id": "hchi",
+          "name": "h+χ Persei — Podwójna Gromada w Perseuszu",
+          "detail": "gromada otwarta, 4.3 mag",
+          "kind": "dso",
+          "bestAt": "2026-01-16T17:15:00.000Z",
+          "maxAltitude": 83.1,
+          "bestAzimuth": 5,
+          "magnitude": 4.3
+        },
+        {
+          "id": "m31",
+          "name": "M31 — Galaktyka Andromedy",
+          "detail": "galaktyka, 3.4 mag",
+          "kind": "dso",
+          "bestAt": "2026-01-16T17:00:00.000Z",
+          "maxAltitude": 73.8,
+          "bestAzimuth": 244,
+          "magnitude": 3.4
+        },
+        {
+          "id": "m45",
+          "name": "M45 — Plejady",
+          "detail": "gromada otwarta, 1.6 mag",
+          "kind": "dso",
+          "bestAt": "2026-01-16T18:45:00.000Z",
+          "maxAltitude": 63.9,
+          "bestAzimuth": 180,
+          "magnitude": 1.6
+        },
+        {
+          "id": "planet-Jupiter",
+          "name": "Jowisz",
+          "detail": "planeta, -2.7 mag",
+          "kind": "planet",
+          "bestAt": "2026-01-16T22:15:00.000Z",
+          "maxAltitude": 62,
+          "bestAzimuth": 178,
+          "magnitude": -2.668659875240305
+        },
+        {
+          "id": "planet-Uranus",
+          "name": "Uran",
+          "detail": "planeta, 5.7 mag",
+          "kind": "planet",
+          "bestAt": "2026-01-16T18:45:00.000Z",
+          "maxAltitude": 59.1,
+          "bestAzimuth": 183,
+          "magnitude": 5.654345397880651
+        },
+        {
+          "id": "m13",
+          "name": "M13 — Gromada Herkulesa",
+          "detail": "gromada kulista, 5.8 mag",
+          "kind": "dso",
+          "bestAt": "2026-01-17T05:00:00.000Z",
+          "maxAltitude": 58.6,
+          "bestAzimuth": 101,
+          "magnitude": 5.8
+        },
+        {
+          "id": "m42",
+          "name": "M42 — Wielka Mgławica w Orionie",
+          "detail": "mgławica, 4.0 mag",
+          "kind": "dso",
+          "bestAt": "2026-01-16T20:30:00.000Z",
+          "maxAltitude": 34.3,
+          "bestAzimuth": 179,
+          "magnitude": 4
+        },
+        {
+          "id": "planet-Neptune",
+          "name": "Neptun",
+          "detail": "planeta, 7.9 mag",
+          "kind": "planet",
+          "bestAt": "2026-01-16T17:00:00.000Z",
+          "maxAltitude": 32.2,
+          "bestAzimuth": 217,
+          "magnitude": 7.915599611709488
+        },
+        {
+          "id": "planet-Saturn",
+          "name": "Saturn",
+          "detail": "planeta, 1.0 mag",
+          "kind": "planet",
+          "bestAt": "2026-01-16T17:00:00.000Z",
+          "maxAltitude": 29.8,
+          "bestAzimuth": 218,
+          "magnitude": 1.0420456623562266
+        }
+      ]
+    },
+    {
+      "from": "2026-01-17T17:00:00.000Z",
+      "to": "2026-01-18T05:00:00.000Z",
+      "status": "no-go",
+      "uncertain": false,
+      "rejection": {
+        "kind": "conditions",
+        "blocker": "cloud-low"
+      },
+      "warnings": [],
+      "window": null,
+      "plan": null,
+      "minTemperature": null,
+      "targets": []
+    },
+    {
+      "from": "2026-01-18T17:00:00.000Z",
+      "to": "2026-01-19T05:00:00.000Z",
+      "status": "no-go",
+      "uncertain": true,
+      "rejection": {
+        "kind": "conditions",
+        "blocker": "wind"
+      },
+      "warnings": [],
+      "window": null,
+      "plan": null,
+      "minTemperature": null,
+      "targets": []
+    }
+  ],
+  "notices": [
+    {
+      "eventId": "conj-test",
+      "title": "Koniunkcja testowa",
+      "body": "Dziś, 22:30 — noc się nadaje, okno 18:00–06:00.",
+      "reason": "new",
+      "notifyAt": "2026-01-16T16:00:00.000Z",
+      "withVerdict": true
+    },
+    {
+      "eventId": "eclipse-test",
+      "title": "Zaćmienie testowe",
+      "body": "pt., 20 lut., 21:00 — zapowiedź, bez prognozy na tę noc (35 dni).",
+      "reason": "preview",
+      "notifyAt": "2026-02-13T16:00:00.000Z",
+      "withVerdict": false
+    }
+  ]
+}
+`;

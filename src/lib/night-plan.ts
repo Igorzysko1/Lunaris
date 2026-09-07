@@ -15,7 +15,9 @@
 
 import * as SunCalc from 'suncalc';
 
+import type { AstroEvent, EventType } from '../data/events.ts';
 import type { Coords } from '../data/places.ts';
+import { computeNightRating } from './astro.ts';
 import type { LunarisConfig } from './config.ts';
 import { windLimitKmh } from './optics.ts';
 import { assumedNextDay, evaluateNight, type NightVerdict } from './session-engine.ts';
@@ -38,6 +40,15 @@ export type PlannedNight = {
   uncertain: boolean;
 };
 
+/**
+ * Zjawiska, które w danym miesiącu się nie powtórzą.
+ *
+ * Fazy Księżyca wracają co miesiąc, a koniunkcje Księżyca z planetami niemal
+ * równie często — nie są powodem, żeby zarywać noc. Zaćmienia, opozycje planet
+ * i maksima rojów zdarzają się raz i tego się nie odrabia.
+ */
+const UNIQUE_TYPES: EventType[] = ['eclipse', 'opposition', 'meteor_shower'];
+
 export type NightPlanInput = {
   nights: NightSlice[];
   target: Coords;
@@ -46,6 +57,11 @@ export type NightPlanInput = {
   config: LunarisConfig;
   bortle: number;
   walkMinutes: number;
+  /**
+   * Zjawiska na najbliższe noce. Bez nich żadna noc nie jest „niepowtarzalna",
+   * a wtedy silnik skraca dla snu nawet noc zaćmienia.
+   */
+  events?: AstroEvent[];
 };
 
 export function planNights({
@@ -55,6 +71,7 @@ export function planNights({
   config,
   bortle,
   walkMinutes,
+  events = [],
 }: NightPlanInput): PlannedNight[] {
   // Okno oceniamy najłagodniejszym progiem wiatru spośród zestawów — noc dobra
   // dla sprzętu na statywie nie ma przepadać przez to, że w konfiguracji stoi
@@ -68,8 +85,25 @@ export function planNights({
     ),
   );
 
+  const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
+
   return nights.map(({ night, hours }, index) => {
     const illumination = Math.round(SunCalc.getMoonIllumination(night.from).fraction * 100);
+
+    // Ta sama ocena, którą użytkownik widzi na ekranie Noc. Musi być ta sama,
+    // bo to ona przesądza o wyjątku od skracania sesji — gdyby silnik liczył ją
+    // po swojemu, wyjątek odpalałby się przy innej liczbie, niż widać.
+    const rating = computeNightRating({
+      avgCloud: avg(hours.map((h) => h.cloud)),
+      avgHumidity: avg(hours.map((h) => h.humidity)),
+      precipitation: hours.reduce((sum, h) => sum + h.precipitation, 0),
+      moonIllumination: illumination,
+      bortle,
+    });
+
+    const uniquePhenomenon = events.some(
+      (e) => e.visible && UNIQUE_TYPES.includes(e.type) && e.at >= night.from && e.at <= night.to,
+    );
 
     const verdict = evaluateNight({
       night,
@@ -81,9 +115,8 @@ export function planNights({
       target,
       home,
       nextDay: assumedNextDay(night, config),
-      // Kalendarz zjawisk nie jest jeszcze wpięty w silnik — dopóki nie jest,
-      // żadna noc nie łamie reguły wczesnego poranka.
-      uniquePhenomenon: false,
+      uniquePhenomenon,
+      rating,
       windLimitKmh: windLimit,
       walkMinutes,
       config,

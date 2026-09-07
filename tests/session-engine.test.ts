@@ -16,6 +16,35 @@ const KATOWICE = { lat: 50.259, lon: 19.021 };
 /** Noc 15/16 stycznia 2026, 18:00 → 00:00. Sześć godzin, siedem próbek. */
 const NIGHT = { from: new Date(2026, 0, 15, 18, 0), to: new Date(2026, 0, 16, 0, 0) };
 
+/**
+ * Prawdziwa styczniowa noc: 18:00 → 06:00, dwanaście godzin ciemności.
+ *
+ * To ona wywołała całą zmianę. Przy sześciogodzinnej nocy reguła snu nigdy nie
+ * wiąże — pobudka wypada długo po jej końcu — więc na krótkiej fikstury nie da
+ * się sprawdzić tego, co w terenie decyduje o werdykcie.
+ */
+const LONG_NIGHT = { from: new Date(2026, 0, 15, 18, 0), to: new Date(2026, 0, 16, 6, 0) };
+
+function longHours(): NightHour[] {
+  return Array.from({ length: 13 }, (_, i) =>
+    hour(new Date(LONG_NIGHT.from.getTime() + i * 3_600_000)),
+  );
+}
+
+/** Zimowa noc bez własnego limitu długości — wtedy o końcu sesji decyduje sen. */
+function sleepBound(over: Partial<NightInput> = {}): NightInput {
+  const config = configWith();
+  config.session.maxDurationHours = 12;
+
+  return input({
+    night: LONG_NIGHT,
+    hours: longHours(),
+    config,
+    nextDay: { firstEventAt: new Date(2026, 0, 16, 8, 0), dayOff: false },
+    ...over,
+  });
+}
+
 function hour(at: Date, over: Partial<NightHour> = {}): NightHour {
   return {
     at,
@@ -52,6 +81,8 @@ function input(over: Partial<NightInput> = {}): NightInput {
     // Pierwsze wydarzenie o 9:00 — sen wychodzi, a reguła „tylko dom" jeszcze działa.
     nextDay: { firstEventAt: new Date(2026, 0, 16, 9, 0), dayOff: false },
     uniquePhenomenon: false,
+    // Ocena poniżej progu wyjątku: domyślnie noc podlega skracaniu dla snu.
+    rating: 50,
     windLimitKmh: DEFAULT_CONFIG.conditions.maxWindGustKmh,
     walkMinutes: 0,
     config: configWith(),
@@ -76,12 +107,17 @@ describe('evaluateNight — brak danych', () => {
 });
 
 describe('evaluateNight — warunki', () => {
-  it('czysta noc z zapasem snu daje wyjazd', () => {
+  it('czysta noc z zapasem snu daje wyjazd, przycięty do limitu długości', () => {
     const verdict = evaluateNight(input());
 
     assert.equal(verdict.status, 'go');
     assert.equal(verdict.rejection, null);
-    assert.equal(verdict.window?.durationMinutes, 360);
+    // Pogoda pozwala na 6 h, ale własny limit sesji to 5 h — okno jest
+    // skracane, a nie unieważniane, i użytkownik o tym wie.
+    assert.equal(verdict.window?.durationMinutes, 300);
+    assert.ok(
+      verdict.warnings.some((w) => w.kind === 'session-trimmed' && w.reason === 'max-duration'),
+    );
     assert.equal(verdict.plan?.wakeAt?.getHours(), 8);
   });
 
@@ -251,20 +287,73 @@ describe('evaluateNight — kalendarz i sen', () => {
     assert.equal(verdict.status, 'go');
   });
 
-  it('za mało snu przekreśla wyjazd nawet w dzień wolny', () => {
+  it('sen skraca sesję, zamiast przekreślać noc', () => {
+    // Dwunastogodzinna styczniowa noc nie mieści się przed pobudką o 7:20.
+    // Wcześniej odpadała w całości; teraz jedzie się na krócej — to użytkownik
+    // decyduje, kiedy wrócić, a nie pogoda.
+    const verdict = evaluateNight(sleepBound());
+
+    assert.equal(verdict.status, 'go');
+    assert.ok((verdict.window?.durationMinutes ?? 0) >= DEFAULT_CONFIG.conditions.minWindowMinutes);
+    assert.ok((verdict.plan?.sleepHours ?? 0) >= DEFAULT_CONFIG.observer.minSleepHours);
+    assert.ok(verdict.warnings.some((w) => w.kind === 'session-trimmed' && w.reason === 'sleep'));
+  });
+
+  it('sesja krótsza od minimum nie jest warta wyjazdu', () => {
+    // Pobudka zostawia dwie godziny obserwacji przy minimum trzech — próg
+    // z sekcji sesji przestaje być martwą wartością w ustawieniach.
     const verdict = evaluateNight(
-      input({ nextDay: { firstEventAt: new Date(2026, 0, 16, 4, 0), dayOff: true } }),
+      sleepBound({ nextDay: { firstEventAt: new Date(2026, 0, 15, 21, 15), dayOff: false } }),
     );
 
     assert.equal(verdict.status, 'no-go');
     assert.equal(verdict.rejection?.kind, 'not-enough-sleep');
   });
 
-  it('sen na styk jest widoczny jako ostrzeżenie', () => {
-    // Powrót 00:15, pobudka 5:35 → 5 h 20 min: powyżej minimum 5,5 h? nie,
-    // dlatego bierzemy 6:05 → 5 h 50 min, czyli w paśmie ostrzeżenia.
+  it('gdy po przycięciu nie zostaje sensowne okno, powodem jest sen', () => {
     const verdict = evaluateNight(
-      input({ nextDay: { firstEventAt: new Date(2026, 0, 16, 6, 45), dayOff: true } }),
+      input({ nextDay: { firstEventAt: new Date(2026, 0, 15, 23, 30), dayOff: false } }),
+    );
+
+    assert.equal(verdict.status, 'no-go');
+    assert.equal(verdict.rejection?.kind, 'not-enough-sleep');
+  });
+
+  it('noc wybitna nie jest skracana, ale mówi, ile snu kosztuje', () => {
+    const verdict = evaluateNight(sleepBound({ rating: 95 }));
+
+    assert.equal(verdict.status, 'go');
+    assert.equal(verdict.window?.durationMinutes, 720);
+    assert.ok(verdict.warnings.some((w) => w.kind === 'sleep-sacrifice' && w.reason === 'rating'));
+    assert.ok(!verdict.warnings.some((w) => w.kind === 'session-trimmed'));
+  });
+
+  it('zjawisko nie do powtórzenia też wstrzymuje skracanie', () => {
+    const verdict = evaluateNight(sleepBound({ rating: 40, uniquePhenomenon: true }));
+
+    assert.equal(verdict.window?.durationMinutes, 720);
+    assert.ok(
+      verdict.warnings.some((w) => w.kind === 'sleep-sacrifice' && w.reason === 'phenomenon'),
+    );
+  });
+
+  it('próg wyjątku jest konfigurowalny — sto go wyłącza', () => {
+    const config = configWith();
+    config.session.maxDurationHours = 12;
+    config.conditions.exceptionalRating = 100;
+
+    const verdict = evaluateNight(sleepBound({ rating: 95, config }));
+
+    assert.ok(verdict.warnings.some((w) => w.kind === 'session-trimmed'));
+    assert.ok(!verdict.warnings.some((w) => w.kind === 'sleep-sacrifice'));
+  });
+
+  it('sen na styk jest widoczny jako ostrzeżenie', () => {
+    // Dzień wolny znosi pobudkę, więc sen liczy się tylko wtedy, gdy kalendarz
+    // narzuca godzinę. Tu narzuca ją tak, że po przycięciu sen wypada tuż nad
+    // minimum — czyli w paśmie ostrzeżenia.
+    const verdict = evaluateNight(
+      sleepBound({ nextDay: { firstEventAt: new Date(2026, 0, 16, 12, 30), dayOff: false } }),
     );
 
     assert.equal(verdict.status, 'go');

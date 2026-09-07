@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 
 import { findPlaceById, type Coords } from '@/data/places';
 import type { LunarisConfig } from '@/lib/config';
+import { upcomingEvents } from '@/lib/events';
 import { planNights, type PlannedNight } from '@/lib/night-plan';
 import { useForecast } from '@/store/forecast';
 
@@ -29,6 +30,14 @@ export function useSessions(
   const homePlace = config.observer.homePlaceId ? findPlaceById(config.observer.homePlaceId) : null;
   const home = homePlace ? { lat: homePlace.lat, lon: homePlace.lon } : null;
 
+  // Zjawiska liczymy tylko na doby objęte prognozą, a nie na cały horyzont
+  // sześćdziesięciu dni: silnikowi potrzebne są wyłącznie te, które wypadają
+  // w ocenianych nocach.
+  const events = useMemo(
+    () => upcomingEvents(new Date(), { lat, lon }, (bundle?.nights.length ?? 0) + 1),
+    [lat, lon, bundle],
+  );
+
   const sessions = useMemo<Session[]>(() => {
     if (!bundle) return [];
 
@@ -39,13 +48,14 @@ export function useSessions(
       config,
       bortle,
       walkMinutes,
+      events,
     });
     // Werdykt jest funkcją danych, konfiguracji i efemeryd — nie sieci. Zmiana
     // progu albo apertury przelicza go natychmiast, bez pobierania czegokolwiek.
     // `home` rozbite na współrzędne, bo obiekt dostaje nową tożsamość przy każdym
     // renderze store'u, a liczy się sama pozycja.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bundle, lat, lon, bortle, config, home?.lat, home?.lon, walkMinutes]);
+  }, [bundle, events, lat, lon, bortle, config, home?.lat, home?.lon, walkMinutes]);
 
   return { status, sessions, savedAt, refresh, refreshing };
 }

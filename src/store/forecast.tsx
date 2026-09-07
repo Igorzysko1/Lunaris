@@ -103,6 +103,8 @@ async function runEventReview(input: {
 
   const homePlace = config.observer.homePlaceId ? findPlaceById(config.observer.homePlaceId) : null;
 
+  const events = upcomingEvents(now, coords);
+
   const verdicts = planNights({
     nights: bundle.nights,
     target: coords,
@@ -110,11 +112,12 @@ async function runEventReview(input: {
     config,
     bortle,
     walkMinutes,
+    events,
   }).map((planned) => planned.verdict);
 
   const { notices, log } = reviewEvents({
     now,
-    events: upcomingEvents(now, coords),
+    events,
     verdicts,
     leadHours: leadHours(leadTime),
     refreshHour: config.refresh.hourOfDay,

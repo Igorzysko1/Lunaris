@@ -146,6 +146,10 @@ export function reviewNights(input: ReviewInput): NightReview[] {
 
       const coords = { lat: site.lat, lon: site.lon };
       const moon = input.moon(slice.night, coords);
+      const bortle = input.bortleFor(site);
+      // Ocena musi powstać PRZED werdyktem: to ona rozstrzyga, czy sesja jest
+      // skracana dla snu, czy noc jest na tyle dobra, żeby pokazać ją w całości.
+      const rating = ratingFor(slice.hours, bortle, moon.illumination);
 
       const verdict = evaluateNight({
         night: slice.night,
@@ -154,8 +158,11 @@ export function reviewNights(input: ReviewInput): NightReview[] {
         target: coords,
         home,
         nextDay: input.nextDay(slice.night),
-        // Kalendarz zjawisk nie jest wpięty w silnik — patrz useSessions.
+        // Przegląd porównuje miejsca, a nie zjawiska: to samo zaćmienie widać
+        // z każdego z nich, więc wyjątek „zjawisko nie do powtórzenia" niczego
+        // tu nie różnicuje. Skracanie sesji dla snu rozstrzyga sama ocena nocy.
         uniquePhenomenon: false,
+        rating,
         windLimitKmh: windLimit,
         walkMinutes: site.walkMinutes,
         config,
@@ -163,8 +170,6 @@ export function reviewNights(input: ReviewInput): NightReview[] {
 
       const km = home ? distanceKm(home, coords) : 0;
       const travelMinutes = verdict.plan?.travelMinutes ?? 0;
-      const bortle = input.bortleFor(site);
-      const rating = ratingFor(slice.hours, bortle, moon.illumination);
       const penalty = (travelMinutes / 60) * config.conditions.travelPenaltyPerHour;
 
       return [

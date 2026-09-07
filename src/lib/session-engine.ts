@@ -40,7 +40,18 @@ export type Warning =
   | { kind: 'walk-too-long'; walkMinutes: number }
   | { kind: 'tight-sleep'; sleepHours: number }
   /** Wiatr mieści się w progu dla statywu, ale nie dla sprzętu trzymanego z ręki. */
-  | { kind: 'handheld-wind'; maxGustKmh: number; handheldLimitKmh: number };
+  | { kind: 'handheld-wind'; maxGustKmh: number; handheldLimitKmh: number }
+  /**
+   * Sesja została skrócona, żeby zmieścić sen albo własny limit długości.
+   * Nie jest to powód do rezygnacji, ale użytkownik musi wiedzieć, że jedzie
+   * na krócej, niż pozwala pogoda — inaczej zdziwi się na miejscu.
+   */
+  | { kind: 'session-trimmed'; reason: 'sleep' | 'max-duration'; droppedMinutes: number }
+  /**
+   * Noc na tyle dobra, że nie skracamy jej dla snu — użytkownik ma o niej
+   * wiedzieć mimo wszystko, razem z ceną, którą za nią zapłaci.
+   */
+  | { kind: 'sleep-sacrifice'; sleepHours: number; reason: 'rating' | 'phenomenon' };
 
 /** Ciągły blok godzin spełniających kryteria. */
 export type ObservingWindow = {
@@ -105,6 +116,12 @@ export type NightInput = {
    * zwykłej miejscowości z bazy jest zerem, bo nie wiemy, gdzie się stanie.
    */
   walkMinutes: number;
+  /**
+   * Ocena nocy 0–100 — ta sama liczba, którą widzi użytkownik na ekranie.
+   * Silnik jej nie liczy, bo do rachunku potrzeba Bortle, a to własność miejsca,
+   * nie nocy. Powyżej progu z konfiguracji noc przestaje być skracana dla snu.
+   */
+  rating: number;
   config: LunarisConfig;
 };
 
@@ -237,6 +254,38 @@ function isExceptional(hours: NightHour[], input: NightInput, window: ObservingW
 }
 
 /**
+ * Czy noc jest warta nieprzespanej nocy.
+ *
+ * To osobne pojęcie niż `isExceptional`, i celowo łagodniejsze. Tamto rozstrzyga,
+ * czy złamać regułę wczesnego poranka — decyzję ciężką, bo dotyczy obowiązków
+ * następnego dnia. To rozstrzyga tylko, czy skracać sesję: noc wybitna albo
+ * zjawisko, które się nie powtórzy, mają być pokazane w całości, a użytkownik
+ * sam zdecyduje, ile z niej weźmie.
+ */
+function worthLosingSleep(input: NightInput): 'rating' | 'phenomenon' | null {
+  if (input.uniquePhenomenon) return 'phenomenon';
+  if (input.rating >= input.config.conditions.exceptionalRating) return 'rating';
+  return null;
+}
+
+/**
+ * Najpóźniejszy koniec sesji, przy którym sen jeszcze się mieści.
+ *
+ * Liczone wstecz od godziny pobudki: pobudka minus minimum snu daje godzinę
+ * powrotu, a od niej odejmujemy zwijanie sprzętu i drogę. `null` znaczy, że nic
+ * nie ogranicza — nocleg w terenie albo dzień wolny.
+ */
+function latestEndForSleep(input: NightInput, travel: number): Date | null {
+  const { config, nextDay } = input;
+  if (config.session.overnight || !nextDay.firstEventAt) return null;
+
+  const wakeAt = nextDay.firstEventAt.getTime() - config.observer.wakeBufferMin * MINUTE_MS;
+  const latestReturn = wakeAt - config.observer.minSleepHours * HOUR_MS;
+
+  return new Date(latestReturn - (config.observer.packUpMin + travel) * MINUTE_MS);
+}
+
+/**
  * Kalendarz następnego dnia z założenia w konfiguracji.
  *
  * Rozwiązanie zastępcze do czasu podpięcia prawdziwego kalendarza, ale wspólne:
@@ -332,7 +381,85 @@ export function evaluateNight(input: NightInput): NightVerdict {
     warnings.push({ kind: 'walk-too-long', walkMinutes: input.walkMinutes });
   }
 
-  const observing: ObservingWindow = { ...window, moonLimited };
+  // Sesja przycięta wstecz od godziny wymuszonej snem.
+  //
+  // Wcześniej pełne okno szło do planu w całości, a noc, która się w sen nie
+  // mieściła, odpadała w komplecie — czysta, bezksiężycowa noc dostawała werdykt
+  // „nie jedź", bo silnik zakładał obserwację do świtu. Teraz ograniczenie
+  // **skraca sesję**, zamiast ją przekreślać: to użytkownik decyduje, kiedy
+  // wrócić, a nie pogoda.
+  const travel = travelMinutes(input.home, input.target, config);
+  const sacrifice = worthLosingSleep(input);
+
+  const limits: { at: Date; reason: 'sleep' | 'max-duration' }[] = [];
+
+  // Noc wybitna albo zjawisko nie do powtórzenia nie są skracane — o takiej
+  // nocy użytkownik ma się dowiedzieć w całości, razem z jej ceną.
+  if (!sacrifice) {
+    const latestEnd = latestEndForSleep(input, travel);
+    if (latestEnd) limits.push({ at: latestEnd, reason: 'sleep' });
+
+    limits.push({
+      at: new Date(window.from.getTime() + config.session.maxDurationHours * HOUR_MS),
+      reason: 'max-duration',
+    });
+  }
+
+  const binding = limits
+    .filter((l) => l.at < window.to)
+    .sort((a, b) => a.at.getTime() - b.at.getTime())[0];
+
+  const trimmedTo = binding ? binding.at : window.to;
+  const trimmedMinutes = (trimmedTo.getTime() - window.from.getTime()) / MINUTE_MS;
+
+  // Po przycięciu obowiązuje próg z sekcji sesji: „jazda na godzinę" nie jest
+  // wyprawą wartą pakowania sprzętu. `minWindowMinutes` mówi, kiedy okno pogodowe
+  // w ogóle się liczy; to mówi, kiedy wyjazd ma sens.
+  const worthTheDrive = Math.max(
+    config.conditions.minWindowMinutes,
+    config.session.minDurationHours * 60,
+  );
+
+  if (binding && trimmedMinutes < worthTheDrive) {
+    // Po przycięciu nie zostaje nic sensownego. Powód podajemy ten, który
+    // faktycznie przyciął — „musiałbyś wrócić przed 23:00" i „okno było za
+    // krótkie" to dla użytkownika dwie różne informacje.
+    if (binding.reason === 'sleep') {
+      const plan = planFor({ ...window, moonLimited }, input);
+      return {
+        night,
+        window: null,
+        plan: null,
+        warnings,
+        status: 'no-go',
+        rejection: { kind: 'not-enough-sleep', sleepHours: plan.sleepHours ?? 0 },
+      };
+    }
+
+    return {
+      night,
+      window: null,
+      plan: null,
+      warnings,
+      status: 'no-go',
+      rejection: { kind: 'window-too-short', longestMinutes: trimmedMinutes },
+    };
+  }
+
+  if (binding) {
+    warnings.push({
+      kind: 'session-trimmed',
+      reason: binding.reason,
+      droppedMinutes: Math.round((window.to.getTime() - trimmedTo.getTime()) / MINUTE_MS),
+    });
+  }
+
+  const observing: ObservingWindow = {
+    ...window,
+    to: trimmedTo,
+    durationMinutes: trimmedMinutes,
+    moonLimited,
+  };
   const plan = planFor(observing, input);
   const withPlan = { night, window: observing, plan, warnings };
 
@@ -354,17 +481,20 @@ export function evaluateNight(input: NightInput): NightVerdict {
     }
   }
 
+  // Sen poniżej minimum nie odrzuca już nocy — okno zostało przycięte tak, żeby
+  // się mieścił. Zostaje tylko wtedy, gdy świadomie go poświęcamy.
   if (plan.sleepHours !== null && plan.sleepHours < config.observer.minSleepHours) {
-    return {
-      ...withPlan,
-      status: 'no-go',
-      rejection: { kind: 'not-enough-sleep', sleepHours: plan.sleepHours },
-    };
-  }
-
-  // Sen „na styk" musi być widoczny — to jedyny moment, w którym użytkownik
-  // może sam odpuścić, zanim wyjedzie.
-  if (plan.sleepHours !== null && plan.sleepHours < config.observer.minSleepHours + 0.5) {
+    warnings.push({
+      kind: 'sleep-sacrifice',
+      sleepHours: plan.sleepHours,
+      reason: sacrifice ?? 'rating',
+    });
+  } else if (
+    // Sen „na styk" musi być widoczny — to jedyny moment, w którym użytkownik
+    // może sam odpuścić, zanim wyjedzie.
+    plan.sleepHours !== null &&
+    plan.sleepHours < config.observer.minSleepHours + 0.5
+  ) {
     warnings.push({ kind: 'tight-sleep', sleepHours: plan.sleepHours });
   }
 

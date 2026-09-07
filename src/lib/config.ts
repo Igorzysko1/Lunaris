@@ -81,6 +81,14 @@ export type ConditionThresholds = {
    * lepsza". Zero wyłącza karę i zostawia sam ranking jakości nieba.
    */
   travelPenaltyPerHour: number;
+  /**
+   * Ocena nocy, powyżej której sesja przestaje być skracana dla snu.
+   *
+   * Nie jest to twardy limit, tylko granica wyjątku: noc oceniona wyżej ma być
+   * pokazana w całości, nawet jeśli oznacza to nieprzespaną noc — o takiej
+   * użytkownik chce wiedzieć, a decyzję podejmuje sam. Sto wyłącza wyjątek.
+   */
+  exceptionalRating: number;
 };
 
 /** Reguły wynikające z kalendarza następnego dnia. */
@@ -160,6 +168,7 @@ export const DEFAULT_CONFIG: LunarisConfig = {
     minWindowMinutes: 90,
     dewWarningSpreadC: 2,
     travelPenaltyPerHour: 10,
+    exceptionalRating: 85,
   },
   calendar: {
     rejectBeforeHour: 8,
@@ -202,6 +211,7 @@ export const CONFIG_LIMITS = {
     minWindowMinutes: { min: 15, max: 600 },
     dewWarningSpreadC: { min: 0, max: 15 },
     travelPenaltyPerHour: { min: 0, max: 50 },
+    exceptionalRating: { min: 0, max: 100 },
   },
   sites: {
     bortle: { min: 1, max: 9 },
@@ -424,6 +434,11 @@ export function clampConfig(config: LunarisConfig): LunarisConfig {
         config.conditions.travelPenaltyPerHour,
         l.conditions.travelPenaltyPerHour,
         d.conditions.travelPenaltyPerHour,
+      ),
+      exceptionalRating: clampNumber(
+        config.conditions.exceptionalRating,
+        l.conditions.exceptionalRating,
+        d.conditions.exceptionalRating,
       ),
     },
     calendar: {

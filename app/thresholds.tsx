@@ -106,6 +106,21 @@ export default function ThresholdsScreen() {
             onCommit={(dewWarningSpreadC) => updateConfig('conditions', { dewWarningSpreadC })}
           />
           <Divider />
+          <NumberRow
+            label="Noc wyjątkowa od oceny"
+            unit="/100"
+            value={conditions.exceptionalRating}
+            limits={limits.conditions.exceptionalRating}
+            onCommit={(exceptionalRating) => updateConfig('conditions', { exceptionalRating })}
+          />
+          <Divider />
+          <Text style={styles.note}>
+            Sesja jest domyślnie skracana wstecz od godziny wymuszonej snem, a nie odrzucana —
+            jedziesz na krócej, zamiast nie jechać wcale. Powyżej oceny wyjątkowej i przy zjawisku,
+            które się nie powtórzy, skracanie nie działa: taką noc zobaczysz w całości, razem z
+            informacją, ile snu kosztuje.
+          </Text>
+          <Divider />
           <Text style={styles.note}>
             Przy większej fazie Księżyca okno liczy się tylko dla celów księżycowych i planetarnych.
             Ostrzeżenie o rosie to różnica temperatury i punktu rosy. Niższy próg wiatru dotyczy

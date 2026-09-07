@@ -80,6 +80,14 @@ function describeWarning(warning: Warning): string {
       return `Sen na styk: ${warning.sleepHours.toFixed(1)} h. Możesz odpuścić.`;
     case 'handheld-wind':
       return `Porywy do ${Math.round(warning.maxGustKmh)} km/h — dla sprzętu z ręki (próg ${warning.handheldLimitKmh} km/h) noc będzie trudna.`;
+    case 'session-trimmed':
+      return warning.reason === 'sleep'
+        ? `Sesja skrócona o ${formatDuration(warning.droppedMinutes)}, żeby zostało na sen. Pogoda pozwala dłużej.`
+        : `Sesja skrócona o ${formatDuration(warning.droppedMinutes)} do twojego limitu długości.`;
+    case 'sleep-sacrifice':
+      return warning.reason === 'phenomenon'
+        ? `Zjawisko, które się nie powtórzy — nie skracam nocy. Zostanie ${warning.sleepHours.toFixed(1)} h snu.`
+        : `Noc wyjątkowo dobra — nie skracam jej. Zostanie ${warning.sleepHours.toFixed(1)} h snu.`;
   }
 }
 
