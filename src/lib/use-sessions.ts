@@ -48,7 +48,12 @@ function assumedNextDay(night: { to: Date }, config: LunarisConfig) {
  * wyjazdu i cele są funkcją danych, konfiguracji i efemeryd, więc zmiana progu
  * albo apertury przelicza widok bez ponownego pobierania czegokolwiek.
  */
-export function useSessions(coords: Coords, bortle: number, config: LunarisConfig) {
+export function useSessions(
+  coords: Coords,
+  bortle: number,
+  config: LunarisConfig,
+  walkMinutes = 0,
+) {
   const [status, setStatus] = useState<SessionsStatus>('loading');
   const [sessions, setSessions] = useState<Session[]>([]);
   const [attempt, setAttempt] = useState(0);
@@ -102,6 +107,7 @@ export function useSessions(coords: Coords, bortle: number, config: LunarisConfi
               // żadna noc nie łamie reguły wczesnego poranka.
               uniquePhenomenon: false,
               windLimitKmh: windLimit,
+              walkMinutes,
               config,
             });
 
@@ -136,7 +142,7 @@ export function useSessions(coords: Coords, bortle: number, config: LunarisConfi
     // po zmianie progu jest tu zamierzone. `home` rozbite na współrzędne, bo obiekt
     // dostaje nową tożsamość przy każdym renderze store'u, a liczy się sama pozycja.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lat, lon, bortle, config, home?.lat, home?.lon, attempt]);
+  }, [lat, lon, bortle, config, home?.lat, home?.lon, walkMinutes, attempt]);
 
   return { status, sessions, refresh };
 }

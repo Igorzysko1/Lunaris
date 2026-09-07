@@ -166,6 +166,100 @@ describe('clampConfig', () => {
   });
 });
 
+describe('katalog miejscówek', () => {
+  it('domyślna konfiguracja niesie katalog z rozpoznania', () => {
+    assert.ok(DEFAULT_CONFIG.sites.length >= 5);
+    for (const site of DEFAULT_CONFIG.sites) {
+      assert.ok(site.id.length > 0);
+      assert.ok(site.name.length > 0);
+      assert.ok(site.bortle >= 1 && site.bortle <= 9);
+      assert.ok(site.walkMinutes >= 0);
+    }
+  });
+
+  it('wpis bez współrzędnych jest pomijany — nie ma dla czego liczyć pogody', () => {
+    const config = clone(DEFAULT_CONFIG);
+    config.sites = [
+      null as never,
+      {
+        id: 'x',
+        name: 'Bez punktu',
+        region: '',
+        lat: NaN,
+        lon: 19,
+        bortle: 4,
+        walkMinutes: 0,
+        notes: '',
+      },
+      {
+        id: 'ok',
+        name: 'Dobra',
+        region: 'śląskie',
+        lat: 50,
+        lon: 19,
+        bortle: 4,
+        walkMinutes: 5,
+        notes: '',
+      },
+    ];
+
+    const sites = clampConfig(config).sites;
+    assert.equal(sites.length, 1);
+    assert.equal(sites[0].id, 'ok');
+  });
+
+  it('przycina Bortle i marsz do sensownego zakresu', () => {
+    const config = clone(DEFAULT_CONFIG);
+    config.sites = [
+      {
+        id: 'x',
+        name: 'Dziwna',
+        region: '',
+        lat: 50,
+        lon: 19,
+        bortle: 42,
+        walkMinutes: 9999,
+        notes: '',
+      },
+    ];
+
+    const site = clampConfig(config).sites[0];
+    assert.equal(site.bortle, 9);
+    assert.equal(site.walkMinutes, 240);
+  });
+
+  it('pusta lista zostaje pusta — brak własnych miejscówek to normalny stan', () => {
+    const config = clone(DEFAULT_CONFIG);
+    config.sites = [];
+    assert.deepEqual(clampConfig(config).sites, []);
+  });
+
+  it('zapis sprzed katalogu dostaje listę domyślną', () => {
+    const merged = mergeConfig({ observer: { minSleepHours: 7 } });
+    assert.deepEqual(merged.sites, DEFAULT_CONFIG.sites);
+  });
+
+  it('zapisany katalog wygrywa z domyślnym, łącznie z notatkami', () => {
+    const merged = mergeConfig({
+      sites: [
+        {
+          id: 'mine',
+          name: 'Moja łąka',
+          region: 'śląskie',
+          lat: 50.1,
+          lon: 19.1,
+          bortle: 4,
+          walkMinutes: 3,
+          notes: 'brama od wschodu',
+        },
+      ],
+    });
+
+    assert.equal(merged.sites.length, 1);
+    assert.equal(merged.sites[0].notes, 'brama od wschodu');
+  });
+});
+
 describe('mergeConfig', () => {
   it('zapis pusty albo niebędący obiektem daje konfigurację domyślną', () => {
     assert.deepEqual(mergeConfig(null), DEFAULT_CONFIG);

@@ -63,6 +63,7 @@ function AppStack() {
       <Stack.Screen name="location" />
       <Stack.Screen name="moon" />
       <Stack.Screen name="thresholds" />
+      <Stack.Screen name="sites" />
     </Stack>
   );
 }

@@ -196,6 +196,22 @@ export default function SettingsScreen() {
           />
         </Card>
 
+        <SectionLabel style={styles.groupLabel}>Miejscówki</SectionLabel>
+        <Card variant="raised" style={styles.group}>
+          <Link href="/sites" asChild>
+            <Pressable style={styles.row}>
+              <View style={styles.rowText}>
+                <Text style={styles.rowLabel}>Katalog miejsc obserwacyjnych</Text>
+                <Text style={styles.rowHint}>
+                  {config.sites.length} {config.sites.length === 1 ? 'miejsce' : 'miejsc'} · dojazd,
+                  dojście, notatki
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+            </Pressable>
+          </Link>
+        </Card>
+
         <SectionLabel style={styles.groupLabel}>Werdykt nocy</SectionLabel>
         <Card variant="raised" style={styles.group}>
           <Link href="/thresholds" asChild>

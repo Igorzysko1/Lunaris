@@ -6,20 +6,26 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { LightPollutionLink } from '@/components/LightPollutionLink';
 import { Badge, Pill } from '@/components/primitives';
+import { siteAsPlace, type ObservingSite } from '@/data/observing-sites';
 import { CITIES, GMINY, type Place } from '@/data/places';
 import { bortleMeta, distanceKm, formatDistance } from '@/lib/astro';
 import { useSettings, type ActiveLocation } from '@/store/settings';
 import { HAIRLINE, colors, fonts } from '@/theme';
 
-type PickerTab = 'cities' | 'gminy';
+type PickerTab = 'sites' | 'cities' | 'gminy';
 
 const TABS: { key: PickerTab; label: string }[] = [
+  { key: 'sites', label: 'Miejscówki' },
   { key: 'cities', label: 'Miasta' },
   { key: 'gminy', label: 'Gminy' },
 ];
 
-/** Miejsce z policzoną odległością — liczymy ją raz, nie w komparatorze sortowania. */
-type Ranked = { place: Place; distance: number };
+/**
+ * Miejsce z policzoną odległością — liczymy ją raz, nie w komparatorze sortowania.
+ * `site` jest ustawione tylko dla wpisów z katalogu miejscówek: niosą dodatkowo
+ * dojście od parkingu i notatki z wyjazdów, których zwykła miejscowość nie ma.
+ */
+type Ranked = { place: Place; distance: number; site?: ObservingSite };
 
 export default function LocationScreen() {
   const router = useRouter();
@@ -30,23 +36,37 @@ export default function LocationScreen() {
   const { placeId, autoLocation, active, selectPlace, config, updateConfig, enableGps } =
     useSettings();
   const [query, setQuery] = useState('');
-  const [tab, setTab] = useState<PickerTab>('cities');
+  // Punktem startowym jest dom, a nie miejscówka — przy jego wyborze katalog
+  // nie ma sensu, więc zakładka znika i domyślnie stoimy na miastach.
+  const [tab, setTab] = useState<PickerTab>(target === 'home' ? 'cities' : 'sites');
+  const tabs = target === 'home' ? TABS.filter((t) => t.key !== 'sites') : TABS;
 
   // Sortujemy od miejsca, w którym faktycznie jesteśmy (albo które wybrano ręcznie).
   const origin = active.coords;
 
+  const sites = config.sites;
+
   const places = useMemo<Ranked[]>(() => {
-    const source = tab === 'gminy' ? GMINY : CITIES;
     const q = query.trim().toLowerCase();
+    const matches = (p: { name: string; region: string }) =>
+      !q || p.name.toLowerCase().includes(q) || p.region.toLowerCase().includes(q);
 
-    const matching = q
-      ? source.filter((p) => p.name.toLowerCase().includes(q) || p.region.toLowerCase().includes(q))
-      : source;
+    if (tab === 'sites') {
+      return sites
+        .filter(matches)
+        .map((site) => ({
+          site,
+          place: siteAsPlace(site),
+          distance: distanceKm(origin, site),
+        }))
+        .sort((a, b) => a.distance - b.distance);
+    }
 
-    return matching
+    return (tab === 'gminy' ? GMINY : CITIES)
+      .filter(matches)
       .map((place) => ({ place, distance: distanceKm(origin, place) }))
       .sort((a, b) => a.distance - b.distance);
-  }, [tab, query, origin]);
+  }, [tab, query, origin, sites]);
 
   const selectedId = pickingHome ? config.observer.homePlaceId : placeId;
 
@@ -84,7 +104,7 @@ export default function LocationScreen() {
       </View>
 
       <View style={styles.tabs}>
-        {TABS.map((t) => (
+        {tabs.map((t) => (
           <Pill key={t.key} label={t.label} active={tab === t.key} onPress={() => setTab(t.key)} />
         ))}
       </View>
@@ -125,6 +145,7 @@ export default function LocationScreen() {
           <PlaceRow
             place={item.place}
             distance={item.distance}
+            site={item.site}
             selected={(pickingHome || !autoLocation) && selectedId === item.place.id}
             onPress={() => choosePlace(item.place.id)}
           />
@@ -160,11 +181,14 @@ function gpsDetail(autoLocation: boolean, active: ActiveLocation): string {
 function PlaceRow({
   place,
   distance,
+  site,
   selected,
   onPress,
 }: {
   place: Place;
   distance: number;
+  /** Ustawione tylko dla miejscówek z katalogu. */
+  site?: ObservingSite;
   selected: boolean;
   onPress: () => void;
 }) {
@@ -182,7 +206,15 @@ function PlaceRow({
         <Text style={styles.placeMeta}>
           <Text style={styles.placeDistance}>{formatDistance(distance)}</Text>
           <Text> · {place.region}</Text>
+          {site !== undefined && site.walkMinutes > 0 && (
+            <Text> · {Math.round(site.walkMinutes)} min od parkingu</Text>
+          )}
         </Text>
+        {site !== undefined && site.notes.length > 0 && (
+          <Text style={styles.placeNote} numberOfLines={2}>
+            {site.notes}
+          </Text>
+        )}
       </View>
       {selected && <Ionicons name="checkmark" size={18} color={colors.purple} />}
     </Pressable>
@@ -288,6 +320,13 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: colors.textMuted,
     marginTop: 3,
+  },
+  placeNote: {
+    fontFamily: fonts.sans,
+    fontSize: 12,
+    color: colors.textMuted,
+    marginTop: 3,
+    lineHeight: 16,
   },
   placeDistance: {
     color: colors.textSecondary,

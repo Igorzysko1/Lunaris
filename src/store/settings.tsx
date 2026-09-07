@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
+import { siteAsPlace } from '@/data/observing-sites';
 import { FALLBACK_POSITION, findPlaceById, nearestPlace, type Coords } from '@/data/places';
 import { DEFAULT_CONFIG, clampConfig, type LunarisConfig } from '@/lib/config';
 import { defaultProfile, type OpticsProfile } from '@/lib/optics';
@@ -21,6 +22,12 @@ export type ActiveLocation = {
   coords: Coords;
   bortle: number;
   source: 'gps' | 'manual';
+  /**
+   * Marsz od parkingu do stanowiska w minutach — zna go tylko katalog miejsc.
+   * Dla miejscowości z bazy i dla pozycji z GPS zostaje zerem: nie wiemy wtedy,
+   * gdzie użytkownik faktycznie stanie.
+   */
+  walkMinutes: number;
   /** Gdy GPS jest włączony, ale nie zadziałał — UI musi to pokazać, a nie udawać. */
   gpsStatus: LocationStatus;
 };
@@ -52,6 +59,11 @@ type Settings = {
     section: K,
     patch: Partial<LunarisConfig[K]>,
   ) => void;
+  /**
+   * Notatki z wyjazdu przy miejscówce — jedyne pole katalogu, które zmienia się
+   * po każdej sesji, więc jedyne edytowalne z aplikacji.
+   */
+  updateSiteNotes: (id: string, notes: string) => void;
   /** Dodaje zestaw sprzętu na koniec listy. */
   addOpticsProfile: () => void;
   /** Zmienia nazwę albo wybrane parametry jednego zestawu. */
@@ -119,20 +131,27 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         coords: device.coords,
         bortle: near.bortle,
         source: 'gps',
+        walkMinutes: 0,
         gpsStatus: device.status,
       };
     }
 
     // Brak GPS (wyłączony, odmowa, brak sygnału) — wracamy do wyboru ręcznego.
-    const place = findPlaceById(placeId) ?? nearestPlace(FALLBACK_POSITION);
+    // Najpierw katalog miejscówek, bo tylko one wiedzą o dojściu od parkingu.
+    const site = config.sites.find((s) => s.id === placeId);
+    const place = site
+      ? siteAsPlace(site)
+      : (findPlaceById(placeId) ?? nearestPlace(FALLBACK_POSITION));
+
     return {
       label: place.name,
       coords: { lat: place.lat, lon: place.lon },
       bortle: place.bortle,
       source: 'manual',
+      walkMinutes: site?.walkMinutes ?? 0,
       gpsStatus: device.status,
     };
-  }, [autoLocation, device.coords, device.label, device.status, placeId]);
+  }, [autoLocation, device.coords, device.label, device.status, placeId, config.sites]);
 
   const value = useMemo<Settings>(
     () => ({
@@ -160,6 +179,14 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
           config: clampConfig({
             ...s.config,
             opticsProfiles: [...s.config.opticsProfiles, { ...defaultProfile(), label: '' }],
+          }),
+        })),
+      updateSiteNotes: (id, notes) =>
+        setPersisted((s) => ({
+          ...s,
+          config: clampConfig({
+            ...s.config,
+            sites: s.config.sites.map((site) => (site.id === id ? { ...site, notes } : site)),
           }),
         })),
       updateOpticsProfile: (id, patch) =>

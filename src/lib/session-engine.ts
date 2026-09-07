@@ -100,6 +100,11 @@ export type NightInput = {
    * więc rozstrzygnięcie zapada wyżej — silnik dostaje jedną gotową liczbę.
    */
   windLimitKmh: number;
+  /**
+   * Marsz od parkingu do stanowiska w minutach. Zna go katalog miejsc; dla
+   * zwykłej miejscowości z bazy jest zerem, bo nie wiemy, gdzie się stanie.
+   */
+  walkMinutes: number;
   config: LunarisConfig;
 };
 
@@ -302,8 +307,12 @@ export function evaluateNight(input: NightInput): NightVerdict {
     warnings.push({ kind: 'high-clouds', maxPercent: maxHigh });
   }
 
-  // Ostrzeżenie o marszu od parkingu wnosi katalog lokalizacji, gdy pozna dojście
-  // do stanowiska — silnik nie ma skąd wziąć tej informacji z prognozy.
+  // Marsz od parkingu nie przekreśla wyjazdu, ale musi być widoczny: z lornetką,
+  // statywem i termosem czterdzieści minut podejścia to inna wyprawa niż postój
+  // przy samochodzie.
+  if (input.walkMinutes > config.observer.walkToleranceMin) {
+    warnings.push({ kind: 'walk-too-long', walkMinutes: input.walkMinutes });
+  }
 
   const observing: ObservingWindow = { ...window, moonLimited };
   const plan = planFor(observing, input);

@@ -53,6 +53,7 @@ function input(over: Partial<NightInput> = {}): NightInput {
     nextDay: { firstEventAt: new Date(2026, 0, 16, 9, 0), dayOff: false },
     uniquePhenomenon: false,
     windLimitKmh: DEFAULT_CONFIG.conditions.maxWindGustKmh,
+    walkMinutes: 0,
     config: configWith(),
     ...over,
   };
@@ -188,6 +189,20 @@ describe('evaluateNight — ostrzeżenia', () => {
   it('wczesny poranek zostawia ostrzeżenie „tylko dom"', () => {
     const verdict = evaluateNight(input());
     assert.ok(verdict.warnings.some((w) => w.kind === 'home-only'));
+  });
+
+  it('marsz od parkingu powyżej tolerancji daje ostrzeżenie', () => {
+    const verdict = evaluateNight(input({ walkMinutes: 45 }));
+
+    assert.equal(verdict.status, 'go');
+    assert.ok(verdict.warnings.some((w) => w.kind === 'walk-too-long' && w.walkMinutes === 45));
+  });
+
+  it('marsz w granicach tolerancji przechodzi bez słowa', () => {
+    const tolerance = DEFAULT_CONFIG.observer.walkToleranceMin;
+    const verdict = evaluateNight(input({ walkMinutes: tolerance }));
+
+    assert.ok(!verdict.warnings.some((w) => w.kind === 'walk-too-long'));
   });
 });
 

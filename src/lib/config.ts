@@ -13,6 +13,7 @@
  * Importy względne (nie alias @/), żeby moduł dało się uruchomić poza Metro.
  */
 
+import { DEFAULT_SITES, type ObservingSite } from '../data/observing-sites.ts';
 import {
   DEFAULT_OPTICS,
   clampOptics,
@@ -98,6 +99,11 @@ export type LunarisConfig = {
    * zestaw domyślny, bo bez żadnego sprzętu dobór celów nie ma czego liczyć.
    */
   opticsProfiles: OpticsProfile[];
+  /**
+   * Katalog miejsc obserwacyjnych. W konfiguracji, a nie w kodzie, żeby dodanie
+   * miejscówki po wyjeździe nie wymagało zmiany ani jednej linii silnika.
+   */
+  sites: ObservingSite[];
   session: SessionMode;
   conditions: ConditionThresholds;
   calendar: CalendarThresholds;
@@ -113,6 +119,7 @@ export const DEFAULT_CONFIG: LunarisConfig = {
     averageSpeedKmh: 50,
   },
   opticsProfiles: [{ id: 'default', label: 'Lornetka 15x70', optics: DEFAULT_OPTICS }],
+  sites: DEFAULT_SITES,
   session: {
     overnight: false,
     minDurationHours: 3,
@@ -166,6 +173,12 @@ export const CONFIG_LIMITS = {
     minWindowMinutes: { min: 15, max: 600 },
     dewWarningSpreadC: { min: 0, max: 15 },
   },
+  sites: {
+    bortle: { min: 1, max: 9 },
+    walkMinutes: { min: 0, max: 240 },
+    lat: { min: -90, max: 90 },
+    lon: { min: -180, max: 180 },
+  },
   calendar: {
     rejectBeforeHour: { min: 0, max: 23 },
     homeOnlyBeforeHour: { min: 0, max: 23 },
@@ -189,6 +202,29 @@ function clampProfiles(profiles: OpticsProfile[]): OpticsProfile[] {
     }));
 
   return valid.length > 0 ? valid : [defaultProfile()];
+}
+
+/**
+ * Każde miejsce z osobna. Wpis bez współrzędnych jest bezużyteczny — nie ma dla
+ * czego liczyć pogody — więc go pomijamy, zamiast podstawiać zmyślony punkt.
+ * Pusta lista jest dopuszczalna: brak własnych miejscówek to normalny stan.
+ */
+function clampSites(sites: ObservingSite[]): ObservingSite[] {
+  const l = CONFIG_LIMITS.sites;
+
+  return (Array.isArray(sites) ? sites : [])
+    .filter((s): s is ObservingSite => typeof s === 'object' && s !== null)
+    .filter((s) => Number.isFinite(s.lat) && Number.isFinite(s.lon))
+    .map((s) => ({
+      id: typeof s.id === 'string' && s.id.length > 0 ? s.id : newProfileId(),
+      name: typeof s.name === 'string' && s.name.length > 0 ? s.name : 'Bez nazwy',
+      region: typeof s.region === 'string' ? s.region : '',
+      lat: clampNumber(s.lat, l.lat, 0),
+      lon: clampNumber(s.lon, l.lon, 0),
+      bortle: Math.round(clampNumber(s.bortle, l.bortle, 4)),
+      walkMinutes: clampNumber(s.walkMinutes, l.walkMinutes, 0),
+      notes: typeof s.notes === 'string' ? s.notes : '',
+    }));
 }
 
 /** Wartość spoza zakresu wraca do granicy, a niebędąca liczbą — do domyślnej. */
@@ -274,6 +310,7 @@ export function clampConfig(config: LunarisConfig): LunarisConfig {
       ),
     },
     opticsProfiles: clampProfiles(config.opticsProfiles),
+    sites: clampSites(config.sites),
     session: {
       ...session,
       // Minimum dłuższe od maksimum dałoby okno, którego nie da się spełnić.
@@ -347,9 +384,16 @@ export function mergeConfig(stored: unknown): LunarisConfig {
       ? [{ id: newProfileId(), label: '', optics: raw.optics as OpticsProfile['optics'] }]
       : DEFAULT_CONFIG.opticsProfiles;
 
+  // Katalog miejsc: zapisy sprzed tej wersji go nie mają, więc dostają domyślny.
+  // Pusta zapisana lista zostaje pusta — użytkownik mógł skasować wszystkie.
+  const sites: ObservingSite[] = Array.isArray(raw.sites)
+    ? (raw.sites as ObservingSite[])
+    : DEFAULT_CONFIG.sites;
+
   return clampConfig({
     observer: section('observer'),
     opticsProfiles: profiles,
+    sites,
     session: section('session'),
     conditions: section('conditions'),
     calendar: section('calendar'),

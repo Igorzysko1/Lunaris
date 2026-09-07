@@ -29,7 +29,7 @@ export default function NightScreen() {
   const router = useRouter();
   const { active, config } = useSettings();
   const { status, data, refresh, refreshing } = useNightData(active.coords, active.bortle);
-  const sessions = useSessions(active.coords, active.bortle, config);
+  const sessions = useSessions(active.coords, active.bortle, config, active.walkMinutes);
 
   const { lat, lon } = active.coords;
   const nextEvent = useMemo(() => upcomingEvents(new Date(), { lat, lon })[0] ?? null, [lat, lon]);
