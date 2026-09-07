@@ -19,6 +19,7 @@
 import type { ObservingSite } from '../data/observing-sites.ts';
 import type { Coords } from '../data/places.ts';
 import { computeNightRating, distanceKm } from './astro.ts';
+import { horizonOf } from './horizon.ts';
 import type { LunarisConfig } from './config.ts';
 import type { NightWindow } from './night-window.ts';
 import { windLimitKmh } from './optics.ts';
@@ -203,11 +204,16 @@ function targetsAt(outlook: SiteOutlook, config: LunarisConfig): Map<string, str
   const coords = { lat: outlook.site.lat, lon: outlook.site.lon };
   const found = new Map<string, string>();
 
+  // Maska horyzontu jest własnością miejsca: ten sam obiekt widać z pustyni
+  // i nie widać zza ściany lasu, choć stoi tak samo wysoko.
+  const horizon = horizonOf(outlook.site.horizonMask, outlook.site.horizonOverrides);
+
   for (const target of nightTargetsForProfiles(
     window,
     coords,
     config.opticsProfiles,
     outlook.bortle,
+    horizon,
   )) {
     // Ten sam obiekt wraca raz na zestaw sprzętu — do porównania miejsc liczy się
     // tylko to, czy widać go w ogóle.

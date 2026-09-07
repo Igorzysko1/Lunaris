@@ -19,6 +19,7 @@ import { Card, SectionLabel } from '@/components/primitives';
 import { dayBucket, formatLongDate, formatTime } from '@/lib/date';
 import { upcomingEvents } from '@/lib/events';
 import { formatAge } from '@/lib/forecast-cache';
+import { horizonOf } from '@/lib/horizon';
 import { currentNightWindow } from '@/lib/night-window';
 import { nightTargetsForProfiles } from '@/lib/sky-targets';
 import { useSessions } from '@/lib/use-sessions';
@@ -47,8 +48,9 @@ export default function NightScreen() {
         { lat, lon },
         config.opticsProfiles,
         active.bortle,
+        horizonOf(active.horizonMask, active.horizonOverrides),
       ),
-    [lat, lon, config.opticsProfiles, active.bortle],
+    [lat, lon, config.opticsProfiles, active.bortle, active.horizonMask, active.horizonOverrides],
   );
 
   return (

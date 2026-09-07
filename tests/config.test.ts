@@ -191,6 +191,8 @@ describe('katalog miejscówek', () => {
         walkMinutes: 0,
         notes: '',
         accuracyM: null,
+        horizonMask: null,
+        horizonOverrides: [],
       },
       {
         id: 'ok',
@@ -202,6 +204,8 @@ describe('katalog miejscówek', () => {
         walkMinutes: 5,
         notes: '',
         accuracyM: null,
+        horizonMask: null,
+        horizonOverrides: [],
       },
     ];
 
@@ -223,6 +227,8 @@ describe('katalog miejscówek', () => {
         walkMinutes: 9999,
         notes: '',
         accuracyM: null,
+        horizonMask: null,
+        horizonOverrides: [],
       },
     ];
 
@@ -255,6 +261,8 @@ describe('katalog miejscówek', () => {
         walkMinutes: 0,
         notes: '',
         accuracyM: 12.4,
+        horizonMask: null,
+        horizonOverrides: [],
       },
       {
         id: 'b',
@@ -266,6 +274,8 @@ describe('katalog miejscówek', () => {
         walkMinutes: 0,
         notes: '',
         accuracyM: null,
+        horizonMask: null,
+        horizonOverrides: [],
       },
       // Zero metrów to nie to samo co brak pomiaru — wartość spoza zakresu
       // wraca do granicy, ale niebędąca liczbą zostaje pustką.
@@ -279,6 +289,8 @@ describe('katalog miejscówek', () => {
         walkMinutes: 0,
         notes: '',
         accuracyM: 'dużo' as never,
+        horizonMask: null,
+        horizonOverrides: [],
       },
     ];
 
@@ -301,6 +313,8 @@ describe('katalog miejscówek', () => {
         walkMinutes: 0,
         notes: '',
         accuracyM: 999999,
+        horizonMask: null,
+        horizonOverrides: [],
       },
     ];
 
@@ -320,6 +334,8 @@ describe('katalog miejscówek', () => {
           walkMinutes: 3,
           notes: 'brama od wschodu',
           accuracyM: null,
+          horizonMask: null,
+          horizonOverrides: [],
         },
       ],
     });

@@ -6,7 +6,7 @@ import { Card, Divider, SectionLabel } from '@/components/primitives';
 import { dewRiskColor, ratingMeta } from '@/lib/astro';
 import { formatTime } from '@/lib/date';
 import type { Moon } from '@/lib/moon';
-import type { SkyTarget } from '@/lib/sky-targets';
+import { describeOutOfReach, type SkyTarget } from '@/lib/sky-targets';
 import type { NightData } from '@/lib/use-night-data';
 import { HAIRLINE, colors, fonts, radius } from '@/theme';
 
@@ -125,7 +125,11 @@ export function AstroTimesRow({
  */
 export function NightTargetsCard({ targets }: { targets: SkyTarget[] }) {
   const inReach = targets.filter((t) => t.visible);
-  const outOfReach = targets.length - inReach.length;
+
+  // Obiekty odrzucone przez teren wymieniamy z nazwy, bo to informacja o
+  // miejscu, a nie o niebie — reszta odpada z powodów, których przejściem
+  // w bok się nie naprawi, więc wystarczy ich policzyć.
+  const blocked = targets.filter((t) => t.outOfReach === 'behind-horizon');
 
   // Przy jednym zestawie nie ma czego odróżniać — podpis sprzętu tylko
   // zaśmiecałby listę.
@@ -162,13 +166,22 @@ export function NightTargetsCard({ targets }: { targets: SkyTarget[] }) {
         ))
       )}
 
-      {outOfReach > 0 && (
+      {blocked.length > 0 && (
         <>
           <Divider style={styles.targetsDivider} />
-          <Text style={styles.targetsFooter}>
-            {outOfReach} {outOfReach === 1 ? 'obiekt poza zasięgiem' : 'obiektów poza zasięgiem'}{' '}
-            tej nocy — za nisko albo za słabe dla tej optyki pod tym niebem.
-          </Text>
+          {/* Powód odrzucenia niesie informację: „za terenem na SW" znaczy
+              co innego niż „za nisko" — pierwsze zmienia się po przejściu
+              dwustu metrów, drugie nie. */}
+          {blocked.map((target) => (
+            <View key={`${target.profileId}-${target.id}`} style={styles.blockedRow}>
+              <Text style={styles.blockedName} numberOfLines={1}>
+                {target.name}
+              </Text>
+              <Text style={styles.blockedWhy} numberOfLines={1}>
+                {describeOutOfReach(target)}
+              </Text>
+            </View>
+          ))}
         </>
       )}
     </Card>
@@ -342,6 +355,24 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: colors.textMuted,
     marginTop: 2,
+  },
+  blockedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    paddingVertical: 3,
+  },
+  blockedName: {
+    flex: 1,
+    fontFamily: fonts.sans,
+    fontSize: 12,
+    color: colors.textMuted,
+  },
+  blockedWhy: {
+    fontFamily: fonts.sans,
+    fontSize: 11,
+    color: colors.amber,
   },
   targetsDivider: {
     marginTop: 14,

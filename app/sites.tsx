@@ -8,6 +8,7 @@ import { Badge, Card, SectionLabel } from '@/components/primitives';
 import { type ObservingSite } from '@/data/observing-sites';
 import { bortleMeta, distanceKm, formatDistance } from '@/lib/astro';
 import { skyQualityAt } from '@/lib/sky-map';
+import { compassLabel, type HorizonOverride } from '@/lib/horizon';
 import { capturePosition, type PositionFix } from '@/lib/use-device-location';
 import { findPlaceById, type Coords } from '@/data/places';
 import { useSettings } from '@/store/settings';
@@ -28,7 +29,16 @@ type Capture =
 
 export default function SitesScreen() {
   const router = useRouter();
-  const { config, updateSiteNotes, addSiteAt, moveSite, removeSite, selectPlace } = useSettings();
+  const {
+    config,
+    updateSiteNotes,
+    addSiteAt,
+    moveSite,
+    removeSite,
+    addHorizonOverride,
+    removeHorizonOverride,
+    selectPlace,
+  } = useSettings();
   const [capture, setCapture] = useState<Capture>({ state: 'idle' });
   const [name, setName] = useState('');
 
@@ -92,6 +102,8 @@ export default function SitesScreen() {
             walkToleranceMin={config.observer.walkToleranceMin}
             onNotes={(notes) => updateSiteNotes(site.id, notes)}
             onRemove={() => removeSite(site.id)}
+            onAddOverride={(o) => addHorizonOverride(site.id, o)}
+            onRemoveOverride={(i) => removeHorizonOverride(site.id, i)}
           />
         ))}
 
@@ -220,6 +232,8 @@ function SiteCard({
   walkToleranceMin,
   onNotes,
   onRemove,
+  onAddOverride,
+  onRemoveOverride,
 }: {
   site: ObservingSite;
   home: Coords | null;
@@ -227,6 +241,8 @@ function SiteCard({
   walkToleranceMin: number;
   onNotes: (notes: string) => void;
   onRemove: () => void;
+  onAddOverride: (override: HorizonOverride) => void;
+  onRemoveOverride: (index: number) => void;
 }) {
   // Notatka trzymana lokalnie w trakcie pisania; do konfiguracji trafia po
   // wyjściu z pola, żeby każdy znak nie wywoływał zapisu na dysk.
@@ -283,6 +299,8 @@ function SiteCard({
         </Text>
       </View>
 
+      <HorizonRow site={site} onAddOverride={onAddOverride} onRemoveOverride={onRemoveOverride} />
+
       <TextInput
         style={styles.notes}
         value={draft}
@@ -293,6 +311,87 @@ function SiteCard({
         multiline
       />
     </Card>
+  );
+}
+
+/**
+ * Horyzont miejsca: policzona maska i ręczne korekty.
+ *
+ * Korekta bije maskę, bo jedna linijka wpisana po wyjeździe bije każdy model —
+ * nalot lotniczy jest sprzed kilku lat, a las przez ten czas urósł albo został
+ * wycięty. Maska bez tej furtki starzeje się w milczeniu.
+ */
+function HorizonRow({
+  site,
+  onAddOverride,
+  onRemoveOverride,
+}: {
+  site: ObservingSite;
+  onAddOverride: (override: HorizonOverride) => void;
+  onRemoveOverride: (index: number) => void;
+}) {
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
+  const [altitude, setAltitude] = useState('');
+
+  const add = () => {
+    const values = [from, to, altitude].map(Number);
+    if (values.some((v) => !Number.isFinite(v))) return;
+
+    onAddOverride({ from: values[0], to: values[1], altitude: values[2] });
+    setFrom('');
+    setTo('');
+    setAltitude('');
+  };
+
+  const mask = site.horizonMask;
+  const summary = mask
+    ? `maska terenu: ${Math.round(Math.min(...mask))}–${Math.round(Math.max(...mask))}°`
+    : 'brak maski terenu — obowiązuje próg 15°';
+
+  return (
+    <View style={styles.horizonBlock}>
+      <Text style={styles.sky}>{summary}</Text>
+
+      {site.horizonOverrides.map((o, i) => (
+        <Pressable key={`${o.from}-${o.to}-${i}`} onPress={() => onRemoveOverride(i)}>
+          <Text style={styles.override}>
+            {compassLabel(o.from)}–{compassLabel(o.to)} ({o.from}°–{o.to}°): przeszkoda do{' '}
+            {o.altitude}° · dotknij, aby usunąć
+          </Text>
+        </Pressable>
+      ))}
+
+      <View style={styles.overrideForm}>
+        <TextInput
+          style={styles.degInput}
+          value={from}
+          onChangeText={setFrom}
+          placeholder="od°"
+          placeholderTextColor={colors.textMuted}
+          keyboardType="numeric"
+        />
+        <TextInput
+          style={styles.degInput}
+          value={to}
+          onChangeText={setTo}
+          placeholder="do°"
+          placeholderTextColor={colors.textMuted}
+          keyboardType="numeric"
+        />
+        <TextInput
+          style={styles.degInput}
+          value={altitude}
+          onChangeText={setAltitude}
+          placeholder="wys.°"
+          placeholderTextColor={colors.textMuted}
+          keyboardType="numeric"
+        />
+        <Pressable onPress={add} style={styles.addOverride}>
+          <Ionicons name="add" size={16} color={colors.purple} />
+        </Pressable>
+      </View>
+    </View>
   );
 }
 
@@ -409,6 +508,31 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.textMuted,
     marginTop: 4,
+  },
+  horizonBlock: { marginTop: 8 },
+  override: {
+    fontFamily: fonts.sans,
+    fontSize: 12,
+    color: colors.amber,
+    marginTop: 4,
+  },
+  overrideForm: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
+  degInput: {
+    flex: 1,
+    borderRadius: 8,
+    backgroundColor: colors.surface,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    fontFamily: fonts.mono,
+    fontSize: 12,
+    color: colors.textPrimary,
+  },
+  addOverride: {
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 8,
+    borderWidth: HAIRLINE,
+    borderColor: colors.purple,
   },
   walkRow: {
     flexDirection: 'row',

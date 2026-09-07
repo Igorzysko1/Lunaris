@@ -26,6 +26,8 @@ function site(id: string, over: Partial<ObservingSite> = {}): ObservingSite {
     walkMinutes: 0,
     notes: '',
     accuracyM: null,
+    horizonMask: null,
+    horizonOverrides: [],
     ...over,
   };
 }

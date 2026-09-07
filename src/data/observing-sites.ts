@@ -15,6 +15,7 @@
  * Importy względne (nie alias @/), żeby moduł dało się uruchomić poza Metro.
  */
 
+import type { HorizonMask, HorizonOverride } from '../lib/horizon.ts';
 import type { Place } from './places.ts';
 
 export type ObservingSite = {
@@ -43,6 +44,14 @@ export type ObservingSite = {
    * budować na nim maskę horyzontu czy jasność nieba.
    */
   accuracyM: number | null;
+  /**
+   * Wysokość terenu dla azymutów 0–359, policzona poza aplikacją z modelu
+   * terenu. `null` znaczy „jeszcze nie policzona" i jest stanem normalnym:
+   * miejsce zapisane w terenie czeka na maskę do powrotu w zasięg.
+   */
+  horizonMask: HorizonMask | null;
+  /** Ręczne korekty sektorów — mają pierwszeństwo przed policzoną maską. */
+  horizonOverrides: HorizonOverride[];
 };
 
 /**
@@ -60,6 +69,8 @@ export const DEFAULT_SITES: ObservingSite[] = [
     walkMinutes: 15,
     notes: 'Znana łuna od strony zabudowy — psuje obiekty nisko nad horyzontem z tej strony.',
     accuracyM: null,
+    horizonMask: null,
+    horizonOverrides: [],
   },
   {
     id: 'site-zborow',
@@ -71,6 +82,8 @@ export const DEFAULT_SITES: ObservingSite[] = [
     walkMinutes: 10,
     notes: '',
     accuracyM: null,
+    horizonMask: null,
+    horizonOverrides: [],
   },
   {
     id: 'site-zloty-potok',
@@ -82,6 +95,8 @@ export const DEFAULT_SITES: ObservingSite[] = [
     walkMinutes: 5,
     notes: '',
     accuracyM: null,
+    horizonMask: null,
+    horizonOverrides: [],
   },
   {
     id: 'site-salmopolska',
@@ -93,6 +108,22 @@ export const DEFAULT_SITES: ObservingSite[] = [
     walkMinutes: 5,
     notes: '',
     accuracyM: null,
+    horizonMask: null,
+    horizonOverrides: [],
+  },
+  {
+    id: 'site-siwa-polana',
+    name: 'Siwa Polana / Kiry (TPN)',
+    region: 'małopolskie',
+    lat: 49.2717,
+    lon: 19.7906,
+    bortle: 4,
+    walkMinutes: 10,
+    notes:
+      'Najciemniejszy punkt katalogu (mapa: ~21,4 mag/arcsec², tuż pod progiem Bortle 3), ale i najdalszy — ~110 km. Parking TPN przy wejściu do Doliny Chochołowskiej, stanowisko na skraju polany, kilka minut od auta. W parku obowiązuje ruch po szlakach i zakaz biwakowania: rozstawiać się przy drodze/polanie, nie schodzić w teren. Horyzont zamknięty od południa grzbietami — cele nisko nad południem odpadają, zysk jest w zenicie.',
+    accuracyM: null,
+    horizonMask: null,
+    horizonOverrides: [],
   },
   {
     id: 'site-hala-lipowska',
@@ -104,6 +135,8 @@ export const DEFAULT_SITES: ObservingSite[] = [
     walkMinutes: 60,
     notes: 'Podejście z Korbielowa — powyżej tolerancji marszu, planować z zapasem.',
     accuracyM: null,
+    horizonMask: null,
+    horizonOverrides: [],
   },
 ];
 

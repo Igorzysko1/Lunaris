@@ -14,6 +14,7 @@
  */
 
 import { DEFAULT_SITES, type ObservingSite } from '../data/observing-sites.ts';
+import { isValidMask, type HorizonOverride } from './horizon.ts';
 import {
   DEFAULT_OPTICS,
   clampOptics,
@@ -217,6 +218,26 @@ function clampProfiles(profiles: OpticsProfile[]): OpticsProfile[] {
   return valid.length > 0 ? valid : [defaultProfile()];
 }
 
+/** Korekty sektorów: kąty sprowadzone do zakresu, wpisy bez sensu pominięte. */
+function clampOverrides(overrides: unknown): HorizonOverride[] {
+  const wrap = (v: number) => ((Math.round(v) % 360) + 360) % 360;
+
+  return (Array.isArray(overrides) ? overrides : [])
+    .filter(
+      (o): o is HorizonOverride =>
+        typeof o === 'object' &&
+        o !== null &&
+        Number.isFinite(o.from) &&
+        Number.isFinite(o.to) &&
+        Number.isFinite(o.altitude),
+    )
+    .map((o) => ({
+      from: wrap(o.from),
+      to: wrap(o.to),
+      altitude: Math.min(90, Math.max(0, o.altitude)),
+    }));
+}
+
 /**
  * Każde miejsce z osobna. Wpis bez współrzędnych jest bezużyteczny — nie ma dla
  * czego liczyć pogody — więc go pomijamy, zamiast podstawiać zmyślony punkt.
@@ -242,6 +263,10 @@ function clampSites(sites: ObservingSite[]): ObservingSite[] {
       accuracyM: Number.isFinite(s.accuracyM as number)
         ? clampNumber(s.accuracyM as number, l.accuracyM, 0)
         : null,
+      // Maska albo jest kompletna, albo jej nie ma. Częściowa byłaby gorsza od
+      // braku: milcząco chowałaby cele w kierunkach, których nikt nie policzył.
+      horizonMask: isValidMask(s.horizonMask) ? s.horizonMask : null,
+      horizonOverrides: clampOverrides(s.horizonOverrides),
     }));
 }
 

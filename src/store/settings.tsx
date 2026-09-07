@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 
 import { newSiteId, siteAsPlace, type ObservingSite } from '@/data/observing-sites';
 import { skyQualityAt, type BortleSource } from '@/lib/sky-map';
+import type { HorizonMask, HorizonOverride } from '@/lib/horizon';
 import { FALLBACK_POSITION, findPlaceById, nearestPlace, type Coords } from '@/data/places';
 import { DEFAULT_CONFIG, clampConfig, type LunarisConfig } from '@/lib/config';
 import { defaultProfile, type OpticsProfile } from '@/lib/optics';
@@ -29,6 +30,9 @@ export type ActiveLocation = {
    * i UI ma je rozróżniać, a nie podawać obu jako pewnik.
    */
   bortleSource: BortleSource;
+  /** Maska horyzontu miejsca, gdy je znamy — dla GPS i miast jej nie ma. */
+  horizonMask: HorizonMask | null;
+  horizonOverrides: HorizonOverride[];
   /**
    * Marsz od parkingu do stanowiska w minutach — zna go tylko katalog miejsc.
    * Dla miejscowości z bazy i dla pozycji z GPS zostaje zerem: nie wiemy wtedy,
@@ -80,6 +84,10 @@ type Settings = {
   moveSite: (id: string, coords: Coords, accuracyM: number | null) => void;
   /** Usuwa miejsce z katalogu. */
   removeSite: (id: string) => void;
+  /** Dopisuje ręczną korektę horyzontu dla sektora — bije policzoną maskę. */
+  addHorizonOverride: (id: string, override: HorizonOverride) => void;
+  /** Usuwa korektę po jej pozycji na liście. */
+  removeHorizonOverride: (id: string, index: number) => void;
   /** Dodaje zestaw sprzętu na koniec listy. */
   addOpticsProfile: () => void;
   /** Zmienia nazwę albo wybrane parametry jednego zestawu. */
@@ -153,6 +161,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         bortle: sky.bortle,
         source: 'gps',
         bortleSource: sky.source,
+        horizonMask: null,
+        horizonOverrides: [],
         walkMinutes: 0,
         gpsStatus: device.status,
       };
@@ -173,6 +183,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       bortle: sky.bortle,
       source: 'manual',
       bortleSource: sky.source,
+      horizonMask: site?.horizonMask ?? null,
+      horizonOverrides: site?.horizonOverrides ?? [],
       walkMinutes: site?.walkMinutes ?? 0,
       gpsStatus: device.status,
     };
@@ -233,6 +245,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
             walkMinutes: 0,
             notes: '',
             accuracyM,
+            // Maska wymaga modelu terenu i liczy się poza aplikacją — punkt
+            // zapisany w terenie czeka na nią do powrotu w zasięg.
+            horizonMask: null,
+            horizonOverrides: [],
           };
 
           return {
@@ -259,6 +275,30 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
           config: clampConfig({
             ...s.config,
             sites: s.config.sites.filter((site) => site.id !== id),
+          }),
+        })),
+      addHorizonOverride: (id, override) =>
+        setPersisted((s) => ({
+          ...s,
+          config: clampConfig({
+            ...s.config,
+            sites: s.config.sites.map((site) =>
+              site.id === id
+                ? { ...site, horizonOverrides: [...site.horizonOverrides, override] }
+                : site,
+            ),
+          }),
+        })),
+      removeHorizonOverride: (id, index) =>
+        setPersisted((s) => ({
+          ...s,
+          config: clampConfig({
+            ...s.config,
+            sites: s.config.sites.map((site) =>
+              site.id === id
+                ? { ...site, horizonOverrides: site.horizonOverrides.filter((_, i) => i !== index) }
+                : site,
+            ),
           }),
         })),
       updateOpticsProfile: (id, patch) =>
