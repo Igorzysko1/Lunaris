@@ -65,6 +65,14 @@ export default function NightScreen() {
               />
               <Text style={styles.city}>{active.label}</Text>
             </View>
+            {/* Dwie różne wiarygodności: policzone dla tego punktu z mapy
+                jasności, albo odziedziczone po najbliższej miejscowości. */}
+            <Text style={styles.sky}>
+              Bortle {active.bortle} ·{' '}
+              {active.bortleSource === 'map'
+                ? 'policzone dla tego punktu'
+                : 'z najbliższej miejscowości'}
+            </Text>
           </View>
           <RefreshButton spinning={refreshing} onPress={refresh} />
         </View>
@@ -259,6 +267,12 @@ const styles = StyleSheet.create({
     fontFamily: fonts.sansMedium,
     fontSize: 17,
     color: colors.textPrimary,
+  },
+  sky: {
+    fontFamily: fonts.sans,
+    fontSize: 11,
+    color: colors.textMuted,
+    marginTop: 4,
   },
   refreshButton: {
     width: 38,

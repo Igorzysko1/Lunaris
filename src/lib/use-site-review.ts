@@ -6,6 +6,7 @@ import type { LunarisConfig } from '@/lib/config';
 import { loadForecast, saveForecast } from '@/lib/forecast-cache';
 import { assumedNextDay } from '@/lib/session-engine';
 import { reviewNights, type NightReview } from '@/lib/site-review';
+import { skyQualityAt } from '@/lib/sky-map';
 import { fetchUpcomingNightsForPoints, type NightSlice } from '@/lib/weather';
 
 /** Tyle nocy naprzód, ile ma sens porównywać — dalej prognoza jest zgadywanką. */
@@ -120,6 +121,9 @@ export function useSiteReview(config: LunarisConfig) {
           upAt: (at) => SunCalc.getMoonPosition(at, coords.lat, coords.lon).altitude > 0,
         }),
         nextDay: (night) => assumedNextDay(night, config),
+        // Bortle policzone dla współrzędnych miejsca bije szacunek wpisany
+        // do katalogu; szacunek zostaje dla punktów spoza wgranej mapy.
+        bortleFor: (site) => skyQualityAt(site.lat, site.lon, site.bortle).bortle,
       }),
     );
     // Werdykty liczą się z danych z pamięci, więc zmiana progu przestawia ranking

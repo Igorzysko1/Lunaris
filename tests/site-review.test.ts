@@ -59,6 +59,9 @@ function input(sites: ObservingSite[], clouds: number[], config = DEFAULT_CONFIG
     moon: () => ({ illumination: 5, upAt: () => false }),
     // Dzień wolny: reguła kalendarzowa nie ma tu nic do rzeczy.
     nextDay: () => ({ firstEventAt: null, dayOff: true }),
+    // Niebo bierzemy z danych miejsca, a nie z wgranej mapy — inaczej test
+    // sprawdzałby zawartość mapy, a nie regułę rankingu.
+    bortleFor: (s) => s.bortle,
   };
 }
 

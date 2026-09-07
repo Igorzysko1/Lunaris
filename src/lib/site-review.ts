@@ -36,6 +36,8 @@ export type SiteOutlook = {
   score: number;
   distanceKm: number;
   travelMinutes: number;
+  /** Jakość nieba użyta w rachunku — z mapy, gdy punkt na niej leży. */
+  bortle: number;
   /**
    * Miejsce, które jest **jednocześnie bliżej i lepsze**. Gdy takie istnieje,
    * wybór tego miejsca nie ma żadnego uzasadnienia i można je złożyć — to jedyny
@@ -83,6 +85,12 @@ export type ReviewInput = {
     coords: Coords,
   ) => { illumination: number; upAt: (at: Date) => boolean };
   nextDay: (night: NightWindow) => NextDay;
+  /**
+   * Jakość nieba dla miejsca. Wstrzykiwana, bo pochodzi z mapy wgranej w dane
+   * aplikacji, a ten moduł ma zostać czystym rachunkiem — dzięki temu sprawdza
+   * się go na wartościach z palca, a nie na tym, co akurat jest w mapie.
+   */
+  bortleFor: (site: ObservingSite) => number;
 };
 
 /** Najłagodniejszy próg wiatru spośród zestawów — patrz useSessions. */
@@ -154,7 +162,8 @@ export function reviewNights(input: ReviewInput): NightReview[] {
 
       const km = home ? distanceKm(home, coords) : 0;
       const travelMinutes = verdict.plan?.travelMinutes ?? 0;
-      const rating = ratingFor(slice.hours, site.bortle, moon.illumination);
+      const bortle = input.bortleFor(site);
+      const rating = ratingFor(slice.hours, bortle, moon.illumination);
       const penalty = (travelMinutes / 60) * config.conditions.travelPenaltyPerHour;
 
       return [
@@ -165,6 +174,7 @@ export function reviewNights(input: ReviewInput): NightReview[] {
           score: rating - penalty,
           distanceKm: km,
           travelMinutes,
+          bortle,
           dominatedBy: null,
           uniqueTargets: [],
         },
@@ -197,7 +207,7 @@ function targetsAt(outlook: SiteOutlook, config: LunarisConfig): Map<string, str
     window,
     coords,
     config.opticsProfiles,
-    outlook.site.bortle,
+    outlook.bortle,
   )) {
     // Ten sam obiekt wraca raz na zestaw sprzętu — do porównania miejsc liczy się
     // tylko to, czy widać go w ogóle.

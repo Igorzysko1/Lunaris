@@ -14,7 +14,8 @@
     "format:check": "prettier --check .",
     "test": "TZ=Europe/Warsaw node --experimental-strip-types --no-warnings --test tests/*.test.ts",
     "weather": "node --experimental-strip-types --no-warnings scripts/check-weather.ts",
-    "build:places": "node --experimental-strip-types --no-warnings scripts/build-places.ts"
+    "build:places": "node --experimental-strip-types --no-warnings scripts/build-places.ts",
+    "build:sky-map": "node --experimental-strip-types --no-warnings scripts/build-sky-map.ts"
   },
   "dependencies": {
     "@expo-google-fonts/ibm-plex-mono": "^0.4.1",

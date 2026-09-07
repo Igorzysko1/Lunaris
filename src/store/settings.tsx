@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import { siteAsPlace } from '@/data/observing-sites';
+import { skyQualityAt, type BortleSource } from '@/lib/sky-map';
 import { FALLBACK_POSITION, findPlaceById, nearestPlace, type Coords } from '@/data/places';
 import { DEFAULT_CONFIG, clampConfig, type LunarisConfig } from '@/lib/config';
 import { defaultProfile, type OpticsProfile } from '@/lib/optics';
@@ -22,6 +23,12 @@ export type ActiveLocation = {
   coords: Coords;
   bortle: number;
   source: 'gps' | 'manual';
+  /**
+   * Skąd wzięła się jakość nieba: policzona dla tego punktu z mapy jasności,
+   * czy odziedziczona po najbliższej miejscowości. To dwie różne wiarygodności
+   * i UI ma je rozróżniać, a nie podawać obu jako pewnik.
+   */
+  bortleSource: BortleSource;
   /**
    * Marsz od parkingu do stanowiska w minutach — zna go tylko katalog miejsc.
    * Dla miejscowości z bazy i dla pozycji z GPS zostaje zerem: nie wiemy wtedy,
@@ -126,11 +133,17 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       // Bortle mamy tylko dla miejscowości z listy, więc dla dowolnego punktu GPS
       // bierzemy je z najbliższej znanej. To przybliżenie — patrz vault.
       const near = nearestPlace(device.coords);
+      // Mapa jasności zna ten konkretny punkt; najbliższa miejscowość to
+      // zabudowa i oświetlenie, więc dziedziczenie zaniża niebo dokładnie tam,
+      // gdzie się obserwuje. Zostaje wyłącznie dla punktów spoza mapy.
+      const sky = skyQualityAt(device.coords.lat, device.coords.lon, near.bortle);
+
       return {
         label: device.label ?? near.name,
         coords: device.coords,
-        bortle: near.bortle,
+        bortle: sky.bortle,
         source: 'gps',
+        bortleSource: sky.source,
         walkMinutes: 0,
         gpsStatus: device.status,
       };
@@ -143,11 +156,14 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       ? siteAsPlace(site)
       : (findPlaceById(placeId) ?? nearestPlace(FALLBACK_POSITION));
 
+    const sky = skyQualityAt(place.lat, place.lon, place.bortle);
+
     return {
       label: place.name,
       coords: { lat: place.lat, lon: place.lon },
-      bortle: place.bortle,
+      bortle: sky.bortle,
       source: 'manual',
+      bortleSource: sky.source,
       walkMinutes: site?.walkMinutes ?? 0,
       gpsStatus: device.status,
     };

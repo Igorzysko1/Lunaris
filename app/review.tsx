@@ -162,7 +162,7 @@ function OutlookRow({
   onChoose: () => void;
 }) {
   const { config } = useSettings();
-  const bortle = bortleMeta(outlook.site.bortle);
+  const bortle = bortleMeta(outlook.bortle);
   const rejected = outlook.verdict.rejection;
   const window = outlook.verdict.window;
 

@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Badge, Card, SectionLabel } from '@/components/primitives';
 import { type ObservingSite } from '@/data/observing-sites';
 import { bortleMeta, distanceKm, formatDistance } from '@/lib/astro';
+import { skyQualityAt } from '@/lib/sky-map';
 import { findPlaceById, type Coords } from '@/data/places';
 import { useSettings } from '@/store/settings';
 import { colors, fonts } from '@/theme';
@@ -76,7 +77,9 @@ function SiteCard({
   // wyjściu z pola, żeby każdy znak nie wywoływał zapisu na dysk.
   const [draft, setDraft] = useState(site.notes);
 
-  const bortle = bortleMeta(site.bortle);
+  // Wartość z katalogu jest szacunkiem z rozpoznania; mapa zna ten punkt.
+  const sky = skyQualityAt(site.lat, site.lon, site.bortle);
+  const bortle = bortleMeta(sky.bortle);
   const km = home ? distanceKm(home, site) : null;
   const driveMin = km === null ? null : Math.round((km / speedKmh) * 60);
   const walkTooLong = site.walkMinutes > walkToleranceMin;
@@ -92,6 +95,14 @@ function SiteCard({
 
       <Text style={styles.meta}>
         {km === null ? site.region : `${formatDistance(km)} · ok. ${driveMin} min jazdy`}
+      </Text>
+
+      {/* Skąd wzięło się niebo: policzone dla punktu i odziedziczone po
+          miejscowości to dwie różne wiarygodności. */}
+      <Text style={styles.sky}>
+        {sky.source === 'map'
+          ? `Bortle ${sky.bortle} · ${sky.mpsas?.toFixed(2)} mag/arcsec² policzone dla tego punktu`
+          : `Bortle ${sky.bortle} — szacunek, punkt poza wgraną mapą nieba`}
       </Text>
 
       <View style={styles.walkRow}>
@@ -169,6 +180,12 @@ const styles = StyleSheet.create({
     fontFamily: fonts.mono,
     fontSize: 12,
     color: colors.textSecondary,
+  },
+  sky: {
+    fontFamily: fonts.sans,
+    fontSize: 12,
+    color: colors.textMuted,
+    marginTop: 4,
   },
   walkRow: {
     flexDirection: 'row',
