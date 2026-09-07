@@ -69,6 +69,16 @@ export type ConditionThresholds = {
   minWindowMinutes: number;
   /** Spread temperatura minus punkt rosy, poniżej którego ostrzegamy o rosie. */
   dewWarningSpreadC: number;
+  /**
+   * Ile punktów oceny nocy jest wart jeden pełen kwadrans... a właściwie godzina
+   * jazdy — przy porównywaniu miejscówek. Bez tej wagi ranking zawsze wskazywałby
+   * najciemniejsze niebo, choćby leżało dwie godziny drogi dalej.
+   *
+   * Wartość jest arbitralna, jak wagi w `computeNightRating`, i z założenia do
+   * strojenia: 10 znaczy „pojadę godzinę dłużej, jeśli noc jest o 10 punktów
+   * lepsza". Zero wyłącza karę i zostawia sam ranking jakości nieba.
+   */
+  travelPenaltyPerHour: number;
 };
 
 /** Reguły wynikające z kalendarza następnego dnia. */
@@ -134,6 +144,7 @@ export const DEFAULT_CONFIG: LunarisConfig = {
     maxMoonIllumination: 30,
     minWindowMinutes: 90,
     dewWarningSpreadC: 2,
+    travelPenaltyPerHour: 10,
   },
   calendar: {
     rejectBeforeHour: 8,
@@ -172,6 +183,7 @@ export const CONFIG_LIMITS = {
     maxMoonIllumination: { min: 0, max: 100 },
     minWindowMinutes: { min: 15, max: 600 },
     dewWarningSpreadC: { min: 0, max: 15 },
+    travelPenaltyPerHour: { min: 0, max: 50 },
   },
   sites: {
     bortle: { min: 1, max: 9 },
@@ -356,6 +368,11 @@ export function clampConfig(config: LunarisConfig): LunarisConfig {
         config.conditions.dewWarningSpreadC,
         l.conditions.dewWarningSpreadC,
         d.conditions.dewWarningSpreadC,
+      ),
+      travelPenaltyPerHour: clampNumber(
+        config.conditions.travelPenaltyPerHour,
+        l.conditions.travelPenaltyPerHour,
+        d.conditions.travelPenaltyPerHour,
       ),
     },
     calendar: {

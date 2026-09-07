@@ -18,7 +18,7 @@ function formatDuration(minutes: number): string {
 }
 
 /** Nagłówek nocy: „Dziś w nocy", „Jutro", potem dzień tygodnia. */
-function nightLabel(from: Date, now: Date): string {
+export function nightLabel(from: Date, now: Date): string {
   const days = ['niedzieli', 'poniedziałku', 'wtorku', 'środy', 'czwartku', 'piątku', 'soboty'];
   const sameDay =
     from.getFullYear() === now.getFullYear() &&
@@ -37,7 +37,7 @@ function nightLabel(from: Date, now: Date): string {
 }
 
 /** Powód odrzucenia po ludzku — użytkownik ma wiedzieć, czego nie da się obejść. */
-function describeRejection(rejection: Rejection): string {
+export function describeRejection(rejection: Rejection): string {
   switch (rejection.kind) {
     case 'no-forecast':
       return 'Brak prognozy na tę noc.';

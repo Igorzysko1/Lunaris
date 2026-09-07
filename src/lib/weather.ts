@@ -197,17 +197,49 @@ export async function fetchUpcomingNights(
   nights: number,
   signal?: AbortSignal,
 ): Promise<NightSlice[]> {
+  const [slices] = await fetchUpcomingNightsForPoints([coords], nights, signal);
+  return slices;
+}
+
+/**
+ * To samo dla wielu punktów naraz — jednym żądaniem.
+ *
+ * Open-Meteo przyjmuje listę współrzędnych po przecinku i odpowiada tablicą,
+ * po jednym wpisie na punkt, w tej samej kolejności. To jedyny sposób, żeby
+ * przegląd całego katalogu miejscówek nie kosztował tylu żądań, ile miejsc —
+ * limit darmowego API liczy się od liczby współrzędnych, ale jedno żądanie
+ * zamiast dziesięciu to dziesięć razy mniej okazji do zerwania połączenia
+ * w połowie i dziesięć razy mniej opóźnienia w terenie.
+ *
+ * Wynik jest tablicą równoległą do wejścia: `wynik[i]` dotyczy `points[i]`.
+ */
+export async function fetchUpcomingNightsForPoints(
+  points: Coords[],
+  nights: number,
+  signal?: AbortSignal,
+): Promise<NightSlice[][]> {
+  if (points.length === 0) return [];
+
   const url = new URL(API);
-  url.searchParams.set('latitude', String(coords.lat));
-  url.searchParams.set('longitude', String(coords.lon));
+  url.searchParams.set('latitude', points.map((p) => p.lat).join(','));
+  url.searchParams.set('longitude', points.map((p) => p.lon).join(','));
   url.searchParams.set('hourly', HOURLY_FIELDS);
   url.searchParams.set('timezone', 'auto');
   // Noc n-ta kończy się rano dnia n+1, więc dób trzeba o jedną więcej.
   url.searchParams.set('forecast_days', String(Math.min(16, nights + 1)));
 
-  const json = (await getJson(url, signal)) as ApiResponse;
+  const json = await getJson(url, signal);
 
-  const all = toHours(json);
+  // Dla jednego punktu API odpowiada obiektem, dla wielu — tablicą. Sprowadzamy
+  // do jednego kształtu, żeby dalej był jeden przypadek zamiast dwóch.
+  const responses = (Array.isArray(json) ? json : [json]) as ApiResponse[];
+
+  if (responses.length !== points.length) {
+    throw new ForecastError(
+      'api',
+      `Open-Meteo zwróciło ${responses.length} punktów zamiast ${points.length}`,
+    );
+  }
 
   // Kolejne doby liczone kalendarzowo, nie przez dorzucanie 24 godzin: doba
   // zmiany czasu ma 23 albo 25 godzin i przy dodawaniu milisekund któraś noc
@@ -218,11 +250,19 @@ export async function fetchUpcomingNights(
     return d;
   };
 
-  return Array.from({ length: nights }, (_, i) => {
-    const night = nightWindow(dayFromNow(i), coords);
-    return {
-      night,
-      hours: all.filter((h) => h.at >= night.from && h.at <= night.to),
-    };
+  return responses.map((response, index) => {
+    const coords = points[index];
+    const all = toHours(response);
+
+    // Okno nocy liczymy dla KAŻDEGO punktu osobno: zmierzch na Hali Lipowskiej
+    // wypada o innej porze niż na Pustyni Błędowskiej, a przy porównywaniu
+    // miejsc oddalonych o sto kilometrów to już nie jest zaokrąglenie.
+    return Array.from({ length: nights }, (_, i) => {
+      const night = nightWindow(dayFromNow(i), coords);
+      return {
+        night,
+        hours: all.filter((h) => h.at >= night.from && h.at <= night.to),
+      };
+    });
   });
 }

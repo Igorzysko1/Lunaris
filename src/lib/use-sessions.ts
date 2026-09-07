@@ -5,7 +5,7 @@ import { findPlaceById, type Coords } from '@/data/places';
 import type { LunarisConfig } from '@/lib/config';
 import { windLimitKmh } from '@/lib/optics';
 import { nightTargetsForProfiles, type SkyTarget } from '@/lib/sky-targets';
-import { evaluateNight, type NightVerdict } from '@/lib/session-engine';
+import { assumedNextDay, evaluateNight, type NightVerdict } from '@/lib/session-engine';
 import { loadForecast, saveForecast } from '@/lib/forecast-cache';
 import { fetchUpcomingNights, type NightSlice } from '@/lib/weather';
 
@@ -29,18 +29,6 @@ export type Session = {
 };
 
 export type SessionsStatus = 'loading' | 'ready' | 'error';
-
-/** Kalendarz nie jest jeszcze podpięty — korzystamy z założenia z konfiguracji. */
-function assumedNextDay(night: { to: Date }, config: LunarisConfig) {
-  const morning = night.to;
-  const dayOff =
-    config.calendar.weekendDaysOff && (morning.getDay() === 0 || morning.getDay() === 6);
-
-  const firstEventAt = new Date(morning);
-  firstEventAt.setHours(config.calendar.assumedFirstEventHour, 0, 0, 0);
-
-  return { firstEventAt: dayOff ? null : firstEventAt, dayOff };
-}
 
 /**
  * Trzy najbliższe noce z werdyktem: jechać czy nie, a jeśli nie, to dlaczego.

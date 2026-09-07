@@ -237,6 +237,24 @@ function isExceptional(hours: NightHour[], input: NightInput, window: ObservingW
 }
 
 /**
+ * Kalendarz następnego dnia z założenia w konfiguracji.
+ *
+ * Rozwiązanie zastępcze do czasu podpięcia prawdziwego kalendarza, ale wspólne:
+ * ekran Noc i przegląd miejscówek muszą przyjmować to samo, inaczej ta sama noc
+ * dostaje dwa różne werdykty w dwóch miejscach aplikacji.
+ */
+export function assumedNextDay(night: { to: Date }, config: LunarisConfig): NextDay {
+  const morning = night.to;
+  const dayOff =
+    config.calendar.weekendDaysOff && (morning.getDay() === 0 || morning.getDay() === 6);
+
+  const firstEventAt = new Date(morning);
+  firstEventAt.setHours(config.calendar.assumedFirstEventHour, 0, 0, 0);
+
+  return { firstEventAt: dayOff ? null : firstEventAt, dayOff };
+}
+
+/**
  * Werdykt dla jednej nocy.
  *
  * Kolejność sprawdzeń jest kolejnością powodów odrzucenia: najpierw dane, potem

@@ -141,6 +141,20 @@ export default function NightScreen() {
 
             {nextEvent && (
               <>
+                <Pressable
+                  onPress={() => router.push('/review')}
+                  style={[styles.reviewLink, styles.gap]}
+                >
+                  <Ionicons name="map-outline" size={18} color={colors.purple} />
+                  <View style={styles.reviewText}>
+                    <Text style={styles.reviewTitle}>Gdzie dziś jechać</Text>
+                    <Text style={styles.reviewHint}>
+                      Porównaj {config.sites.length} miejscówek na najbliższe noce
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+                </Pressable>
+
                 <SectionLabel style={styles.sessionsLabel}>
                   {sessions.savedAt
                     ? `Nadchodzące sesje · z prognozy ${formatAge(sessions.savedAt)}`
@@ -282,6 +296,31 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.purple,
     textDecorationLine: 'underline',
+  },
+  reviewLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceRaised,
+    borderWidth: HAIRLINE,
+    borderColor: colors.border,
+  },
+  reviewText: {
+    flex: 1,
+  },
+  reviewTitle: {
+    fontFamily: fonts.sansMedium,
+    fontSize: 14,
+    color: colors.textPrimary,
+  },
+  reviewHint: {
+    fontFamily: fonts.sans,
+    fontSize: 12,
+    color: colors.textMuted,
+    marginTop: 2,
   },
   staleBar: {
     flexDirection: 'row',
