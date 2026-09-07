@@ -24,6 +24,11 @@ export type LeadTime = '1h' | '2h' | '6h' | '12h';
 
 export const LEAD_TIMES: LeadTime[] = ['1h', '2h', '6h', '12h'];
 
+/** Wyprzedzenie w godzinach — etykieta jest tekstem, a rachunek potrzebuje liczby. */
+export function leadHours(value: LeadTime): number {
+  return Number(value.slice(0, -1));
+}
+
 /** To, co naprawdę trafia na dysk — bez pól wyliczanych i bez akcji. */
 export type PersistedSettings = {
   placeId: string;

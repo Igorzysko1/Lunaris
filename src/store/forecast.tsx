@@ -10,6 +10,8 @@ import {
 } from 'react';
 import { AppState } from 'react-native';
 
+import { findPlaceById, type Coords } from '@/data/places';
+import type { LunarisConfig } from '@/lib/config';
 import {
   EMPTY_CYCLE_STATE,
   decideRefresh,
@@ -18,6 +20,17 @@ import {
   markSuccess,
   type CycleState,
 } from '@/lib/daily-cycle';
+import { reviewEvents } from '@/lib/event-review';
+import { upcomingEvents } from '@/lib/events';
+import { planNights } from '@/lib/night-plan';
+import {
+  loadNoticeLog,
+  loadNoticePlan,
+  saveNoticeLog,
+  saveNoticePlan,
+  type StoredNotice,
+} from '@/lib/notice-store';
+import { leadHours, type LeadTime } from '@/lib/settings-storage';
 import {
   loadCycleState,
   loadForecast,
@@ -47,6 +60,8 @@ export type ForecastState = {
 };
 
 type ForecastStore = ForecastState & {
+  /** Plan powiadomień o zjawiskach z ostatniego przebiegu cyklu. */
+  notices: StoredNotice[];
   /** Wymuszone pobranie — dla użytkownika, który wie, że coś się zmieniło. */
   refresh: () => void;
   refreshing: boolean;
@@ -67,8 +82,53 @@ const ForecastContext = createContext<ForecastStore | null>(null);
  * Noc i sekcja sesji potrzebują tych samych godzin w dwóch różnych oknach,
  * a dotąd każde z nich odpytywało Open-Meteo osobno.
  */
+/**
+ * Przegląd zjawisk — krok, którym kończy się cykl.
+ *
+ * Pobranie danych nie jest celem samym w sobie: celem jest to, żeby wieczorem
+ * było wiadomo, czy jechać, bez otwierania aplikacji. Dlatego po zapisie
+ * prognozy cykl przechodzi po horyzoncie zjawisk i rozstrzyga, o czym warto
+ * powiadomić — z werdyktem nocy, w którą zjawisko wypada.
+ */
+async function runEventReview(input: {
+  bundle: ForecastBundle;
+  coords: Coords;
+  bortle: number;
+  walkMinutes: number;
+  config: LunarisConfig;
+  leadTime: LeadTime;
+}): Promise<StoredNotice[]> {
+  const { bundle, coords, bortle, walkMinutes, config, leadTime } = input;
+  const now = new Date();
+
+  const homePlace = config.observer.homePlaceId ? findPlaceById(config.observer.homePlaceId) : null;
+
+  const verdicts = planNights({
+    nights: bundle.nights,
+    target: coords,
+    home: homePlace ? { lat: homePlace.lat, lon: homePlace.lon } : null,
+    config,
+    bortle,
+    walkMinutes,
+  }).map((planned) => planned.verdict);
+
+  const { notices, log } = reviewEvents({
+    now,
+    events: upcomingEvents(now, coords),
+    verdicts,
+    leadHours: leadHours(leadTime),
+    refreshHour: config.refresh.hourOfDay,
+    previous: await loadNoticeLog(),
+  });
+
+  await saveNoticeLog(log);
+  await saveNoticePlan(notices);
+
+  return loadNoticePlan();
+}
+
 export function ForecastProvider({ children }: { children: ReactNode }) {
-  const { active, config } = useSettings();
+  const { active, config, notifications, leadTime } = useSettings();
   const { lat, lon } = active.coords;
   const hour = config.refresh.hourOfDay;
 
@@ -82,6 +142,30 @@ export function ForecastProvider({ children }: { children: ReactNode }) {
   const [cycle, setCycle] = useState<CycleState>(EMPTY_CYCLE_STATE);
   const [refreshing, setRefreshing] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  const [notices, setNotices] = useState<StoredNotice[]>([]);
+
+  /**
+   * Wejście przeglądu zjawisk trzymamy w ref, a nie w zależnościach efektu:
+   * zmiana Bortle, sprzętu czy wyprzedzenia zmienia to, o czym powiadamiamy,
+   * ale nie jest powodem, żeby pobierać prognozę jeszcze raz.
+   */
+  const reviewInput = useRef({
+    bortle: active.bortle,
+    walkMinutes: active.walkMinutes,
+    config,
+    leadTime,
+    notifications,
+  });
+
+  useEffect(() => {
+    reviewInput.current = {
+      bortle: active.bortle,
+      walkMinutes: active.walkMinutes,
+      config,
+      leadTime,
+      notifications,
+    };
+  }, [active.bortle, active.walkMinutes, config, leadTime, notifications]);
 
   /** Ręczne odświeżenie pomija terminarz — użytkownik wie więcej niż zegar. */
   const forced = useRef(false);
@@ -157,6 +241,22 @@ export function ForecastProvider({ children }: { children: ReactNode }) {
         // Klucz zapisu zawiera współrzędne, więc każdy wyjazd zostawia nowy —
         // sprzątanie raz na cykl wystarcza, żeby nie rosły w nieskończoność.
         void pruneExpired();
+
+        // Przegląd zjawisk pomijamy przy wyłączonych powiadomieniach — inaczej
+        // pamięć przeglądu zapisywałaby zgłoszenia, których nikt nie zobaczył,
+        // a po włączeniu powiadomień te zjawiska byłyby już „ogłoszone".
+        const review = reviewInput.current;
+        if (review.notifications) {
+          const planned = await runEventReview({
+            bundle,
+            coords,
+            bortle: review.bortle,
+            walkMinutes: review.walkMinutes,
+            config: review.config,
+            leadTime: review.leadTime,
+          });
+          if (active) setNotices(planned);
+        }
       } catch (error) {
         if (!active || (error instanceof Error && error.name === 'AbortError')) return;
 
@@ -185,7 +285,16 @@ export function ForecastProvider({ children }: { children: ReactNode }) {
       active = false;
       controller.abort();
     };
+    // Pobranie zależy wyłącznie od punktu, pory odświeżania i ręcznego żądania.
+    // Reszta wejścia idzie przez `reviewInput`, żeby zmiana progu nie kosztowała
+    // żądania sieciowego.
   }, [lat, lon, hour, attempt]);
+
+  // Plan z poprzedniego uruchomienia: cykl mógł policzyć go wczoraj, a zgłoszenia
+  // odzywają się dopiero za kilka dni.
+  useEffect(() => {
+    void loadNoticePlan().then(setNotices);
+  }, []);
 
   // Nadrobienie po powrocie do aplikacji. To ta ścieżka, a nie zadanie w tle,
   // odpowiada za aktualność danych: system może pominąć zadanie, ale nie może
@@ -198,8 +307,8 @@ export function ForecastProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo<ForecastStore>(
-    () => ({ ...state, refresh, refreshing, cycle }),
-    [state, refresh, refreshing, cycle],
+    () => ({ ...state, notices, refresh, refreshing, cycle }),
+    [state, notices, refresh, refreshing, cycle],
   );
 
   return <ForecastContext.Provider value={value}>{children}</ForecastContext.Provider>;

@@ -15,6 +15,7 @@ import {
   type Optics,
   type OpticsProfile,
 } from '@/lib/optics';
+import { formatShortDate } from '@/lib/date';
 import { formatAge } from '@/lib/forecast-cache';
 import { useForecast } from '@/store/forecast';
 import { LEAD_TIMES, useSettings } from '@/store/settings';
@@ -289,7 +290,8 @@ export default function SettingsScreen() {
  * a przy nich powód ostatniego niepowodzenia.
  */
 function RefreshStatusCard() {
-  const { cycle, refresh, refreshing } = useForecast();
+  const { cycle, notices, refresh, refreshing } = useForecast();
+  const next = notices[0] ?? null;
 
   return (
     <Card variant="raised" style={styles.group}>
@@ -312,6 +314,28 @@ function RefreshStatusCard() {
           <View style={styles.row}>
             <Text style={styles.rowLabel}>Powód niepowodzenia</Text>
             <Text style={styles.aboutValue}>{cycle.lastError}</Text>
+          </View>
+        </>
+      )}
+      <Divider />
+      <View style={styles.row}>
+        <Text style={styles.rowLabel}>Zjawiska do zgłoszenia</Text>
+        <Text style={styles.subValueMuted}>
+          {notices.length === 0 ? 'brak' : `${notices.length}`}
+        </Text>
+      </View>
+      {next && (
+        <>
+          <Divider />
+          <View style={styles.row}>
+            {/* Zapowiedź nie ma werdyktu i nie może czytać się jak obietnica
+                dobrej nocy — stąd podpis przy każdym zgłoszeniu. */}
+            <Text style={styles.rowLabel}>
+              {next.withVerdict ? 'Najbliższe zgłoszenie' : 'Najbliższa zapowiedź'}
+            </Text>
+            <Text style={styles.aboutValue}>
+              {next.title} · {formatShortDate(next.notifyAt)}
+            </Text>
           </View>
         </>
       )}

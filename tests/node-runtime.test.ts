@@ -39,6 +39,14 @@ describe('moduły domenowe ładują się pod Node', () => {
     assert.equal(typeof cycle.lastScheduledRefresh, 'function');
   });
 
+  it('night-plan.ts i event-review.ts — cykl liczy je bez interfejsu', async () => {
+    const plan = await import('../src/lib/night-plan.ts');
+    const review = await import('../src/lib/event-review.ts');
+
+    assert.equal(typeof plan.planNights, 'function');
+    assert.equal(typeof review.reviewEvents, 'function');
+  });
+
   it('planetary-events.ts i katalogi danych', async () => {
     const planets = await import('../src/lib/planetary-events.ts');
     const sites = await import('../src/data/observing-sites.ts');
