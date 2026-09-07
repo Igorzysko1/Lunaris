@@ -72,6 +72,51 @@ export function useDeviceLocation(enabled: boolean): DeviceLocation & { retry: (
   return { ...state, retry };
 }
 
+/** Pozycja złapana na żądanie, razem z tym, jak bardzo można jej ufać. */
+export type PositionFix = {
+  coords: Coords;
+  /** Promień niepewności w metrach; `null`, gdy system go nie podaje. */
+  accuracyM: number | null;
+};
+
+export type CaptureResult =
+  { ok: true; fix: PositionFix } | { ok: false; reason: 'denied' | 'unavailable' };
+
+/**
+ * Jednorazowy odczyt pozycji — do zapisania miejsca, w którym się właśnie stoi.
+ *
+ * Osobno od `useDeviceLocation`, bo to inna czynność: tamto śledzi pozycję na
+ * potrzeby prognozy i jest związane z przełącznikiem GPS w ustawieniach, a to
+ * jest gest wykonywany raz, niezależnie od tego, czy śledzenie jest włączone.
+ *
+ * **Działa bez sieci.** GNSS jej nie potrzebuje, a to właśnie w terenie bez
+ * zasięgu ta funkcja ma sens. Dlatego nie wołamy tu geokodowania wstecznego —
+ * nazwę nadaje użytkownik, a nie usługa, której akurat nie ma.
+ *
+ * Dokładność bierzemy wyższą niż przy śledzeniu: punkt zapisuje się raz i na
+ * stałe, więc kilkanaście sekund dłuższy pomiar jest tego wart.
+ */
+export async function capturePosition(): Promise<CaptureResult> {
+  const { status } = await Location.requestForegroundPermissionsAsync();
+  if (status !== Location.PermissionStatus.GRANTED) return { ok: false, reason: 'denied' };
+
+  try {
+    const position = await Location.getCurrentPositionAsync({
+      accuracy: Location.Accuracy.High,
+    });
+
+    return {
+      ok: true,
+      fix: {
+        coords: { lat: position.coords.latitude, lon: position.coords.longitude },
+        accuracyM: position.coords.accuracy ?? null,
+      },
+    };
+  } catch {
+    return { ok: false, reason: 'unavailable' };
+  }
+}
+
 /** Geokodowanie wsteczne bywa niedostępne (brak sieci, brak usługi) — wtedy bierzemy najbliższe miasto. */
 async function resolveLabel(coords: Coords): Promise<string> {
   try {

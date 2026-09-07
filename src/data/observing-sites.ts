@@ -36,6 +36,13 @@ export type ObservingSite = {
   walkMinutes: number;
   /** Notatki z wyjazdów: gdzie faktycznie zaparkować, jaki teren, co przeszkadza. */
   notes: string;
+  /**
+   * Dokładność pozycji w metrach w chwili zapisu z terenu; `null` dla punktów
+   * wpisanych z mapy. Ma znaczenie później: fix złapany pod drzewami potrafi
+   * mieć kilkadziesiąt metrów błędu i wtedy warto punkt powtórzyć, zamiast
+   * budować na nim maskę horyzontu czy jasność nieba.
+   */
+  accuracyM: number | null;
 };
 
 /**
@@ -52,6 +59,7 @@ export const DEFAULT_SITES: ObservingSite[] = [
     bortle: 4,
     walkMinutes: 15,
     notes: 'Znana łuna od strony zabudowy — psuje obiekty nisko nad horyzontem z tej strony.',
+    accuracyM: null,
   },
   {
     id: 'site-zborow',
@@ -62,6 +70,7 @@ export const DEFAULT_SITES: ObservingSite[] = [
     bortle: 4,
     walkMinutes: 10,
     notes: '',
+    accuracyM: null,
   },
   {
     id: 'site-zloty-potok',
@@ -72,6 +81,7 @@ export const DEFAULT_SITES: ObservingSite[] = [
     bortle: 4,
     walkMinutes: 5,
     notes: '',
+    accuracyM: null,
   },
   {
     id: 'site-salmopolska',
@@ -82,6 +92,7 @@ export const DEFAULT_SITES: ObservingSite[] = [
     bortle: 4,
     walkMinutes: 5,
     notes: '',
+    accuracyM: null,
   },
   {
     id: 'site-hala-lipowska',
@@ -92,6 +103,7 @@ export const DEFAULT_SITES: ObservingSite[] = [
     bortle: 3,
     walkMinutes: 60,
     notes: 'Podejście z Korbielowa — powyżej tolerancji marszu, planować z zapasem.',
+    accuracyM: null,
   },
 ];
 
@@ -102,6 +114,11 @@ export const DEFAULT_SITES: ObservingSite[] = [
  * patrzą na miasto z bazy, czy na miejscówkę z katalogu — jedna ścieżka zamiast
  * dwóch równoległych.
  */
+/** Identyfikator miejsca. Nie musi być kryptograficzny — ma tylko nie kolidować. */
+export function newSiteId(): string {
+  return `site-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
 export function siteAsPlace(site: ObservingSite): Place {
   return {
     id: site.id,

@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
-import { siteAsPlace } from '@/data/observing-sites';
+import { newSiteId, siteAsPlace, type ObservingSite } from '@/data/observing-sites';
 import { skyQualityAt, type BortleSource } from '@/lib/sky-map';
 import { FALLBACK_POSITION, findPlaceById, nearestPlace, type Coords } from '@/data/places';
 import { DEFAULT_CONFIG, clampConfig, type LunarisConfig } from '@/lib/config';
@@ -71,6 +71,15 @@ type Settings = {
    * po każdej sesji, więc jedyne edytowalne z aplikacji.
    */
   updateSiteNotes: (id: string, notes: string) => void;
+  /**
+   * Zapisuje punkt, w którym użytkownik właśnie stoi, jako nowe miejsce.
+   * Zwraca jego identyfikator, żeby wywołujący mógł od razu je wybrać.
+   */
+  addSiteAt: (name: string, coords: Coords, accuracyM: number | null) => string;
+  /** Przesuwa istniejące miejsce na zmierzoną pozycję, resztę zostawiając. */
+  moveSite: (id: string, coords: Coords, accuracyM: number | null) => void;
+  /** Usuwa miejsce z katalogu. */
+  removeSite: (id: string) => void;
   /** Dodaje zestaw sprzętu na koniec listy. */
   addOpticsProfile: () => void;
   /** Zmienia nazwę albo wybrane parametry jednego zestawu. */
@@ -203,6 +212,53 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
           config: clampConfig({
             ...s.config,
             sites: s.config.sites.map((site) => (site.id === id ? { ...site, notes } : site)),
+          }),
+        })),
+      addSiteAt: (name, coords, accuracyM) => {
+        const id = newSiteId();
+
+        setPersisted((s) => {
+          const site: ObservingSite = {
+            id,
+            name: name.trim() || 'Nowe miejsce',
+            // Region tylko do wyświetlenia; z terenu bierzemy najbliższą znaną
+            // miejscowość, bo geokodowanie wymagałoby sieci, której tam nie ma.
+            region: nearestPlace(coords).name,
+            lat: coords.lat,
+            lon: coords.lon,
+            // Zapas na wypadek punktu spoza mapy jasności nieba; gdy punkt na
+            // niej leży, i tak liczy się go z mapy.
+            bortle: nearestPlace(coords).bortle,
+            // Skoro stoisz na stanowisku, marsz jest już za tobą.
+            walkMinutes: 0,
+            notes: '',
+            accuracyM,
+          };
+
+          return {
+            ...s,
+            config: clampConfig({ ...s.config, sites: [...s.config.sites, site] }),
+          };
+        });
+
+        return id;
+      },
+      moveSite: (id, coords, accuracyM) =>
+        setPersisted((s) => ({
+          ...s,
+          config: clampConfig({
+            ...s.config,
+            sites: s.config.sites.map((site) =>
+              site.id === id ? { ...site, ...coords, accuracyM } : site,
+            ),
+          }),
+        })),
+      removeSite: (id) =>
+        setPersisted((s) => ({
+          ...s,
+          config: clampConfig({
+            ...s.config,
+            sites: s.config.sites.filter((site) => site.id !== id),
           }),
         })),
       updateOpticsProfile: (id, patch) =>

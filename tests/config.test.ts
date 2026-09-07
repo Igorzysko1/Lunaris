@@ -190,6 +190,7 @@ describe('katalog miejscówek', () => {
         bortle: 4,
         walkMinutes: 0,
         notes: '',
+        accuracyM: null,
       },
       {
         id: 'ok',
@@ -200,6 +201,7 @@ describe('katalog miejscówek', () => {
         bortle: 4,
         walkMinutes: 5,
         notes: '',
+        accuracyM: null,
       },
     ];
 
@@ -220,6 +222,7 @@ describe('katalog miejscówek', () => {
         bortle: 42,
         walkMinutes: 9999,
         notes: '',
+        accuracyM: null,
       },
     ];
 
@@ -239,6 +242,71 @@ describe('katalog miejscówek', () => {
     assert.deepEqual(merged.sites, DEFAULT_CONFIG.sites);
   });
 
+  it('dokładność pomiaru przechodzi przez walidację, a jej brak zostaje brakiem', () => {
+    const config = clone(DEFAULT_CONFIG);
+    config.sites = [
+      {
+        id: 'a',
+        name: 'Zmierzone',
+        region: '',
+        lat: 50,
+        lon: 19,
+        bortle: 4,
+        walkMinutes: 0,
+        notes: '',
+        accuracyM: 12.4,
+      },
+      {
+        id: 'b',
+        name: 'Z mapy',
+        region: '',
+        lat: 50,
+        lon: 19,
+        bortle: 4,
+        walkMinutes: 0,
+        notes: '',
+        accuracyM: null,
+      },
+      // Zero metrów to nie to samo co brak pomiaru — wartość spoza zakresu
+      // wraca do granicy, ale niebędąca liczbą zostaje pustką.
+      {
+        id: 'c',
+        name: 'Bzdura',
+        region: '',
+        lat: 50,
+        lon: 19,
+        bortle: 4,
+        walkMinutes: 0,
+        notes: '',
+        accuracyM: 'dużo' as never,
+      },
+    ];
+
+    const sites = clampConfig(config).sites;
+    assert.equal(sites[0].accuracyM, 12.4);
+    assert.equal(sites[1].accuracyM, null);
+    assert.equal(sites[2].accuracyM, null);
+  });
+
+  it('dokładność spoza zakresu jest przycinana', () => {
+    const config = clone(DEFAULT_CONFIG);
+    config.sites = [
+      {
+        id: 'a',
+        name: 'Fatalny fix',
+        region: '',
+        lat: 50,
+        lon: 19,
+        bortle: 4,
+        walkMinutes: 0,
+        notes: '',
+        accuracyM: 999999,
+      },
+    ];
+
+    assert.equal(clampConfig(config).sites[0].accuracyM, 10000);
+  });
+
   it('zapisany katalog wygrywa z domyślnym, łącznie z notatkami', () => {
     const merged = mergeConfig({
       sites: [
@@ -251,6 +319,7 @@ describe('katalog miejscówek', () => {
           bortle: 4,
           walkMinutes: 3,
           notes: 'brama od wschodu',
+          accuracyM: null,
         },
       ],
     });

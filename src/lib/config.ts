@@ -188,6 +188,7 @@ export const CONFIG_LIMITS = {
   sites: {
     bortle: { min: 1, max: 9 },
     walkMinutes: { min: 0, max: 240 },
+    accuracyM: { min: 0, max: 10000 },
     lat: { min: -90, max: 90 },
     lon: { min: -180, max: 180 },
   },
@@ -236,6 +237,11 @@ function clampSites(sites: ObservingSite[]): ObservingSite[] {
       bortle: Math.round(clampNumber(s.bortle, l.bortle, 4)),
       walkMinutes: clampNumber(s.walkMinutes, l.walkMinutes, 0),
       notes: typeof s.notes === 'string' ? s.notes : '',
+      // Brak pomiaru to nie zero metrów, tylko brak informacji — stąd null,
+      // a nie wartość domyślna.
+      accuracyM: Number.isFinite(s.accuracyM as number)
+        ? clampNumber(s.accuracyM as number, l.accuracyM, 0)
+        : null,
     }));
 }
 

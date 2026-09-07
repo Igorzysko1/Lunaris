@@ -25,6 +25,7 @@ function site(id: string, over: Partial<ObservingSite> = {}): ObservingSite {
     bortle: 4,
     walkMinutes: 0,
     notes: '',
+    accuracyM: null,
     ...over,
   };
 }
