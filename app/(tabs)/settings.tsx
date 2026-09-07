@@ -184,19 +184,24 @@ export default function SettingsScreen() {
           <Divider />
           <NumberRow
             label="Sesja minimum"
-            unit="h"
-            value={config.session.minDurationHours}
-            limits={CONFIG_LIMITS.session.minDurationHours}
-            onCommit={(minDurationHours) => updateConfig('session', { minDurationHours })}
+            unit="min"
+            value={config.session.minDurationMinutes}
+            limits={CONFIG_LIMITS.session.minDurationMinutes}
+            onCommit={(minDurationMinutes) => updateConfig('session', { minDurationMinutes })}
           />
           <Divider />
           <NumberRow
             label="Sesja maksimum"
-            unit="h"
-            value={config.session.maxDurationHours}
-            limits={CONFIG_LIMITS.session.maxDurationHours}
-            onCommit={(maxDurationHours) => updateConfig('session', { maxDurationHours })}
+            unit="min"
+            value={config.session.maxDurationMinutes}
+            limits={CONFIG_LIMITS.session.maxDurationMinutes}
+            onCommit={(maxDurationMinutes) => updateConfig('session', { maxDurationMinutes })}
           />
+          <Divider />
+          <Text style={styles.note}>
+            Krótsza sesja to noc odrzucona, dłuższa jest przycinana — jedno i drugie liczone na tym,
+            co zostaje po odjęciu snu i drogi, a nie na samym oknie pogodowym.
+          </Text>
         </Card>
 
         <SectionLabel style={styles.groupLabel}>Miejscówki</SectionLabel>
@@ -553,6 +558,13 @@ const styles = StyleSheet.create({
     fontFamily: fonts.sans,
     fontSize: 13,
     color: colors.textMuted,
+  },
+  note: {
+    fontFamily: fonts.sans,
+    fontSize: 12,
+    lineHeight: 17,
+    color: colors.textMuted,
+    paddingVertical: 10,
   },
   leadHeader: {
     flexDirection: 'row',

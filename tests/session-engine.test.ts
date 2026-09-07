@@ -34,7 +34,7 @@ function longHours(): NightHour[] {
 /** Zimowa noc bez własnego limitu długości — wtedy o końcu sesji decyduje sen. */
 function sleepBound(over: Partial<NightInput> = {}): NightInput {
   const config = configWith();
-  config.session.maxDurationHours = 12;
+  config.session.maxDurationMinutes = 720;
 
   return input({
     night: LONG_NIGHT,
@@ -294,7 +294,7 @@ describe('evaluateNight — kalendarz i sen', () => {
     const verdict = evaluateNight(sleepBound());
 
     assert.equal(verdict.status, 'go');
-    assert.ok((verdict.window?.durationMinutes ?? 0) >= DEFAULT_CONFIG.conditions.minWindowMinutes);
+    assert.ok((verdict.window?.durationMinutes ?? 0) >= DEFAULT_CONFIG.session.minDurationMinutes);
     assert.ok((verdict.plan?.sleepHours ?? 0) >= DEFAULT_CONFIG.observer.minSleepHours);
     assert.ok(verdict.warnings.some((w) => w.kind === 'session-trimmed' && w.reason === 'sleep'));
   });
@@ -339,7 +339,7 @@ describe('evaluateNight — kalendarz i sen', () => {
 
   it('próg wyjątku jest konfigurowalny — sto go wyłącza', () => {
     const config = configWith();
-    config.session.maxDurationHours = 12;
+    config.session.maxDurationMinutes = 720;
     config.conditions.exceptionalRating = 100;
 
     const verdict = evaluateNight(sleepBound({ rating: 95, config }));

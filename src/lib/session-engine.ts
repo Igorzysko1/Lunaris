@@ -154,6 +154,9 @@ function blockerFor(hour: NightHour, config: LunarisConfig, windLimit: number): 
  * Godziny są punktami prognozy, a nie odcinkami, więc blok od 22:00 do 01:00
  * obejmuje cztery próbki i trwa trzy godziny. Blok przycinamy do okna nocy
  * astronomicznej — poza nim niebo nie jest jeszcze ciemne.
+ *
+ * Funkcja mówi wyłącznie, ile dała pogoda. Czy to wystarczy na wyjazd, zależy
+ * jeszcze od snu i od limitu długości, więc rozstrzyga się po przycięciu.
  */
 function longestBlock(
   hours: NightHour[],
@@ -193,9 +196,9 @@ function longestBlock(
   // Najczęstsza przyczyna blokowania — to ona tłumaczy, dlaczego nocy nie ma.
   const blocker = [...blockers.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
 
-  if (!best || longestMinutes < config.conditions.minWindowMinutes) {
-    return { window: null, longestMinutes, blocker };
-  }
+  // Bez progu: czy blok jest dość długi, rozstrzyga się raz, na samym końcu —
+  // po przycięciu. Tutaj wiemy tylko, ile pogoda dała, a nie ile z tego zostanie.
+  if (!best) return { window: null, longestMinutes, blocker };
 
   return {
     window: { ...best, durationMinutes: longestMinutes, moonLimited: false },
@@ -325,6 +328,8 @@ export function evaluateNight(input: NightInput): NightVerdict {
     input.windLimitKmh,
   );
 
+  // Brak okna znaczy teraz jedno: ani jedna godzina nocy nie przeszła przez
+  // progi. Za krótkie okno rozstrzyga się niżej, po przycięciu.
   if (!window) {
     if (longestMinutes < 0) {
       return { ...base, status: 'no-go', rejection: { kind: 'no-forecast' } };
@@ -332,10 +337,9 @@ export function evaluateNight(input: NightInput): NightVerdict {
     return {
       ...base,
       status: 'no-go',
-      rejection:
-        longestMinutes > 0 || !blocker
-          ? { kind: 'window-too-short', longestMinutes }
-          : { kind: 'conditions', blocker },
+      rejection: blocker
+        ? { kind: 'conditions', blocker }
+        : { kind: 'window-too-short', longestMinutes },
     };
   }
 
@@ -400,7 +404,7 @@ export function evaluateNight(input: NightInput): NightVerdict {
     if (latestEnd) limits.push({ at: latestEnd, reason: 'sleep' });
 
     limits.push({
-      at: new Date(window.from.getTime() + config.session.maxDurationHours * HOUR_MS),
+      at: new Date(window.from.getTime() + config.session.maxDurationMinutes * MINUTE_MS),
       reason: 'max-duration',
     });
   }
@@ -412,19 +416,12 @@ export function evaluateNight(input: NightInput): NightVerdict {
   const trimmedTo = binding ? binding.at : window.to;
   const trimmedMinutes = (trimmedTo.getTime() - window.from.getTime()) / MINUTE_MS;
 
-  // Po przycięciu obowiązuje próg z sekcji sesji: „jazda na godzinę" nie jest
-  // wyprawą wartą pakowania sprzętu. `minWindowMinutes` mówi, kiedy okno pogodowe
-  // w ogóle się liczy; to mówi, kiedy wyjazd ma sens.
-  const worthTheDrive = Math.max(
-    config.conditions.minWindowMinutes,
-    config.session.minDurationHours * 60,
-  );
-
-  if (binding && trimmedMinutes < worthTheDrive) {
-    // Po przycięciu nie zostaje nic sensownego. Powód podajemy ten, który
-    // faktycznie przyciął — „musiałbyś wrócić przed 23:00" i „okno było za
-    // krótkie" to dla użytkownika dwie różne informacje.
-    if (binding.reason === 'sleep') {
+  // Jedyny test długości w całym silniku, i to na tym, co użytkownik faktycznie
+  // dostanie: na sesji po przycięciu, a nie na oknie pogodowym przed nim.
+  if (trimmedMinutes < config.session.minDurationMinutes) {
+    // Powód podajemy ten, który faktycznie przesądził — „musiałbyś wrócić przed
+    // 23:00" i „pogoda dała tylko godzinę" to dwie różne informacje.
+    if (binding?.reason === 'sleep') {
       const plan = planFor({ ...window, moonLimited }, input);
       return {
         night,

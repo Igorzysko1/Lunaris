@@ -122,11 +122,11 @@ describe('windLimitKmh', () => {
 describe('clampConfig', () => {
   it('nie pozwala, by minimum sesji przekroczyło maksimum', () => {
     const config = clone(DEFAULT_CONFIG);
-    config.session.minDurationHours = 8;
-    config.session.maxDurationHours = 2;
+    config.session.minDurationMinutes = 480;
+    config.session.maxDurationMinutes = 120;
 
     const clamped = clampConfig(config);
-    assert.ok(clamped.session.maxDurationHours >= clamped.session.minDurationHours);
+    assert.ok(clamped.session.maxDurationMinutes >= clamped.session.minDurationMinutes);
   });
 
   it('godzina „tylko dom" nie wypada przed godziną odrzucenia', () => {
@@ -379,9 +379,26 @@ describe('mergeConfig', () => {
   });
 
   it('wartość spoza zakresu w zapisie jest przycinana przy wczytaniu', () => {
-    const merged = mergeConfig({ conditions: { maxCloudTotal: 900, minWindowMinutes: 1 } });
+    const merged = mergeConfig({ conditions: { maxCloudTotal: 900, dewWarningSpreadC: -5 } });
 
     assert.equal(merged.conditions.maxCloudTotal, 100);
-    assert.equal(merged.conditions.minWindowMinutes, 15);
+    assert.equal(merged.conditions.dewWarningSpreadC, 0);
+  });
+
+  it('długość sesji zapisana w godzinach wraca jako minuty', () => {
+    // Zapisy sprzed zmiany jednostki nie mogą przepadać: użytkownik nie ma
+    // powodu ustawiać tego drugi raz tylko dlatego, że zmieniła się jednostka.
+    const merged = mergeConfig({ session: { minDurationHours: 2.5, maxDurationHours: 6 } });
+
+    assert.equal(merged.session.minDurationMinutes, 150);
+    assert.equal(merged.session.maxDurationMinutes, 360);
+  });
+
+  it('nowa jednostka ma pierwszeństwo przed starą', () => {
+    const merged = mergeConfig({
+      session: { minDurationHours: 2, minDurationMinutes: 45 },
+    });
+
+    assert.equal(merged.session.minDurationMinutes, 45);
   });
 });

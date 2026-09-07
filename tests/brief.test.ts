@@ -96,6 +96,22 @@ describe('kontrakt briefu', () => {
   });
 });
 
+describe('cele w briefie', () => {
+  it('każdy cel niesie komplet pól i jest w zasięgu', () => {
+    const { brief } = buildBrief(input({ nights: [CLEAR_NIGHT] }));
+    const targets = brief.nights[0].targets;
+
+    assert.ok(targets.length > 0);
+    for (const target of targets) {
+      assert.equal(typeof target.id, 'string');
+      assert.equal(typeof target.name, 'string');
+      assert.ok(['planet', 'dso'].includes(target.kind));
+      assert.match(target.bestAt, /^\d{4}-\d{2}-\d{2}T/);
+      assert.ok(target.maxAltitude > 0);
+    }
+  });
+});
+
 describe('ten sam silnik co aplikacja', () => {
   it('werdykty są identyczne z tymi, które liczy warstwa domenowa', () => {
     // To jest sedno taska: brief nie ma prawa mieć własnego rachunku.
@@ -152,20 +168,35 @@ describe('ten sam silnik co aplikacja', () => {
   });
 });
 
+/**
+ * Do snapshotu idzie sama liczba celów, nie ich lista.
+ *
+ * Cele mają własne testy, a katalog obiektów rośnie niezależnie od silnika:
+ * jedna dopisana galaktyka przestawiałaby kilkaset linii snapshotu i diff
+ * przestałby cokolwiek pokazywać. Liczba wciąż łapie zmianę doboru, a snapshot
+ * zostaje czytelny.
+ */
+function withoutTargetList(brief: ReturnType<typeof buildBrief>['brief']) {
+  return {
+    ...brief,
+    nights: brief.nights.map((n) => ({ ...n, targets: n.targets.length })),
+  };
+}
+
 describe('snapshoty zamrożonych zestawów', () => {
   it('noc czysta', (t) => {
-    t.assert.snapshot(buildBrief(input({ nights: [CLEAR_NIGHT] })).brief);
+    t.assert.snapshot(withoutTargetList(buildBrief(input({ nights: [CLEAR_NIGHT] })).brief));
   });
 
   it('noc pod chmurami', (t) => {
-    t.assert.snapshot(buildBrief(input({ nights: [CLOUDY_NIGHT] })).brief);
+    t.assert.snapshot(withoutTargetList(buildBrief(input({ nights: [CLOUDY_NIGHT] })).brief));
   });
 
   it('noc wietrzna', (t) => {
-    t.assert.snapshot(buildBrief(input({ nights: [WINDY_NIGHT] })).brief);
+    t.assert.snapshot(withoutTargetList(buildBrief(input({ nights: [WINDY_NIGHT] })).brief));
   });
 
   it('trzy noce razem', (t) => {
-    t.assert.snapshot(buildBrief(input()).brief);
+    t.assert.snapshot(withoutTargetList(buildBrief(input()).brief));
   });
 });

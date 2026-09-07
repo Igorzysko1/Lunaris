@@ -89,14 +89,7 @@ export default function ThresholdsScreen() {
             limits={limits.conditions.maxMoonIllumination}
             onCommit={(maxMoonIllumination) => updateConfig('conditions', { maxMoonIllumination })}
           />
-          <Divider />
-          <NumberRow
-            label="Minimalne okno"
-            unit="min"
-            value={conditions.minWindowMinutes}
-            limits={limits.conditions.minWindowMinutes}
-            onCommit={(minWindowMinutes) => updateConfig('conditions', { minWindowMinutes })}
-          />
+
           <Divider />
           <NumberRow
             label="Ostrzeżenie o rosie"

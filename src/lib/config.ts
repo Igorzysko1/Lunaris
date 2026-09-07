@@ -52,8 +52,18 @@ export type ObserverProfile = {
  */
 export type SessionMode = {
   overnight: boolean;
-  minDurationHours: number;
-  maxDurationHours: number;
+  /**
+   * Najkrótsza sesja warta wyjazdu, w minutach.
+   *
+   * Jeden próg na całą długość sesji — nie dwa. Wcześniej obok siebie stały
+   * „minimalne okno pogodowe" i „minimalna długość sesji", w różnych jednostkach
+   * i sekcjach, sprawdzane na różnych etapach: pierwszy przed przycięciem,
+   * drugi po. Ta sama noc mogła przejść jeden, a nie przejść drugiego, a
+   * użytkownik nie miał jak zgadnąć, który zadziałał.
+   */
+  minDurationMinutes: number;
+  /** Najdłuższa sesja, na jaką użytkownik ma ochotę. Przycina, a nie odrzuca. */
+  maxDurationMinutes: number;
 };
 
 /** Progi pogodowe i księżycowe decydujące o tym, czy noc w ogóle się liczy. */
@@ -68,7 +78,6 @@ export type ConditionThresholds = {
   maxWindGustHandheldKmh: number;
   /** Powyżej tej fazy okno liczy się tylko dla celów księżycowych i planetarnych. */
   maxMoonIllumination: number;
-  minWindowMinutes: number;
   /** Spread temperatura minus punkt rosy, poniżej którego ostrzegamy o rosie. */
   dewWarningSpreadC: number;
   /**
@@ -155,8 +164,8 @@ export const DEFAULT_CONFIG: LunarisConfig = {
   sites: DEFAULT_SITES,
   session: {
     overnight: false,
-    minDurationHours: 3,
-    maxDurationHours: 5,
+    minDurationMinutes: 120,
+    maxDurationMinutes: 300,
   },
   conditions: {
     maxCloudTotal: 25,
@@ -165,7 +174,6 @@ export const DEFAULT_CONFIG: LunarisConfig = {
     maxWindGustKmh: 25,
     maxWindGustHandheldKmh: 15,
     maxMoonIllumination: 30,
-    minWindowMinutes: 90,
     dewWarningSpreadC: 2,
     travelPenaltyPerHour: 10,
     exceptionalRating: 85,
@@ -198,8 +206,8 @@ export const CONFIG_LIMITS = {
     averageSpeedKmh: { min: 10, max: 140 },
   },
   session: {
-    minDurationHours: { min: 0.5, max: 12 },
-    maxDurationHours: { min: 0.5, max: 14 },
+    minDurationMinutes: { min: 30, max: 720 },
+    maxDurationMinutes: { min: 30, max: 840 },
   },
   conditions: {
     maxCloudTotal: { min: 0, max: 100 },
@@ -208,7 +216,6 @@ export const CONFIG_LIMITS = {
     maxWindGustKmh: { min: 0, max: 120 },
     maxWindGustHandheldKmh: { min: 0, max: 120 },
     maxMoonIllumination: { min: 0, max: 100 },
-    minWindowMinutes: { min: 15, max: 600 },
     dewWarningSpreadC: { min: 0, max: 15 },
     travelPenaltyPerHour: { min: 0, max: 50 },
     exceptionalRating: { min: 0, max: 100 },
@@ -320,15 +327,15 @@ export function clampConfig(config: LunarisConfig): LunarisConfig {
 
   const session = {
     overnight: config.session.overnight === true,
-    minDurationHours: clampNumber(
-      config.session.minDurationHours,
-      l.session.minDurationHours,
-      d.session.minDurationHours,
+    minDurationMinutes: clampNumber(
+      config.session.minDurationMinutes,
+      l.session.minDurationMinutes,
+      d.session.minDurationMinutes,
     ),
-    maxDurationHours: clampNumber(
-      config.session.maxDurationHours,
-      l.session.maxDurationHours,
-      d.session.maxDurationHours,
+    maxDurationMinutes: clampNumber(
+      config.session.maxDurationMinutes,
+      l.session.maxDurationMinutes,
+      d.session.maxDurationMinutes,
     ),
   };
 
@@ -387,7 +394,7 @@ export function clampConfig(config: LunarisConfig): LunarisConfig {
     session: {
       ...session,
       // Minimum dłuższe od maksimum dałoby okno, którego nie da się spełnić.
-      maxDurationHours: Math.max(session.maxDurationHours, session.minDurationHours),
+      maxDurationMinutes: Math.max(session.maxDurationMinutes, session.minDurationMinutes),
     },
     conditions: {
       maxCloudTotal: clampNumber(
@@ -419,11 +426,6 @@ export function clampConfig(config: LunarisConfig): LunarisConfig {
         config.conditions.maxMoonIllumination,
         l.conditions.maxMoonIllumination,
         d.conditions.maxMoonIllumination,
-      ),
-      minWindowMinutes: clampNumber(
-        config.conditions.minWindowMinutes,
-        l.conditions.minWindowMinutes,
-        d.conditions.minWindowMinutes,
       ),
       dewWarningSpreadC: clampNumber(
         config.conditions.dewWarningSpreadC,
@@ -474,6 +476,26 @@ export function mergeConfig(stored: unknown): LunarisConfig {
       ? [{ id: newProfileId(), label: '', optics: raw.optics as OpticsProfile['optics'] }]
       : DEFAULT_CONFIG.opticsProfiles;
 
+  // Długość sesji trzymana była w godzinach, a próg okna pogodowego osobno,
+  // w minutach. Przeliczamy stare pola zamiast je gubić — użytkownik nie ma
+  // powodu ustawiać tego drugi raz tylko dlatego, że zmieniła się jednostka.
+  const storedSession = (raw.session ?? {}) as Record<string, unknown>;
+  const legacyHours = (key: string): number | undefined =>
+    typeof storedSession[key] === 'number' ? (storedSession[key] as number) * 60 : undefined;
+
+  const session: SessionMode = {
+    ...DEFAULT_CONFIG.session,
+    ...(raw.session as Partial<SessionMode>),
+    minDurationMinutes:
+      (raw.session as Partial<SessionMode>)?.minDurationMinutes ??
+      legacyHours('minDurationHours') ??
+      DEFAULT_CONFIG.session.minDurationMinutes,
+    maxDurationMinutes:
+      (raw.session as Partial<SessionMode>)?.maxDurationMinutes ??
+      legacyHours('maxDurationHours') ??
+      DEFAULT_CONFIG.session.maxDurationMinutes,
+  };
+
   // Katalog miejsc: zapisy sprzed tej wersji go nie mają, więc dostają domyślny.
   // Pusta zapisana lista zostaje pusta — użytkownik mógł skasować wszystkie.
   const sites: ObservingSite[] = Array.isArray(raw.sites)
@@ -484,7 +506,7 @@ export function mergeConfig(stored: unknown): LunarisConfig {
     observer: section('observer'),
     opticsProfiles: profiles,
     sites,
-    session: section('session'),
+    session,
     conditions: section('conditions'),
     calendar: section('calendar'),
     refresh: section('refresh'),
