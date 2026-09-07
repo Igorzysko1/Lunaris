@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Kolejny push na tę samą gałąź anuluje poprzedni przebieg — liczy się wynik
+# dla najnowszego commita, a nie dla każdego kroku po drodze.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Typy, lint, format, testy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # Testy uruchamiają pliki .ts bezpośrednio, przez zdejmowanie typów
+          # w Node — stąd wersja LTS, w której ten mechanizm jest stabilny.
+          node-version: 24
+          cache: npm
+
+      # `npm ci` zamiast `npm install`: instaluje dokładnie to, co w lockfile,
+      # i wywala się, gdy package.json rozjedzie się z package-lock.json.
+      - run: npm ci
+
+      # Każdy krok osobno, żeby z czerwonego przebiegu było widać, co poszło źle,
+      # bez czytania logu. Kroki po pierwszym błędzie się nie wykonują.
+      - name: Typy
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Format
+        run: npm run format:check
+
+      - name: Testy
+        run: npm test
+
+  doctor:
+    name: Zgodność zależności z SDK
+    runs-on: ubuntu-latest
+    # Osobne zadanie, bo sprawdza higienę zależności, a nie poprawność kodu —
+    # i chodzi po sieci. Nie ma powodu, żeby blokowało wynik testów.
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: expo-doctor
+        run: npx expo-doctor

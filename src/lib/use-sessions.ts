@@ -65,7 +65,6 @@ export function useSessions(coords: Coords, bortle: number, config: LunarisConfi
 
     // Reset stanu przy zmianie wejścia jest tu celowy: zanim odpowie sieć, widok ma
     // pokazywać ładowanie dla NOWEJ lokalizacji, a nie dane dla poprzedniej.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setStatus('loading');
 
     fetchUpcomingNights({ lat, lon }, SESSION_NIGHTS, controller.signal)
