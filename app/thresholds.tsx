@@ -73,6 +73,16 @@ export default function ThresholdsScreen() {
           />
           <Divider />
           <NumberRow
+            label="Porywy wiatru, z ręki"
+            unit="km/h"
+            value={conditions.maxWindGustHandheldKmh}
+            limits={limits.conditions.maxWindGustHandheldKmh}
+            onCommit={(maxWindGustHandheldKmh) =>
+              updateConfig('conditions', { maxWindGustHandheldKmh })
+            }
+          />
+          <Divider />
+          <NumberRow
             label="Faza Księżyca, maks."
             unit="%"
             value={conditions.maxMoonIllumination}
@@ -98,7 +108,9 @@ export default function ThresholdsScreen() {
           <Divider />
           <Text style={styles.note}>
             Przy większej fazie Księżyca okno liczy się tylko dla celów księżycowych i planetarnych.
-            Ostrzeżenie o rosie to różnica temperatury i punktu rosy.
+            Ostrzeżenie o rosie to różnica temperatury i punktu rosy. Niższy próg wiatru dotyczy
+            zestawów trzymanych z ręki — noc oceniana jest łagodniejszym z progów, a o gorszym
+            informuje ostrzeżenie.
           </Text>
         </Card>
 
@@ -128,9 +140,20 @@ export default function ThresholdsScreen() {
             onCommit={(exceptionalMaxCloud) => updateConfig('calendar', { exceptionalMaxCloud })}
           />
           <Divider />
+          <NumberRow
+            label="Zakładana pierwsza godzina"
+            unit=":00"
+            value={calendar.assumedFirstEventHour}
+            limits={limits.calendar.assumedFirstEventHour}
+            onCommit={(assumedFirstEventHour) =>
+              updateConfig('calendar', { assumedFirstEventHour })
+            }
+          />
+          <Divider />
           <Text style={styles.note}>
             Wcześniejsze wydarzenie odrzuca sesję, chyba że noc jest wybitna: zachmurzenie poniżej
-            progu, Księżyc pod horyzontem i zjawisko niepowtarzalne w tym miesiącu.
+            progu, Księżyc pod horyzontem i zjawisko niepowtarzalne w tym miesiącu. Zakładana
+            godzina obowiązuje w dni robocze do czasu podpięcia prawdziwego kalendarza.
           </Text>
         </Card>
       </ScrollView>
