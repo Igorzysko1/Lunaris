@@ -142,6 +142,9 @@ describe('expiredKeys', () => {
       [
         ['lunaris.settings', ancient],
         ['lunaris.cycle.bundle', ancient],
+        // Dziennik obserwacji jest przyrostowy i nieodtwarzalny: sprzątanie
+        // cache'u nie może go dotknąć, choćby był sprzed roku.
+        ['lunaris.journal', ancient],
       ],
       NOW,
     );

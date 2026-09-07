@@ -65,6 +65,7 @@ function AppStack() {
         <Stack.Screen name="thresholds" />
         <Stack.Screen name="sites" />
         <Stack.Screen name="review" />
+        <Stack.Screen name="journal" />
       </Stack>
     </ForecastProvider>
   );

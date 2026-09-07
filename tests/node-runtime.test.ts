@@ -47,6 +47,13 @@ describe('moduły domenowe ładują się pod Node', () => {
     assert.equal(typeof review.reviewEvents, 'function');
   });
 
+  it('journal.ts — raport miesięczny policzy go poza aplikacją', async () => {
+    const journal = await import('../src/lib/journal.ts');
+
+    assert.equal(typeof journal.orderByHistory, 'function');
+    assert.equal(typeof journal.exportJournal, 'function');
+  });
+
   it('planetary-events.ts i katalogi danych', async () => {
     const planets = await import('../src/lib/planetary-events.ts');
     const sites = await import('../src/data/observing-sites.ts');

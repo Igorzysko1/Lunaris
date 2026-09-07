@@ -178,6 +178,20 @@ export default function NightScreen() {
                   <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
                 </Pressable>
 
+                <Pressable
+                  onPress={() => router.push('/journal')}
+                  style={[styles.reviewLink, styles.gap]}
+                >
+                  <Ionicons name="create-outline" size={18} color={colors.purple} />
+                  <View style={styles.reviewText}>
+                    <Text style={styles.reviewTitle}>Zapisz noc w dzienniku</Text>
+                    <Text style={styles.reviewHint}>
+                      Co udało się zobaczyć, a co nie — z listy celów tej nocy
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+                </Pressable>
+
                 <SectionLabel style={styles.sessionsLabel}>
                   {sessions.savedAt
                     ? `Nadchodzące sesje · z prognozy ${formatAge(sessions.savedAt)}`

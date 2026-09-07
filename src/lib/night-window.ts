@@ -72,6 +72,20 @@ export function currentNightWindow(now: Date, coords: Coords): NightWindow {
   return now < previous.to ? previous : nightWindow(now, coords);
 }
 
+/**
+ * Noc, którą warto zapisać w dzienniku: ta, która właśnie się skończyła, albo
+ * ta, która właśnie trwa.
+ *
+ * `currentNightWindow` po świcie przeskakuje na noc **nadchodzącą** i to jest
+ * właściwe dla prognozy, ale nie dla dziennika: rano po obserwacji pytanie
+ * dotyczy tego, co było, a nie tego, co będzie. Zapisu można dokonać także
+ * o trzeciej w nocy, przed powrotem — wtedy trwająca noc jest tą właściwą.
+ */
+export function lastObservedNight(now: Date, coords: Coords): NightWindow {
+  const current = currentNightWindow(now, coords);
+  return now < current.from ? nightWindow(noonOf(now, -1), coords) : current;
+}
+
 /** Próbki co 15 minut w oknie nocy — gęstość wystarczająca dla pytania „czy było widać". */
 export function sampleNight(window: NightWindow): Date[] {
   const STEP_MS = 15 * 60_000;
