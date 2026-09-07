@@ -14,6 +14,7 @@ import {
   IBMPlexMono_600SemiBold,
 } from '@expo-google-fonts/ibm-plex-mono';
 
+import { ForecastProvider } from '@/store/forecast';
 import { SettingsProvider, useSettings } from '@/store/settings';
 import { colors } from '@/theme';
 
@@ -52,19 +53,24 @@ function AppStack() {
 
   if (!hydrated) return null;
 
+  // Cykl dobowy startuje dopiero po wczytaniu ustawień: bez znanej lokalizacji
+  // pierwsze pobranie poszłoby dla punktu domyślnego, a więc nie dla tego,
+  // który użytkownik wybrał.
   return (
-    <Stack
-      screenOptions={{
-        headerShown: false,
-        contentStyle: { backgroundColor: colors.bg },
-      }}
-    >
-      <Stack.Screen name="(tabs)" />
-      <Stack.Screen name="location" />
-      <Stack.Screen name="moon" />
-      <Stack.Screen name="thresholds" />
-      <Stack.Screen name="sites" />
-      <Stack.Screen name="review" />
-    </Stack>
+    <ForecastProvider>
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: colors.bg },
+        }}
+      >
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="location" />
+        <Stack.Screen name="moon" />
+        <Stack.Screen name="thresholds" />
+        <Stack.Screen name="sites" />
+        <Stack.Screen name="review" />
+      </Stack>
+    </ForecastProvider>
   );
 }

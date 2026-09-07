@@ -30,7 +30,7 @@ import { HAIRLINE, colors, fonts, radius } from '@/theme';
 export default function NightScreen() {
   const router = useRouter();
   const { active, config } = useSettings();
-  const { status, data, savedAt, failure, refresh, refreshing } = useNightData(
+  const { status, data, savedAt, stale, failure, refresh, refreshing } = useNightData(
     active.coords,
     active.bortle,
   );
@@ -96,8 +96,10 @@ export default function NightScreen() {
           </Card>
         )}
 
-        {/* Dane z zapisu nie mogą udawać świeżych — stąd pasek nad wszystkim. */}
-        {status === 'ready' && savedAt && (
+        {/* Zapis jest normalnym źródłem odczytu, więc sam w sobie nie jest
+            ostrzeżeniem. Ostrzegamy dopiero wtedy, gdy odświeżenie zawiodło albo
+            gdy dane przetrwały termin, w którym miały się zmienić. */}
+        {status === 'ready' && savedAt && (failure || stale) && (
           <Pressable onPress={refresh} style={[styles.staleBar, styles.gap]}>
             <Ionicons
               name={failure === 'offline' ? 'cloud-offline-outline' : 'warning-outline'}
@@ -105,8 +107,12 @@ export default function NightScreen() {
               color={colors.amber}
             />
             <Text style={styles.staleText}>
-              {failure === 'offline' ? 'Brak sieci' : 'Serwis nie odpowiada'} — dane{' '}
-              {formatAge(savedAt)}
+              {failure === 'offline'
+                ? 'Brak sieci'
+                : failure
+                  ? 'Serwis nie odpowiada'
+                  : 'Dane nie odświeżyły się o porze'}{' '}
+              — {formatAge(savedAt)}
             </Text>
             <Text style={styles.staleRetry}>Odśwież</Text>
           </Pressable>
@@ -171,18 +177,6 @@ export default function NightScreen() {
                     : 'Nadchodzące sesje'}
                 </SectionLabel>
                 {sessions.status === 'loading' && <SessionsSkeleton />}
-                {sessions.status === 'error' && (
-                  <Card style={styles.gap}>
-                    <View style={styles.chartError}>
-                      <Text style={styles.errorText}>
-                        Nie udało się pobrać prognozy na kolejne noce.
-                      </Text>
-                      <Pressable onPress={sessions.refresh}>
-                        <Text style={styles.retry}>Spróbuj ponownie</Text>
-                      </Pressable>
-                    </View>
-                  </Card>
-                )}
                 {sessions.status === 'ready' &&
                   sessions.sessions.map((session) => (
                     <SessionCard

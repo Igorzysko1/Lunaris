@@ -144,25 +144,9 @@ function toHours(json: ApiResponse): NightHour[] {
   }));
 }
 
-export async function fetchNightForecast(
-  lat: number,
-  lon: number,
-  signal?: AbortSignal,
-): Promise<NightForecast> {
-  const url = new URL(API);
-  url.searchParams.set('latitude', String(lat));
-  url.searchParams.set('longitude', String(lon));
-  url.searchParams.set('hourly', HOURLY_FIELDS);
-  url.searchParams.set('daily', 'sunrise,sunset');
-  url.searchParams.set('timezone', 'auto');
-  url.searchParams.set('past_days', '1');
-  url.searchParams.set('forecast_days', '2');
-
-  const json = (await getJson(url, signal)) as ApiResponse;
-
-  const { from, to } = sunWindow(json.daily, new Date());
-
-  const hours = toHours(json).filter((h) => h.at >= from && h.at <= to);
+/** Zwija godziny okna do jednej oceny nocy. Wspólne dla wszystkich pobrań. */
+function summarize(all: NightHour[], from: Date, to: Date): NightForecast {
+  const hours = all.filter((h) => h.at >= from && h.at <= to);
 
   if (hours.length === 0) throw new ForecastError('api', 'Brak danych dla okna nocy');
 
@@ -178,6 +162,26 @@ export async function fetchNightForecast(
   };
 }
 
+export async function fetchNightForecast(
+  lat: number,
+  lon: number,
+  signal?: AbortSignal,
+): Promise<NightForecast> {
+  const url = new URL(API);
+  url.searchParams.set('latitude', String(lat));
+  url.searchParams.set('longitude', String(lon));
+  url.searchParams.set('hourly', HOURLY_FIELDS);
+  url.searchParams.set('daily', 'sunrise,sunset');
+  url.searchParams.set('timezone', 'auto');
+  url.searchParams.set('past_days', '1');
+  url.searchParams.set('forecast_days', '2');
+
+  const json = (await getJson(url, signal)) as ApiResponse;
+  const { from, to } = sunWindow(json.daily, new Date());
+
+  return summarize(toHours(json), from, to);
+}
+
 /** Prognoza godzinowa przypisana do konkretnej nocy astronomicznej. */
 export type NightSlice = {
   night: NightWindow;
@@ -185,24 +189,11 @@ export type NightSlice = {
 };
 
 /**
- * Kolejne noce od dzisiejszego wieczora — materiał wejściowy dla silnika sesji.
+ * Kolejne noce dla wielu punktów naraz — jednym żądaniem.
  *
- * Okna liczymy z efemeryd (zmierzch i świt astronomiczny), a nie z zachodu Słońca
- * zwracanego przez API: silnik ocenia ciemne niebo, a nie porę po zachodzie.
- * Open-Meteo daje prognozę godzinową na kilka dób jednym zapytaniem, więc trzy
- * noce nie kosztują trzech żądań.
- */
-export async function fetchUpcomingNights(
-  coords: Coords,
-  nights: number,
-  signal?: AbortSignal,
-): Promise<NightSlice[]> {
-  const [slices] = await fetchUpcomingNightsForPoints([coords], nights, signal);
-  return slices;
-}
-
-/**
- * To samo dla wielu punktów naraz — jednym żądaniem.
+ * Okna liczymy z efemeryd (zmierzch i świt astronomiczny), a nie z zachodu
+ * Słońca zwracanego przez API: silnik ocenia ciemne niebo, a nie porę po
+ * zachodzie.
  *
  * Open-Meteo przyjmuje listę współrzędnych po przecinku i odpowiada tablicą,
  * po jednym wpisie na punkt, w tej samej kolejności. To jedyny sposób, żeby
@@ -241,28 +232,68 @@ export async function fetchUpcomingNightsForPoints(
     );
   }
 
-  // Kolejne doby liczone kalendarzowo, nie przez dorzucanie 24 godzin: doba
-  // zmiany czasu ma 23 albo 25 godzin i przy dodawaniu milisekund któraś noc
-  // wypadłaby dwa razy albo zniknęła z listy.
+  return responses.map((response, index) => sliceNights(toHours(response), points[index], nights));
+}
+
+/**
+ * Rozkłada godziny prognozy na kolejne noce astronomiczne danego punktu.
+ *
+ * Okno liczymy dla KAŻDEGO punktu osobno: zmierzch na Hali Lipowskiej wypada
+ * o innej porze niż na Pustyni Błędowskiej, a przy porównywaniu miejsc
+ * oddalonych o sto kilometrów to już nie jest zaokrąglenie.
+ *
+ * Kolejne doby liczone kalendarzowo, nie przez dorzucanie 24 godzin: doba
+ * zmiany czasu ma 23 albo 25 godzin i przy dodawaniu milisekund któraś noc
+ * wypadłaby dwa razy albo zniknęła z listy.
+ */
+function sliceNights(all: NightHour[], coords: Coords, nights: number): NightSlice[] {
   const dayFromNow = (days: number) => {
     const d = new Date();
     d.setDate(d.getDate() + days);
     return d;
   };
 
-  return responses.map((response, index) => {
-    const coords = points[index];
-    const all = toHours(response);
-
-    // Okno nocy liczymy dla KAŻDEGO punktu osobno: zmierzch na Hali Lipowskiej
-    // wypada o innej porze niż na Pustyni Błędowskiej, a przy porównywaniu
-    // miejsc oddalonych o sto kilometrów to już nie jest zaokrąglenie.
-    return Array.from({ length: nights }, (_, i) => {
-      const night = nightWindow(dayFromNow(i), coords);
-      return {
-        night,
-        hours: all.filter((h) => h.at >= night.from && h.at <= night.to),
-      };
-    });
+  return Array.from({ length: nights }, (_, i) => {
+    const night = nightWindow(dayFromNow(i), coords);
+    return { night, hours: all.filter((h) => h.at >= night.from && h.at <= night.to) };
   });
+}
+
+/**
+ * Komplet danych sieciowych dla jednego punktu — jedno pobranie na cały cykl.
+ *
+ * Ekran Noc i silnik sesji potrzebują dwóch różnych okien tych samych godzin:
+ * pierwszy patrzy od zachodu do wschodu Słońca, drugi na zmierzch i świt
+ * astronomiczny. Dotąd każdy pobierał osobno, o zachodzące na siebie zakresy —
+ * dwa żądania o te same dane. Tu jedno pobranie karmi oba widoki.
+ */
+export type ForecastBundle = {
+  /** Bieżąca noc w oknie Słońca. */
+  current: NightForecast;
+  /** Kolejne noce w oknie astronomicznym, od dzisiejszego wieczora. */
+  nights: NightSlice[];
+};
+
+export async function fetchForecastBundle(
+  coords: Coords,
+  nights: number,
+  signal?: AbortSignal,
+): Promise<ForecastBundle> {
+  const url = new URL(API);
+  url.searchParams.set('latitude', String(coords.lat));
+  url.searchParams.set('longitude', String(coords.lon));
+  url.searchParams.set('hourly', HOURLY_FIELDS);
+  url.searchParams.set('daily', 'sunrise,sunset');
+  url.searchParams.set('timezone', 'auto');
+  // Doba wstecz jest potrzebna przed świtem: trwa wtedy noc, która zaczęła się
+  // wczoraj, a bez niej okno bieżącej nocy nie miałoby początku.
+  url.searchParams.set('past_days', '1');
+  // Noc n-ta kończy się rano dnia n+1, więc dób trzeba o jedną więcej.
+  url.searchParams.set('forecast_days', String(Math.min(16, Math.max(2, nights + 1))));
+
+  const json = (await getJson(url, signal)) as ApiResponse;
+  const all = toHours(json);
+  const { from, to } = sunWindow(json.daily, new Date());
+
+  return { current: summarize(all, from, to), nights: sliceNights(all, coords, nights) };
 }

@@ -17,7 +17,7 @@ import { colors, fonts } from '@/theme';
 export default function ThresholdsScreen() {
   const router = useRouter();
   const { config, updateConfig } = useSettings();
-  const { conditions, calendar } = config;
+  const { conditions, calendar, refresh } = config;
   const limits = CONFIG_LIMITS;
 
   return (
@@ -111,6 +111,24 @@ export default function ThresholdsScreen() {
             Ostrzeżenie o rosie to różnica temperatury i punktu rosy. Niższy próg wiatru dotyczy
             zestawów trzymanych z ręki — noc oceniana jest łagodniejszym z progów, a o gorszym
             informuje ostrzeżenie.
+          </Text>
+        </Card>
+
+        <SectionLabel style={styles.groupLabel}>Odświeżanie danych</SectionLabel>
+        <Card variant="raised" style={styles.group}>
+          <NumberRow
+            label="Pobieraj o godzinie"
+            unit=":00"
+            value={refresh.hourOfDay}
+            limits={limits.refresh.hourOfDay}
+            onCommit={(hourOfDay) => updateConfig('refresh', { hourOfDay })}
+          />
+          <Divider />
+          <Text style={styles.note}>
+            Dane z sieci pobierają się raz na dobę, o porze podejmowania decyzji o wyjeździe; ekrany
+            czytają z zapisu i otwierają się bez sieci. Pominięty termin nadrabia się przy następnym
+            uruchomieniu aplikacji. Efemerydy, cele i werdykty liczą się na urządzeniu przy każdym
+            wejściu, więc zmiana progu działa natychmiast.
           </Text>
         </Card>
 

@@ -15,6 +15,8 @@ import {
   type Optics,
   type OpticsProfile,
 } from '@/lib/optics';
+import { formatAge } from '@/lib/forecast-cache';
+import { useForecast } from '@/store/forecast';
 import { LEAD_TIMES, useSettings } from '@/store/settings';
 import { colors, fonts } from '@/theme';
 
@@ -258,6 +260,9 @@ export default function SettingsScreen() {
           )}
         </Card>
 
+        <SectionLabel style={styles.groupLabel}>Odświeżanie danych</SectionLabel>
+        <RefreshStatusCard />
+
         <SectionLabel style={styles.groupLabel}>O aplikacji</SectionLabel>
         <Card variant="raised" style={styles.group}>
           <View style={styles.row}>
@@ -272,6 +277,50 @@ export default function SettingsScreen() {
         </Card>
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+/**
+ * Znaczniki cyklu dobowego.
+ *
+ * Cykl, który po cichu przestał działać, jest gorszy niż jego brak: aplikacja
+ * wygląda normalnie i pokazuje dane sprzed tygodnia. Dlatego obok siebie stoją
+ * **próba** i **sukces** — dopiero różnica między nimi mówi, że coś się psuje —
+ * a przy nich powód ostatniego niepowodzenia.
+ */
+function RefreshStatusCard() {
+  const { cycle, refresh, refreshing } = useForecast();
+
+  return (
+    <Card variant="raised" style={styles.group}>
+      <View style={styles.row}>
+        <Text style={styles.rowLabel}>Ostatnie pobranie</Text>
+        <Text style={styles.subValueMuted}>
+          {cycle.lastSuccessAt ? formatAge(cycle.lastSuccessAt) : 'jeszcze nie było'}
+        </Text>
+      </View>
+      <Divider />
+      <View style={styles.row}>
+        <Text style={styles.rowLabel}>Ostatnia próba</Text>
+        <Text style={styles.subValueMuted}>
+          {cycle.lastAttemptAt ? formatAge(cycle.lastAttemptAt) : 'jeszcze nie było'}
+        </Text>
+      </View>
+      {cycle.lastError && (
+        <>
+          <Divider />
+          <View style={styles.row}>
+            <Text style={styles.rowLabel}>Powód niepowodzenia</Text>
+            <Text style={styles.aboutValue}>{cycle.lastError}</Text>
+          </View>
+        </>
+      )}
+      <Divider />
+      <Pressable onPress={refresh} style={styles.row} accessibilityLabel="Odśwież dane teraz">
+        <Text style={styles.rowLabel}>Odśwież teraz</Text>
+        <Text style={styles.subValue}>{refreshing ? 'pobieram…' : 'pobierz'}</Text>
+      </Pressable>
+    </Card>
   );
 }
 

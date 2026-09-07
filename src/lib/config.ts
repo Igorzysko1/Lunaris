@@ -14,6 +14,7 @@
  */
 
 import { DEFAULT_SITES, type ObservingSite } from '../data/observing-sites.ts';
+import { DEFAULT_REFRESH_HOUR } from './daily-cycle.ts';
 import { isValidMask, type HorizonOverride } from './horizon.ts';
 import {
   DEFAULT_OPTICS,
@@ -103,6 +104,18 @@ export type CalendarThresholds = {
   weekendDaysOff: boolean;
 };
 
+/**
+ * Kiedy aplikacja sięga po dane z sieci.
+ *
+ * Godzina jest tu, a nie w kodzie, bo „pora podejmowania decyzji" to nawyk
+ * użytkownika, a nie własność systemu: ktoś decyduje o wyjeździe po pracy,
+ * ktoś inny w porze obiadu.
+ */
+export type RefreshSchedule = {
+  /** Pełna godzina lokalna, o której cykl ma odświeżyć dane. */
+  hourOfDay: number;
+};
+
 export type LunarisConfig = {
   observer: ObserverProfile;
   /**
@@ -118,6 +131,7 @@ export type LunarisConfig = {
   session: SessionMode;
   conditions: ConditionThresholds;
   calendar: CalendarThresholds;
+  refresh: RefreshSchedule;
 };
 
 export const DEFAULT_CONFIG: LunarisConfig = {
@@ -153,6 +167,9 @@ export const DEFAULT_CONFIG: LunarisConfig = {
     exceptionalMaxCloud: 10,
     assumedFirstEventHour: 8,
     weekendDaysOff: true,
+  },
+  refresh: {
+    hourOfDay: DEFAULT_REFRESH_HOUR,
   },
 };
 
@@ -192,6 +209,9 @@ export const CONFIG_LIMITS = {
     accuracyM: { min: 0, max: 10000 },
     lat: { min: -90, max: 90 },
     lon: { min: -180, max: 180 },
+  },
+  refresh: {
+    hourOfDay: { min: 0, max: 23 },
   },
   calendar: {
     rejectBeforeHour: { min: 0, max: 23 },
@@ -411,6 +431,13 @@ export function clampConfig(config: LunarisConfig): LunarisConfig {
       // „Tylko dom" jest łagodniejsze od odrzucenia, więc nie może wypadać wcześniej.
       homeOnlyBeforeHour: Math.max(calendar.homeOnlyBeforeHour, calendar.rejectBeforeHour),
     },
+    refresh: {
+      // Pełna godzina: cykl porównuje znaczniki z terminem, a termin z ułamkiem
+      // godziny nie dałby się zapisać w interfejsie ani sensownie odczytać.
+      hourOfDay: Math.round(
+        clampNumber(config.refresh.hourOfDay, l.refresh.hourOfDay, d.refresh.hourOfDay),
+      ),
+    },
   };
 }
 
@@ -445,5 +472,6 @@ export function mergeConfig(stored: unknown): LunarisConfig {
     session: section('session'),
     conditions: section('conditions'),
     calendar: section('calendar'),
+    refresh: section('refresh'),
   });
 }

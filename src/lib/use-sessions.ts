@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useMemo } from 'react';
 import * as SunCalc from 'suncalc';
 
 import { findPlaceById, type Coords } from '@/data/places';
@@ -6,11 +6,7 @@ import type { LunarisConfig } from '@/lib/config';
 import { windLimitKmh } from '@/lib/optics';
 import { nightTargetsForProfiles, type SkyTarget } from '@/lib/sky-targets';
 import { assumedNextDay, evaluateNight, type NightVerdict } from '@/lib/session-engine';
-import { loadForecast, saveForecast } from '@/lib/forecast-cache';
-import { fetchUpcomingNights, type NightSlice } from '@/lib/weather';
-
-/** Ile nocy pokazuje sekcja. Trzecia doba jest już orientacyjna — patrz `uncertain`. */
-export const SESSION_NIGHTS = 3;
+import { useForecast } from '@/store/forecast';
 
 /**
  * Od czwartej doby modele pogodowe rozjeżdżają się na tyle, że werdykt „jedź"
@@ -33,9 +29,9 @@ export type SessionsStatus = 'loading' | 'ready' | 'error';
 /**
  * Trzy najbliższe noce z werdyktem: jechać czy nie, a jeśli nie, to dlaczego.
  *
- * Prognoza idzie jednym zapytaniem, resztę liczymy lokalnie — werdykt, plan
- * wyjazdu i cele są funkcją danych, konfiguracji i efemeryd, więc zmiana progu
- * albo apertury przelicza widok bez ponownego pobierania czegokolwiek.
+ * Prognoza przychodzi z cyklu dobowego — ten sam komplet danych, z którego
+ * korzysta ekran Noc, więc sekcja sesji nie kosztuje drugiego żądania. Resztę
+ * liczymy lokalnie.
  */
 export function useSessions(
   coords: Coords,
@@ -43,119 +39,67 @@ export function useSessions(
   config: LunarisConfig,
   walkMinutes = 0,
 ) {
-  const [status, setStatus] = useState<SessionsStatus>('loading');
-  const [sessions, setSessions] = useState<Session[]>([]);
-  /** Ustawione tylko wtedy, gdy werdykty policzono z zapisanej prognozy. */
-  const [savedAt, setSavedAt] = useState<Date | null>(null);
-  const [attempt, setAttempt] = useState(0);
-
-  const refresh = useCallback(() => setAttempt((n) => n + 1), []);
+  const { bundle, status, savedAt, refresh, refreshing } = useForecast();
 
   const { lat, lon } = coords;
   const homePlace = config.observer.homePlaceId ? findPlaceById(config.observer.homePlaceId) : null;
   const home = homePlace ? { lat: homePlace.lat, lon: homePlace.lon } : null;
 
-  useEffect(() => {
-    const controller = new AbortController();
-    let active = true;
+  const sessions = useMemo<Session[]>(() => {
+    if (!bundle) return [];
 
-    // Reset stanu przy zmianie wejścia jest tu celowy: zanim odpowie sieć, widok ma
-    // pokazywać ładowanie dla NOWEJ lokalizacji, a nie dane dla poprzedniej.
-    setStatus('loading');
+    return bundle.nights.map(({ night, hours }, index) => {
+      const target = { lat, lon };
+      const illumination = Math.round(SunCalc.getMoonIllumination(night.from).fraction * 100);
 
-    // Werdykty liczymy z prognozy, ale nie z sieci — dzięki temu ta sama funkcja
-    // obsługuje świeże dane i te odtworzone z zapisu.
-    const present = (slices: NightSlice[]) => {
-      setSessions(
-        slices.map(({ night, hours }, index) => {
-          const target = { lat, lon };
-          const illumination = Math.round(SunCalc.getMoonIllumination(night.from).fraction * 100);
-
-          // Okno oceniamy najłagodniejszym progiem wiatru spośród zestawów —
-          // noc dobra dla sprzętu na statywie nie ma przepadać przez to, że
-          // w konfiguracji stoi obok niego lornetka trzymana z ręki.
-          const windLimit = Math.max(
-            ...config.opticsProfiles.map((p) =>
-              windLimitKmh(p.optics, {
-                tripod: config.conditions.maxWindGustKmh,
-                handheld: config.conditions.maxWindGustHandheldKmh,
-              }),
-            ),
-          );
-
-          const verdict = evaluateNight({
-            night,
-            hours,
-            moon: {
-              illumination,
-              upAt: (at) => SunCalc.getMoonPosition(at, lat, lon).altitude > 0,
-            },
-            target,
-            home,
-            nextDay: assumedNextDay(night, config),
-            // Kalendarz zjawisk nie jest jeszcze wpięty w silnik — dopóki nie jest,
-            // żadna noc nie łamie reguły wczesnego poranka.
-            uniquePhenomenon: false,
-            windLimitKmh: windLimit,
-            walkMinutes,
-            config,
-          });
-
-          const window = verdict.window;
-          const inWindow = window
-            ? hours.filter((h) => h.at >= window.from && h.at <= window.to)
-            : [];
-
-          return {
-            verdict,
-            minTemperature: inWindow.length
-              ? Math.min(...inWindow.map((h) => h.temperature))
-              : null,
-            targets: window
-              ? nightTargetsForProfiles(window, target, config.opticsProfiles, bortle)
-              : [],
-            uncertain: index >= UNCERTAIN_FROM_INDEX,
-          };
-        }),
+      // Okno oceniamy najłagodniejszym progiem wiatru spośród zestawów —
+      // noc dobra dla sprzętu na statywie nie ma przepadać przez to, że
+      // w konfiguracji stoi obok niego lornetka trzymana z ręki.
+      const windLimit = Math.max(
+        ...config.opticsProfiles.map((p) =>
+          windLimitKmh(p.optics, {
+            tripod: config.conditions.maxWindGustKmh,
+            handheld: config.conditions.maxWindGustHandheldKmh,
+          }),
+        ),
       );
-      setStatus('ready');
-    };
 
-    fetchUpcomingNights({ lat, lon }, SESSION_NIGHTS, controller.signal)
-      .then((slices) => {
-        if (!active) return;
-        setSavedAt(null);
-        present(slices);
-        void saveForecast('sessions', { lat, lon }, slices);
-      })
-      .catch(async (error: unknown) => {
-        if (!active || (error instanceof Error && error.name === 'AbortError')) return;
-
-        // Brak sieci w terenie jest normalny — wtedy lepiej pokazać werdykty
-        // z ostatniej prognozy niż nic. Przy błędzie API robimy to samo: dane są
-        // te same, a powód rozróżnia ekran Noc, gdzie widać go w jednym miejscu.
-        const cached = await loadForecast<NightSlice[]>('sessions', { lat, lon });
-        if (!active) return;
-
-        if (cached) {
-          setSavedAt(cached.savedAt);
-          present(cached.payload);
-          return;
-        }
-
-        setSavedAt(null);
-        setStatus('error');
+      const verdict = evaluateNight({
+        night,
+        hours,
+        moon: {
+          illumination,
+          upAt: (at) => SunCalc.getMoonPosition(at, lat, lon).altitude > 0,
+        },
+        target,
+        home,
+        nextDay: assumedNextDay(night, config),
+        // Kalendarz zjawisk nie jest jeszcze wpięty w silnik — dopóki nie jest,
+        // żadna noc nie łamie reguły wczesnego poranka.
+        uniquePhenomenon: false,
+        windLimitKmh: windLimit,
+        walkMinutes,
+        config,
       });
 
-    return () => {
-      active = false;
-      controller.abort();
-    };
-    // `config` i `home` zmieniają się razem z konfiguracją — przeliczenie widoku
-    // po zmianie progu jest tu zamierzone. `home` rozbite na współrzędne, bo obiekt
-    // dostaje nową tożsamość przy każdym renderze store'u, a liczy się sama pozycja.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lat, lon, bortle, config, home?.lat, home?.lon, walkMinutes, attempt]);
+      const window = verdict.window;
+      const inWindow = window ? hours.filter((h) => h.at >= window.from && h.at <= window.to) : [];
 
-  return { status, sessions, savedAt, refresh };
+      return {
+        verdict,
+        minTemperature: inWindow.length ? Math.min(...inWindow.map((h) => h.temperature)) : null,
+        targets: window
+          ? nightTargetsForProfiles(window, target, config.opticsProfiles, bortle)
+          : [],
+        uncertain: index >= UNCERTAIN_FROM_INDEX,
+      };
+    });
+    // Werdykt jest funkcją danych, konfiguracji i efemeryd — nie sieci. Zmiana
+    // progu albo apertury przelicza go natychmiast, bez pobierania czegokolwiek.
+    // `home` rozbite na współrzędne, bo obiekt dostaje nową tożsamość przy każdym
+    // renderze store'u, a liczy się sama pozycja.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bundle, lat, lon, bortle, config, home?.lat, home?.lon, walkMinutes]);
+
+  return { status, sessions, savedAt, refresh, refreshing };
 }

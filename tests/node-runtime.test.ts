@@ -15,7 +15,7 @@ describe('moduły domenowe ładują się pod Node', () => {
   it('weather.ts — używa go skrypt check-weather', async () => {
     const weather = await import('../src/lib/weather.ts');
     assert.equal(typeof weather.fetchNightForecast, 'function');
-    assert.equal(typeof weather.fetchUpcomingNights, 'function');
+    assert.equal(typeof weather.fetchForecastBundle, 'function');
 
     const error = new weather.ForecastError('offline', 'test');
     assert.equal(error.kind, 'offline');
@@ -30,6 +30,13 @@ describe('moduły domenowe ładują się pod Node', () => {
     assert.equal(typeof engine.evaluateNight, 'function');
     assert.equal(typeof targets.nightTargetsForProfiles, 'function');
     assert.equal(typeof events.upcomingEvents, 'function');
+  });
+
+  it('daily-cycle.ts — tę samą decyzję podejmuje cron poza aplikacją', async () => {
+    const cycle = await import('../src/lib/daily-cycle.ts');
+
+    assert.equal(typeof cycle.decideRefresh, 'function');
+    assert.equal(typeof cycle.lastScheduledRefresh, 'function');
   });
 
   it('planetary-events.ts i katalogi danych', async () => {

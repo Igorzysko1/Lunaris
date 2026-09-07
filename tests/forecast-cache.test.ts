@@ -10,7 +10,14 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { MAX_AGE_HOURS, formatAge, parse, serialize } from '../src/lib/forecast-cache.ts';
+import {
+  MAX_AGE_HOURS,
+  STALE_AFTER_HOURS,
+  expiredKeys,
+  formatAge,
+  parse,
+  serialize,
+} from '../src/lib/forecast-cache.ts';
 
 const NOW = new Date(2026, 0, 15, 20, 0);
 const hoursAgo = (h: number) => new Date(NOW.getTime() - h * 3_600_000);
@@ -86,5 +93,65 @@ describe('formatAge', () => {
   it('nie pokazuje ujemnego wieku', () => {
     const future = new Date(NOW.getTime() + 60_000);
     assert.equal(formatAge(future, NOW), 'sprzed chwili');
+  });
+});
+
+describe('dwa progi wieku', () => {
+  it('zapis z bieżącego cyklu nie jest oznaczony jako stary', () => {
+    // Przy odświeżaniu raz na dobę dane tuż przed kolejnym terminem mają prawie
+    // 24 godziny i są zupełnie normalne — ostrzeżenie byłoby fałszywym alarmem.
+    const hit = parse<Payload>(serialize(payload, hoursAgo(STALE_AFTER_HOURS - 1)), NOW);
+
+    assert.ok(hit);
+    assert.equal(hit.stale, false);
+  });
+
+  it('zapis, który przetrwał termin, jest oznaczony, ale nadal czytelny', () => {
+    const hit = parse<Payload>(serialize(payload, hoursAgo(STALE_AFTER_HOURS + 1)), NOW);
+
+    assert.ok(hit);
+    assert.equal(hit.stale, true);
+    assert.deepEqual(hit.payload.from, payload.from);
+  });
+
+  it('powyżej twardego progu nie pokazujemy nawet z etykietą', () => {
+    assert.equal(parse<Payload>(serialize(payload, hoursAgo(MAX_AGE_HOURS + 1)), NOW), null);
+  });
+});
+
+describe('expiredKeys', () => {
+  const fresh = serialize(payload, hoursAgo(1));
+  const ancient = serialize(payload, hoursAgo(MAX_AGE_HOURS + 5));
+
+  it('kasuje tylko przeterminowane klucze prognozy', () => {
+    const keys = expiredKeys(
+      [
+        ['lunaris.forecast.bundle.50.35,19.53', fresh],
+        ['lunaris.forecast.site.49.62,19.03', ancient],
+      ],
+      NOW,
+    );
+
+    assert.deepEqual(keys, ['lunaris.forecast.site.49.62,19.03']);
+  });
+
+  it('nie rusza cudzych kluczy, choćby były stare', () => {
+    // W AsyncStorage leżą też ustawienia i stan cyklu — sprzątanie prognozy nie
+    // może ich dotknąć, bo nie mają terminu ważności.
+    const keys = expiredKeys(
+      [
+        ['lunaris.settings', ancient],
+        ['lunaris.cycle.bundle', ancient],
+      ],
+      NOW,
+    );
+
+    assert.deepEqual(keys, []);
+  });
+
+  it('uszkodzony zapis też idzie do skasowania', () => {
+    const keys = expiredKeys([['lunaris.forecast.bundle.50.00,19.00', '{nie json']], NOW);
+
+    assert.deepEqual(keys, ['lunaris.forecast.bundle.50.00,19.00']);
   });
 });
