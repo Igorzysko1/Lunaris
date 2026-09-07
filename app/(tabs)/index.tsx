@@ -12,6 +12,7 @@ import {
   NightRatingCard,
   NightSkeleton,
   NightTargetsCard,
+  SeeingCard,
 } from '@/components/night-cards';
 import { LightPollutionLink } from '@/components/LightPollutionLink';
 import { SessionCard, SessionsSkeleton } from '@/components/session-cards';
@@ -139,6 +140,12 @@ export default function NightScreen() {
                 moon={data.moon}
               />
             </View>
+
+            {data.seeing && (
+              <View style={styles.gap}>
+                <SeeingCard seeing={data.seeing} />
+              </View>
+            )}
 
             <View style={styles.gap}>
               <MoonPhaseCard moon={data.moon} onPress={() => router.push('/moon')} />

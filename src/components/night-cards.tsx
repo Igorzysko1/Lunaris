@@ -6,7 +6,8 @@ import { Card, Divider, SectionLabel } from '@/components/primitives';
 import { dewRiskColor, ratingMeta } from '@/lib/astro';
 import { formatTime } from '@/lib/date';
 import type { Moon } from '@/lib/moon';
-import { describeOutOfReach, type SkyTarget } from '@/lib/sky-targets';
+import { describeSeeing, type Seeing } from '@/lib/seeing';
+import { describeOutOfReach, rankedTargets, type SkyTarget } from '@/lib/sky-targets';
 import type { NightData } from '@/lib/use-night-data';
 import { HAIRLINE, colors, fonts, radius } from '@/theme';
 
@@ -123,8 +124,40 @@ export function AstroTimesRow({
  * Cele na tę noc. Lista wynika ze sprzętu z konfiguracji i jakości nieba, więc po
  * zmianie apertury albo wyjeździe w ciemniejsze miejsce zmienia się sama.
  */
+/**
+ * Spokój atmosfery — osobno od oceny nocy, bo odpowiada na inne pytanie.
+ *
+ * Ocena nocy mówi, czy warto jechać; seeing mówi, na ile warto podkręcić
+ * powiększenie po przyjeździe. Dlatego jest kartą informacyjną, a nie składnikiem
+ * werdyktu: przy lornetce nie zmienia niczego, przy teleskopie decyduje o tym,
+ * co oglądać, a nie o tym, czy wyjeżdżać.
+ */
+export function SeeingCard({ seeing }: { seeing: Seeing }) {
+  const dots = [1, 2, 3, 4, 5];
+
+  return (
+    <Card>
+      <View style={styles.seeingHeader}>
+        <SectionLabel style={styles.seeingLabel}>Spokój atmosfery</SectionLabel>
+        <View style={styles.seeingDots}>
+          {dots.map((n) => (
+            <View key={n} style={[styles.seeingDot, n <= seeing.index && styles.seeingDotOn]} />
+          ))}
+        </View>
+      </View>
+      <Text style={styles.seeingValue}>{seeing.label}</Text>
+      <Text style={styles.seeingDetail}>{describeSeeing(seeing)}</Text>
+    </Card>
+  );
+}
+
+/** Ile celów pokazujemy na karcie. Reszta zostaje policzona, ale niewypisana. */
+const SHOWN_TARGETS = 10;
+
 export function NightTargetsCard({ targets }: { targets: SkyTarget[] }) {
-  const inReach = targets.filter((t) => t.visible);
+  const visible = targets.filter((t) => t.visible);
+  const inReach = rankedTargets(targets, SHOWN_TARGETS);
+  const rest = visible.length - inReach.length;
 
   // Obiekty odrzucone przez teren wymieniamy z nazwy, bo to informacja o
   // miejscu, a nie o niebie — reszta odpada z powodów, których przejściem
@@ -164,6 +197,12 @@ export function NightTargetsCard({ targets }: { targets: SkyTarget[] }) {
             </View>
           </View>
         ))
+      )}
+
+      {rest > 0 && (
+        <Text style={styles.targetsMore}>
+          …i {rest} {rest === 1 ? 'dalszy cel' : 'dalszych celów'} w zasięgu sprzętu.
+        </Text>
       )}
 
       {blocked.length > 0 && (
@@ -373,6 +412,46 @@ const styles = StyleSheet.create({
     fontFamily: fonts.sans,
     fontSize: 11,
     color: colors.amber,
+  },
+  seeingHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  seeingLabel: {
+    marginBottom: 0,
+  },
+  seeingDots: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  seeingDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: colors.border,
+  },
+  seeingDotOn: {
+    backgroundColor: colors.teal,
+  },
+  seeingValue: {
+    fontFamily: fonts.sansMedium,
+    fontSize: 15,
+    color: colors.textPrimary,
+    marginTop: 8,
+  },
+  seeingDetail: {
+    fontFamily: fonts.sans,
+    fontSize: 12,
+    lineHeight: 17,
+    color: colors.textMuted,
+    marginTop: 4,
+  },
+  targetsMore: {
+    fontFamily: fonts.sans,
+    fontSize: 12,
+    color: colors.textMuted,
+    marginTop: 10,
   },
   targetsDivider: {
     marginTop: 14,

@@ -97,6 +97,18 @@ export type SkyTarget = {
   outOfReach: 'too-low' | 'behind-horizon' | 'too-faint' | 'too-diffuse' | 'too-small' | null;
   /** Wypełnione dla `behind-horizon`: wysokość przeszkody w tym kierunku. */
   horizonAltitude: number | null;
+  /**
+   * Zapas w magnitudo do granicy zasięgu sprzętu: ile zostało, zanim obiekt
+   * zniknie. Diagnostyczny, nie prezentacyjny.
+   *
+   * **Nie nadaje się na miarę trudności** i to nie jest wada rachunku, tylko
+   * braku danych. Jasność powierzchniowa liczona jest ze średniej po całej
+   * powierzchni, więc M31 — rozlana na trzy stopnie, ale z jasnym jądrem —
+   * wypada w nim tak samo słabo jak dowolna galaktyka w Pannie. Odróżnienie
+   * jednej od drugiej wymaga pola, którego katalog nie ma: koncentracji światła
+   * albo gotowej klasyfikacji lornetkowej z publikowanej listy.
+   */
+  margin: number;
   /** Zestaw sprzętu, z którego zasięgu wynika ten wpis. */
   profileId: string;
   profileLabel: string;
@@ -279,17 +291,30 @@ function applyReach(
       return skyline.fromTerrain ? ('behind-horizon' as const) : ('too-low' as const);
     }
 
+    // Jasność całkowita obowiązuje KAŻDY obiekt, także rozmyty. Wcześniej
+    // sprawdzana była tylko dla punktowych, więc obiekt 11 mag przechodził, o ile
+    // tylko jego światło rozkładało się korzystnie — a światła od rozlania na
+    // większą powierzchnię nie przybywa. Przez tę lukę do listy wchodziły
+    // galaktyki bez żadnych szans w lornetce.
+    if (base.magnitude > reach.limitPoint) return 'too-faint' as const;
+
     if (base.diffuse && base.sizeArcmin !== null) {
       if (surfaceBrightness(base.magnitude, base.sizeArcmin) > reach.limitSurface) {
         return 'too-diffuse' as const;
       }
-    } else if (base.magnitude > reach.limitPoint) {
-      return 'too-faint' as const;
     }
 
     if (base.sizeArcmin !== null && base.sizeArcmin < reach.minSize) return 'too-small' as const;
     return null;
   })();
+
+  // Zapas liczymy z tego progu, który dla tego obiektu jest ciaśniejszy.
+  const pointMargin = reach.limitPoint - base.magnitude;
+  const surfaceMargin =
+    base.diffuse && base.sizeArcmin !== null
+      ? reach.limitSurface - surfaceBrightness(base.magnitude, base.sizeArcmin)
+      : Infinity;
+  const margin = Math.min(pointMargin, surfaceMargin);
 
   return {
     ...base,
@@ -301,9 +326,28 @@ function applyReach(
     visible: outOfReach === null,
     outOfReach,
     horizonAltitude: outOfReach === 'behind-horizon' ? skyline.altitude : null,
+    margin,
     profileId: profile.id,
     profileLabel: profile.label,
   };
+}
+
+/**
+ * Cele uporządkowane tak, jak warto je pokazać, i przycięte do `limit`.
+ *
+ * Sto obiektów w katalogu znaczy kilkadziesiąt widocznych każdej nocy, a lista
+ * na siedemdziesiąt pozycji przestaje być listą — nikt nie przeczyta jej przed
+ * wyjazdem. Kolejność jest po jasności całkowitej, bo to jedyne kryterium
+ * „efektowności", które da się obronić na danych, jakie katalog ma: M42 i M31
+ * wychodzą na górę, obiekty na granicy zasięgu na dół. Wysokość nad horyzontem
+ * jest tu rozstrzygnięciem remisów, a nie głównym porządkiem — obiekt jasny
+ * nisko jest wart więcej niż słaby w zenicie.
+ */
+export function rankedTargets(targets: SkyTarget[], limit: number): SkyTarget[] {
+  return targets
+    .filter((t) => t.visible)
+    .sort((a, b) => a.magnitude - b.magnitude || b.maxAltitude - a.maxAltitude)
+    .slice(0, limit);
 }
 
 /**

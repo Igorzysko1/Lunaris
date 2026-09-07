@@ -38,7 +38,13 @@ exports[`snapshoty zamrożonych zestawów > noc czysta 1`] = `
         "travelMinutes": 44.607711636654926
       },
       "minTemperature": 8,
-      "targets": 78
+      "seeing": {
+        "index": 5,
+        "label": "bardzo dobry",
+        "driver": "none",
+        "usableMagnification": 350
+      },
+      "targets": 77
     }
   ],
   "notices": [
@@ -94,6 +100,7 @@ exports[`snapshoty zamrożonych zestawów > noc pod chmurami 1`] = `
       "window": null,
       "plan": null,
       "minTemperature": null,
+      "seeing": null,
       "targets": 0
     }
   ],
@@ -142,6 +149,7 @@ exports[`snapshoty zamrożonych zestawów > noc wietrzna 1`] = `
       "window": null,
       "plan": null,
       "minTemperature": null,
+      "seeing": null,
       "targets": 0
     }
   ],
@@ -198,7 +206,13 @@ exports[`snapshoty zamrożonych zestawów > trzy noce razem 1`] = `
         "travelMinutes": 44.607711636654926
       },
       "minTemperature": 8,
-      "targets": 78
+      "seeing": {
+        "index": 5,
+        "label": "bardzo dobry",
+        "driver": "none",
+        "usableMagnification": 350
+      },
+      "targets": 77
     },
     {
       "from": "2026-01-17T17:00:00.000Z",
@@ -213,6 +227,7 @@ exports[`snapshoty zamrożonych zestawów > trzy noce razem 1`] = `
       "window": null,
       "plan": null,
       "minTemperature": null,
+      "seeing": null,
       "targets": 0
     },
     {
@@ -228,6 +243,7 @@ exports[`snapshoty zamrożonych zestawów > trzy noce razem 1`] = `
       "window": null,
       "plan": null,
       "minTemperature": null,
+      "seeing": null,
       "targets": 0
     }
   ],

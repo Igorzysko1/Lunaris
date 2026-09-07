@@ -56,6 +56,12 @@ function hour(at: Date, over: Partial<NightHour> = {}): NightHour {
     dewSpread: 6,
     precipitation: 0,
     windGust: 8,
+    windJet: 20,
+    windMid: 20,
+    temp850: 0,
+    temp500: -20,
+    cape: 0,
+    boundaryLayerM: 60,
     ...over,
   };
 }

@@ -75,6 +75,21 @@ export type NightHour = {
   precipitation: number;
   /** Porywy wiatru (km/h) — to one trzęsą sprzętem, nie średnia prędkość. */
   windGust: number;
+  /**
+   * Wiatr na 250 hPa (km/h) — wysokość prądu strumieniowego, około 10 km.
+   * Główny sprawca drgania obrazu: turbulencja na granicy szybkich warstw
+   * miesza powietrze na całej drodze światła.
+   */
+  windJet: number;
+  /** Wiatr na 500 hPa (km/h), około 5,5 km — turbulencja średniego piętra. */
+  windMid: number;
+  /** Temperatura na 850 i 500 hPa (°C) — z różnicy wychodzi gradient pionowy. */
+  temp850: number;
+  temp500: number;
+  /** Energia konwekcji (J/kg). Powyżej zera powietrze się przelewa w pionie. */
+  cape: number;
+  /** Grubość warstwy granicznej (m) — jak głęboko sięga mieszanie przy gruncie. */
+  boundaryLayerM: number;
 };
 
 export type NightForecast = {
@@ -103,6 +118,12 @@ type ApiResponse = {
     dew_point_2m: (number | null)[];
     precipitation: (number | null)[];
     wind_gusts_10m: (number | null)[];
+    wind_speed_250hPa: (number | null)[];
+    wind_speed_500hPa: (number | null)[];
+    temperature_850hPa: (number | null)[];
+    temperature_500hPa: (number | null)[];
+    cape: (number | null)[];
+    boundary_layer_height: (number | null)[];
   };
   daily: { sunrise: string[]; sunset: string[] };
 };
@@ -128,6 +149,14 @@ const HOURLY_FIELDS = [
   'dew_point_2m',
   'precipitation',
   'wind_gusts_10m',
+  // Pola pod ocenę seeingu — patrz src/lib/seeing.ts. Idą tym samym żądaniem,
+  // więc nie kosztują ani jednego wywołania więcej.
+  'wind_speed_250hPa',
+  'wind_speed_500hPa',
+  'temperature_850hPa',
+  'temperature_500hPa',
+  'cape',
+  'boundary_layer_height',
 ].join(',');
 
 function toHours(json: ApiResponse): NightHour[] {
@@ -141,6 +170,12 @@ function toHours(json: ApiResponse): NightHour[] {
     dewSpread: (json.hourly.temperature_2m[i] ?? 0) - (json.hourly.dew_point_2m[i] ?? 0),
     precipitation: json.hourly.precipitation[i] ?? 0,
     windGust: json.hourly.wind_gusts_10m[i] ?? 0,
+    windJet: json.hourly.wind_speed_250hPa[i] ?? 0,
+    windMid: json.hourly.wind_speed_500hPa[i] ?? 0,
+    temp850: json.hourly.temperature_850hPa[i] ?? 0,
+    temp500: json.hourly.temperature_500hPa[i] ?? 0,
+    cape: json.hourly.cape[i] ?? 0,
+    boundaryLayerM: json.hourly.boundary_layer_height[i] ?? 0,
   }));
 }
 

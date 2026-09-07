@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 import type { Coords } from '@/data/places';
 import { computeNightRating } from '@/lib/astro';
 import { moonAt, type Moon } from '@/lib/moon';
+import { seeingOver, type Seeing } from '@/lib/seeing';
 import { useForecast } from '@/store/forecast';
 import type { NightForecast } from '@/lib/weather';
 
@@ -17,6 +18,8 @@ export type NightData = {
   /** Ocena nocy 0–100 — patrz computeNightRating(). */
   rating: number;
   bortle: number;
+  /** Spokój atmosfery w oknie nocy; `null`, gdy prognoza nie ma godzin. */
+  seeing: Seeing | null;
 };
 
 /**
@@ -43,6 +46,7 @@ export function useNightData(coords: Coords, bortle: number) {
       forecast,
       moon,
       bortle,
+      seeing: seeingOver(forecast.hours),
       rating: computeNightRating({
         avgCloud: forecast.avgCloud,
         avgHumidity: forecast.avgHumidity,

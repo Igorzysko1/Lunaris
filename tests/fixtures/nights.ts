@@ -23,6 +23,14 @@ function hours(from: Date, count: number, shape: HourShape): NightHour[] {
     dewSpread: 4,
     precipitation: 0,
     windGust: 10,
+    // Atmosfera spokojna: seeing nie jest przedmiotem tych fikstur, a niezerowe
+    // wartości zaciemniałyby to, co sprawdzają.
+    windJet: 20,
+    windMid: 20,
+    temp850: 0,
+    temp500: -20,
+    cape: 0,
+    boundaryLayerM: 60,
     ...shape,
   }));
 }

@@ -20,6 +20,7 @@ import type { Coords } from '../data/places.ts';
 import { computeNightRating } from './astro.ts';
 import type { LunarisConfig } from './config.ts';
 import { windLimitKmh } from './optics.ts';
+import { seeingOver, type Seeing } from './seeing.ts';
 import { assumedNextDay, evaluateNight, type NightVerdict } from './session-engine.ts';
 import { nightTargetsForProfiles, type SkyTarget } from './sky-targets.ts';
 import type { NightSlice } from './weather.ts';
@@ -38,6 +39,14 @@ export type PlannedNight = {
   targets: SkyTarget[];
   /** Prognoza na tę dobę jest już orientacyjna. */
   uncertain: boolean;
+  /**
+   * Spokój atmosfery w oknie obserwacyjnym. `null`, gdy okna nie ma.
+   *
+   * Nie wchodzi do werdyktu i nie może go zmienić: przy lornetce seeing nie ma
+   * znaczenia, a przy teleskopie rozstrzyga tylko o tym, co warto oglądać —
+   * nie o tym, czy jechać.
+   */
+  seeing: Seeing | null;
 };
 
 /**
@@ -127,6 +136,7 @@ export function planNights({
 
     return {
       verdict,
+      seeing: seeingOver(inWindow),
       minTemperature: inWindow.length ? Math.min(...inWindow.map((h) => h.temperature)) : null,
       targets: window ? nightTargetsForProfiles(window, target, config.opticsProfiles, bortle) : [],
       uncertain: index >= UNCERTAIN_FROM_INDEX,

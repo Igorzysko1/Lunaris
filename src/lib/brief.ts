@@ -19,6 +19,7 @@ import type { LunarisConfig } from './config.ts';
 import { formatTime } from './date.ts';
 import { reviewEvents, type NoticeLog } from './event-review.ts';
 import { planNights } from './night-plan.ts';
+import { rankedTargets } from './sky-targets.ts';
 import type { Rejection, SessionPlan, Warning } from './session-engine.ts';
 import type { NightSlice } from './weather.ts';
 
@@ -59,6 +60,8 @@ export type BriefNight = {
     travelMinutes: number;
   } | null;
   minTemperature: number | null;
+  /** Spokój atmosfery: 1–5 i to, co go psuje. `null`, gdy nocy nie ma. */
+  seeing: { index: number; label: string; driver: string; usableMagnification: number } | null;
   /** Tylko cele w zasięgu — brief ma mówić, co robić, a nie czego się nie da. */
   targets: BriefTarget[];
 };
@@ -179,7 +182,7 @@ export function buildBrief(input: BriefInput): BriefResult {
   });
 
   const briefNights: BriefNight[] = planned.map(
-    ({ verdict, minTemperature, targets, uncertain }) => ({
+    ({ verdict, minTemperature, targets, uncertain, seeing }) => ({
       from: iso(verdict.night.from),
       to: iso(verdict.night.to),
       status: verdict.status,
@@ -196,18 +199,19 @@ export function buildBrief(input: BriefInput): BriefResult {
         : null,
       plan: plainPlan(verdict.plan),
       minTemperature,
-      targets: targets
-        .filter((t) => t.visible)
-        .map((t) => ({
-          id: t.id,
-          name: t.name,
-          detail: t.detail,
-          kind: t.kind,
-          bestAt: iso(t.bestAt),
-          maxAltitude: Math.round(t.maxAltitude * 10) / 10,
-          bestAzimuth: Math.round(t.bestAzimuth),
-          magnitude: t.magnitude,
-        })),
+      seeing,
+      // Pełna lista, ale w kolejności od najefektowniejszych: odbiorcą jest cron,
+      // który zwykle weźmie z niej kilka pierwszych pozycji.
+      targets: rankedTargets(targets, targets.length).map((t) => ({
+        id: t.id,
+        name: t.name,
+        detail: t.detail,
+        kind: t.kind,
+        bestAt: iso(t.bestAt),
+        maxAltitude: Math.round(t.maxAltitude * 10) / 10,
+        bestAzimuth: Math.round(t.bestAzimuth),
+        magnitude: t.magnitude,
+      })),
     }),
   );
 

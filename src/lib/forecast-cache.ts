@@ -53,7 +53,9 @@ function keyFor(scope: string, coords: { lat: number; lon: number }): string {
 
 type Envelope<T> = { version: number; savedAt: string; payload: T };
 
-const VERSION = 1;
+// 2: godziny prognozy niosą pola pod ocenę seeingu. Zapis w starym kształcie
+// dawałby seeing policzony z samych zer, czyli fałszywie idealny.
+const VERSION = 2;
 
 /** Data w formacie ISO — tylko takie napisy zamieniamy z powrotem na `Date`. */
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/;
