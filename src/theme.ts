@@ -22,7 +22,6 @@ export const colors = {
 export const fonts = {
   sans: 'IBMPlexSans_400Regular',
   sansMedium: 'IBMPlexSans_500Medium',
-  sansSemiBold: 'IBMPlexSans_600SemiBold',
   mono: 'IBMPlexMono_400Regular',
   monoMedium: 'IBMPlexMono_500Medium',
   monoSemiBold: 'IBMPlexMono_600SemiBold',

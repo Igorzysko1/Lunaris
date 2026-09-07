@@ -231,7 +231,7 @@ function dsoGeometry(dso: DeepSkyObject, window: NightWindow, observer: Observer
  * To najdroższa część rachunku — efemerydy — i jedyna, która nie zależy od
  * zestawu, więc przy wielu zestawach liczy się raz i jest współdzielona.
  */
-export function nightGeometry(window: NightWindow, coords: Coords): TargetGeometry[] {
+function nightGeometry(window: NightWindow, coords: Coords): TargetGeometry[] {
   const observer = observerOf(coords);
 
   const planets = PLANETS.map(({ body, name }) => {
@@ -348,25 +348,6 @@ export function rankedTargets(targets: SkyTarget[], limit: number): SkyTarget[] 
     .filter((t) => t.visible)
     .sort((a, b) => a.magnitude - b.magnitude || b.maxAltitude - a.maxAltitude)
     .slice(0, limit);
-}
-
-/**
- * Cele na daną noc dla jednego zestawu i nieba, od najwyżej położonego.
- * Gotową geometrię można podać z zewnątrz, gdy liczy się cele dla wielu zestawów.
- */
-export function nightTargets(
-  window: NightWindow,
-  coords: Coords,
-  optics: Optics,
-  bortle: number,
-  geometry: TargetGeometry[] = nightGeometry(window, coords),
-  horizon: SiteHorizon = FLAT_HORIZON,
-): SkyTarget[] {
-  const reach = reachOf(optics, bortle);
-
-  return geometry
-    .map((g) => applyReach(g, reach, { id: 'single', label: '' }, horizon))
-    .sort((a, b) => b.maxAltitude - a.maxAltitude);
 }
 
 /**

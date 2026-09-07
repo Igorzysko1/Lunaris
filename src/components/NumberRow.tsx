@@ -12,6 +12,13 @@ import { HAIRLINE, colors, fonts, radius } from '@/theme';
  *
  * Przycinamy tu, a nie dopiero w konfiguracji, żeby pole pokazywało wartość
  * faktycznie zapisaną: po wpisaniu apertury 5000 mm ma zostać 400, a nie 5000.
+ *
+ * Samo przycięcie do `limits` nie wystarczy, bo konfiguracja pilnuje jeszcze
+ * zależności między polami: sesja maks. nie może wyjść poniżej sesji min.,
+ * a godzina „tylko dom" przed godziną odrzucenia. Wpis 60 min przy minimum 120
+ * zostaje więc zapisany jako 120 — i tę liczbę, a nie wpisaną, ma pokazać pole.
+ * Dlatego wartość z zewnątrz nadpisuje tekst, gdy rozjedzie się z ostatnią,
+ * którą to pole pokazało.
  */
 export function NumberRow({
   label,
@@ -27,6 +34,14 @@ export function NumberRow({
   onCommit: (value: number) => void;
 }) {
   const [text, setText] = useState(String(value));
+  const [shown, setShown] = useState(value);
+
+  // Synchronizacja w trakcie renderu, nie w efekcie: gdyby szła efektem, pole
+  // mignęłoby na jedną klatkę starą liczbą.
+  if (value !== shown) {
+    setShown(value);
+    setText(String(value));
+  }
 
   const commit = () => {
     const parsed = Number(text.replace(',', '.'));
@@ -38,6 +53,7 @@ export function NumberRow({
 
     const clamped = Math.min(limits.max, Math.max(limits.min, parsed));
     setText(String(clamped));
+    setShown(clamped);
     onCommit(clamped);
   };
 

@@ -457,12 +457,6 @@ const styles = StyleSheet.create({
     marginTop: 14,
     marginBottom: 10,
   },
-  targetsFooter: {
-    fontFamily: fonts.sans,
-    fontSize: 12,
-    color: colors.textMuted,
-    lineHeight: 17,
-  },
   moonCard: {
     flexDirection: 'row',
     alignItems: 'center',

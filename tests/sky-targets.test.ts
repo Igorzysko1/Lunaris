@@ -13,14 +13,15 @@ import { describe, it } from 'node:test';
 
 import { DEEP_SKY_OBJECTS } from '../src/data/deep-sky.ts';
 import { DEFAULT_OPTICS, surfaceBrightness, type Optics } from '../src/lib/optics.ts';
-import { nightTargets, rankedTargets } from '../src/lib/sky-targets.ts';
+import { nightTargetsForProfiles, rankedTargets } from '../src/lib/sky-targets.ts';
 
 const BLEDOWSKA = { lat: 50.35, lon: 19.53 };
 /** Styczniowa noc: długa, więc przez okno przewija się pół katalogu. */
 const NIGHT = { from: new Date(2026, 0, 16, 18, 0), to: new Date(2026, 0, 17, 6, 0) };
 
+/** Jeden zestaw sprzętu — tą samą ścieżką, którą liczy aplikacja. */
 const targetsFor = (optics: Optics = DEFAULT_OPTICS, bortle = 4) =>
-  nightTargets(NIGHT, BLEDOWSKA, optics, bortle);
+  nightTargetsForProfiles(NIGHT, BLEDOWSKA, [{ id: 'test', label: '', optics }], bortle);
 
 describe('katalog obiektów', () => {
   it('identyfikatory są unikalne — dziennik będzie się do nich odwoływał latami', () => {

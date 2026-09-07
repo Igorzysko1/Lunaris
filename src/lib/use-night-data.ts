@@ -7,11 +7,6 @@ import { seeingOver, type Seeing } from '@/lib/seeing';
 import { useForecast } from '@/store/forecast';
 import type { NightForecast } from '@/lib/weather';
 
-export type NightStatus = 'loading' | 'ready' | 'error';
-
-/** Dlaczego prognoza nie przyszła — użytkownik reaguje inaczej na jedno i drugie. */
-export type NightFailure = 'offline' | 'api';
-
 export type NightData = {
   forecast: NightForecast;
   moon: Moon;

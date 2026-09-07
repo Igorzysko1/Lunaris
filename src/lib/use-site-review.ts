@@ -17,7 +17,7 @@ import { skyQualityAt } from '@/lib/sky-map';
 import { fetchUpcomingNightsForPoints, type NightSlice } from '@/lib/weather';
 
 /** Tyle nocy naprzód, ile ma sens porównywać — dalej prognoza jest zgadywanką. */
-export const REVIEW_NIGHTS = 3;
+const REVIEW_NIGHTS = 3;
 
 /**
  * Przegląd ma własny znacznik cyklu, osobny od prognozy aktywnego punktu:

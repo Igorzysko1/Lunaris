@@ -42,7 +42,7 @@ import { ForecastError, fetchForecastBundle, type ForecastBundle } from '@/lib/w
 import { useSettings } from '@/store/settings';
 
 /** Ile nocy naprzód pobieramy. Dalej prognoza jest zgadywanką, a werdykt obietnicą bez pokrycia. */
-export const CYCLE_NIGHTS = 3;
+const CYCLE_NIGHTS = 3;
 
 /** Klucz zapisu dla kompletu danych aktywnego punktu. */
 const SCOPE = 'bundle';
@@ -71,17 +71,6 @@ type ForecastStore = ForecastState & {
 
 const ForecastContext = createContext<ForecastStore | null>(null);
 
-/**
- * Cykl dobowy dla aktywnego punktu.
- *
- * Ekran nigdy nie czeka na sieć przy wejściu: najpierw czytamy zapis i od razu
- * go pokazujemy, a dopiero potem — i tylko jeśli termin odświeżenia minął —
- * pobieramy. Brak zapisu to jedyny przypadek, w którym pobieranie blokuje widok.
- *
- * Provider, a nie hook w ekranie, bo pobranie ma być **jedno na cykl**: ekran
- * Noc i sekcja sesji potrzebują tych samych godzin w dwóch różnych oknach,
- * a dotąd każde z nich odpytywało Open-Meteo osobno.
- */
 /**
  * Przegląd zjawisk — krok, którym kończy się cykl.
  *
@@ -130,6 +119,17 @@ async function runEventReview(input: {
   return loadNoticePlan();
 }
 
+/**
+ * Cykl dobowy dla aktywnego punktu.
+ *
+ * Ekran nigdy nie czeka na sieć przy wejściu: najpierw czytamy zapis i od razu
+ * go pokazujemy, a dopiero potem — i tylko jeśli termin odświeżenia minął —
+ * pobieramy. Brak zapisu to jedyny przypadek, w którym pobieranie blokuje widok.
+ *
+ * Provider, a nie hook w ekranie, bo pobranie ma być **jedno na cykl**: ekran
+ * Noc i sekcja sesji potrzebują tych samych godzin w dwóch różnych oknach,
+ * a dotąd każde z nich odpytywało Open-Meteo osobno.
+ */
 export function ForecastProvider({ children }: { children: ReactNode }) {
   const { active, config, notifications, leadTime } = useSettings();
   const { lat, lon } = active.coords;

@@ -18,14 +18,12 @@ import { nightWindow, sampleNight, type NightWindow } from './night-window.ts';
 import { eclipseEvents, conjunctionEvents, oppositionEvents } from './planetary-events.ts';
 
 /** Ile dni w przód pokazujemy. Dwa miesiące łapią 2 nowie, 2 pełnie i kilka rojów. */
-export const EVENT_HORIZON_DAYS = 60;
+const EVENT_HORIZON_DAYS = 60;
 
 const HOUR_MS = 3_600_000;
 const DAY_MS = 86_400_000;
 const toRad = (deg: number) => (deg * Math.PI) / 180;
 const toDeg = (rad: number) => (rad * 180) / Math.PI;
-
-export { nightWindow, type NightWindow };
 
 /**
  * Czas gwiazdowy lokalny w stopniach. Standardowy wzór na GMST z epoki J2000
@@ -41,7 +39,7 @@ function localSiderealTime(date: Date, lon: number): number {
 }
 
 /** Wysokość obiektu o stałych współrzędnych równikowych nad horyzontem, w stopniach. */
-export function equatorialAltitude(ra: number, dec: number, date: Date, coords: Coords): number {
+function equatorialAltitude(ra: number, dec: number, date: Date, coords: Coords): number {
   const hourAngle = toRad(localSiderealTime(date, coords.lon) - ra);
   const decRad = toRad(dec);
   const latRad = toRad(coords.lat);
@@ -125,7 +123,7 @@ function moonPhaseDescription(event: 'new' | 'full', at: Date, coords: Coords): 
 }
 
 /** Nowie i pełnie w zadanym oknie. Skan co godzinę, potem bisekcja do minuty. */
-export function moonPhaseEvents(from: Date, to: Date, coords: Coords): AstroEvent[] {
+function moonPhaseEvents(from: Date, to: Date, coords: Coords): AstroEvent[] {
   const events: AstroEvent[] = [];
 
   for (const { target, event, title } of MOON_PHASE_TARGETS) {
@@ -179,7 +177,7 @@ function meteorDescription(
 }
 
 /** Maksima rojów wypadające w zadanym oknie, z godziną najwyższego położenia radiantu. */
-export function meteorShowerEvents(from: Date, to: Date, coords: Coords): AstroEvent[] {
+function meteorShowerEvents(from: Date, to: Date, coords: Coords): AstroEvent[] {
   const events: AstroEvent[] = [];
   const years = [from.getFullYear(), to.getFullYear()];
 

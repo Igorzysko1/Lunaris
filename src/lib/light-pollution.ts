@@ -12,7 +12,7 @@ const BASE_URL = 'https://www.lightpollutionmap.info/';
 /** Na tyle blisko, żeby widzieć łunę miast, i na tyle daleko, by szukać ciemnego miejsca. */
 const DEFAULT_ZOOM = 10;
 
-export function lightPollutionMapUrl(lat: number, lon: number, zoom = DEFAULT_ZOOM): string {
+function lightPollutionMapUrl(lat: number, lon: number, zoom = DEFAULT_ZOOM): string {
   return `${BASE_URL}#zoom=${zoom}&lat=${lat.toFixed(4)}&lon=${lon.toFixed(4)}`;
 }
 
