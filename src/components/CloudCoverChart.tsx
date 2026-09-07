@@ -1,6 +1,7 @@
 import { Line, Rect, Svg, Text as SvgText } from 'react-native-svg';
 
 import { cloudBarColor } from '@/lib/astro';
+import { formatTime } from '@/lib/date';
 import type { NightForecast } from '@/lib/weather';
 import { colors, fonts } from '@/theme';
 
@@ -11,10 +12,6 @@ const PLOT_BASE = 120;
 const PLOT_HEIGHT = PLOT_BASE - PLOT_TOP;
 
 const GRID_LINES = [0, 25, 50, 75, 100];
-
-function hhmm(date: Date): string {
-  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
-}
 
 export function CloudCoverChart({ forecast }: { forecast: NightForecast }) {
   const { hours, from, to } = forecast;
@@ -28,8 +25,8 @@ export function CloudCoverChart({ forecast }: { forecast: NightForecast }) {
   const labelEvery = hours.length > 10 ? 3 : 2;
 
   const markers = [
-    { x: 3, label: hhmm(from), anchor: 'start', dx: 4 },
-    { x: WIDTH - 3, label: hhmm(to), anchor: 'end', dx: -4 },
+    { x: 3, label: formatTime(from), anchor: 'start', dx: 4 },
+    { x: WIDTH - 3, label: formatTime(to), anchor: 'end', dx: -4 },
   ] as const;
 
   return (
@@ -69,7 +66,7 @@ export function CloudCoverChart({ forecast }: { forecast: NightForecast }) {
             fontFamily={fonts.mono}
             textAnchor="middle"
           >
-            {hhmm(hour.at)}
+            {formatTime(hour.at)}
           </SvgText>
         ) : null,
       )}

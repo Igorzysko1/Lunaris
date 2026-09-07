@@ -45,6 +45,11 @@ export function isSameDay(a: Date, b: Date): boolean {
   );
 }
 
+/** To samo dla wartości, której może nie być — Księżyc bywa nienachodzący. */
+export function formatTimeOrDash(date: Date | null): string {
+  return date ? formatTime(date) : '—';
+}
+
 /** np. „22:40". Doba 24-godzinna, bez sekund. */
 export function formatTime(date: Date): string {
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;

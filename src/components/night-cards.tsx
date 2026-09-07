@@ -4,11 +4,11 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { Card, Divider, SectionLabel } from '@/components/primitives';
 import { dewRiskColor, ratingMeta } from '@/lib/astro';
-import { formatTime } from '@/lib/date';
+import { formatTime, formatTimeOrDash } from '@/lib/date';
 import type { Moon } from '@/lib/moon';
 import { describeSeeing, type Seeing } from '@/lib/seeing';
 import { describeOutOfReach, rankedTargets, type SkyTarget } from '@/lib/sky-targets';
-import type { NightData } from '@/lib/use-night-data';
+import type { NightData } from '@/hooks/use-night-data';
 import { HAIRLINE, colors, fonts, radius } from '@/theme';
 
 export function NightRatingCard({
@@ -80,11 +80,6 @@ function Metric({ label, value, color }: { label: string; value: string; color?:
 }
 
 /** Księżyc nie każdej doby wschodzi i zachodzi — wtedy nie ma czego pokazać. */
-function hhmm(date: Date | null): string {
-  if (!date) return '—';
-  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
-}
-
 /** Słońce z efemeryd Open-Meteo, Księżyc liczony przez suncalc. */
 export function AstroTimesRow({
   sunset,
@@ -96,10 +91,10 @@ export function AstroTimesRow({
   moon: Moon;
 }) {
   const cells = [
-    { icon: 'arrow-down-outline', label: 'Zach. Słońca', value: hhmm(sunset) },
-    { icon: 'moon-outline', label: 'Wsch. Ks.', value: hhmm(moon.rise) },
-    { icon: 'moon-outline', label: 'Zach. Ks.', value: hhmm(moon.set) },
-    { icon: 'arrow-up-outline', label: 'Wsch. Słońca', value: hhmm(sunrise) },
+    { icon: 'arrow-down-outline', label: 'Zach. Słońca', value: formatTimeOrDash(sunset) },
+    { icon: 'moon-outline', label: 'Wsch. Ks.', value: formatTimeOrDash(moon.rise) },
+    { icon: 'moon-outline', label: 'Zach. Ks.', value: formatTimeOrDash(moon.set) },
+    { icon: 'arrow-up-outline', label: 'Wsch. Słońca', value: formatTimeOrDash(sunrise) },
   ] as const;
 
   return (

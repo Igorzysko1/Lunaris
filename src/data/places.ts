@@ -22,7 +22,7 @@ export type Coords = { lat: number; lon: number };
 
 /**
  * Pozycja używana, **gdy GPS jest niedostępny** (brak zgody, wyłączona lokalizacja).
- * Prawdziwą pozycję czyta expo-location — patrz src/lib/use-device-location.ts.
+ * Prawdziwą pozycję czyta expo-location — patrz src/hooks/use-device-location.ts.
  */
 export const FALLBACK_POSITION: Coords = { lat: 50.259, lon: 19.021 };
 

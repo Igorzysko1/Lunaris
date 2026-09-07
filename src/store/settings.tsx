@@ -13,7 +13,7 @@ import {
   type LeadTime,
   type PersistedSettings,
 } from '@/lib/settings-storage';
-import { useDeviceLocation, type LocationStatus } from '@/lib/use-device-location';
+import { useDeviceLocation, type LocationStatus } from '@/hooks/use-device-location';
 
 export { LEAD_TIMES, type LeadTime };
 export type { LunarisConfig };

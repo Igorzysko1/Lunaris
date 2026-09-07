@@ -9,7 +9,7 @@ import { type ObservingSite } from '@/data/observing-sites';
 import { bortleMeta, distanceKm, formatDistance } from '@/lib/astro';
 import { skyQualityAt } from '@/lib/sky-map';
 import { compassLabel, type HorizonOverride } from '@/lib/horizon';
-import { capturePosition, type PositionFix } from '@/lib/use-device-location';
+import { capturePosition, type PositionFix } from '@/hooks/use-device-location';
 import { findPlaceById, type Coords } from '@/data/places';
 import { useSettings } from '@/store/settings';
 import { HAIRLINE, colors, fonts, radius } from '@/theme';

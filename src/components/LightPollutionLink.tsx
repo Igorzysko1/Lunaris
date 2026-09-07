@@ -1,7 +1,15 @@
-import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import {
+  Linking,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  type StyleProp,
+  type ViewStyle,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import { openLightPollutionMap } from '@/lib/light-pollution';
+import { lightPollutionMapUrl } from '@/lib/light-pollution';
 import { HAIRLINE, colors, fonts, radius } from '@/theme';
 
 type Props = {
@@ -13,10 +21,18 @@ type Props = {
 };
 
 /** Wychodzi z aplikacji do zewnętrznej mapy — stąd ikona „otwórz na zewnątrz". */
+/**
+ * Otwarcie przeglądarki systemowej. Gdy się nie uda — brak przeglądarki albo
+ * odmowa systemu — nie ma czego pokazać, ale to nie powód, żeby wywracać ekran.
+ */
+function openMap(lat: number, lon: number): void {
+  Linking.openURL(lightPollutionMapUrl(lat, lon)).catch(() => {});
+}
+
 export function LightPollutionLink({ lat, lon, subtitle, style }: Props) {
   return (
     <Pressable
-      onPress={() => openLightPollutionMap(lat, lon)}
+      onPress={() => openMap(lat, lon)}
       accessibilityRole="link"
       accessibilityLabel="Otwórz mapę zanieczyszczenia światłem"
       style={[styles.row, style]}

@@ -5,11 +5,11 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Badge, Card, Pill, SectionLabel } from '@/components/primitives';
-import { describeRejection, nightLabel } from '@/components/session-cards';
+import { describeRejection, nightLabel } from '@/lib/session-text';
 import { bortleMeta, formatDistance } from '@/lib/astro';
 import { formatAge } from '@/lib/forecast-cache';
 import { explainScore, type SiteOutlook } from '@/lib/site-review';
-import { useSiteReview } from '@/lib/use-site-review';
+import { useSiteReview } from '@/hooks/use-site-review';
 import { useSettings } from '@/store/settings';
 import { HAIRLINE, colors, fonts, radius } from '@/theme';
 
