@@ -7,7 +7,7 @@ import { NumberRow } from '@/components/NumberRow';
 import { Card, Divider, SectionLabel } from '@/components/primitives';
 import { CONFIG_LIMITS } from '@/lib/config';
 import { useSettings } from '@/store/settings';
-import { colors, fonts } from '@/theme';
+import { colors, fonts, touchSlop } from '@/theme';
 
 /**
  * Progi decydujące o werdykcie nocy. Osobny ekran, bo jest ich kilkanaście —
@@ -23,7 +23,13 @@ export default function ThresholdsScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} accessibilityLabel="Wróć" style={styles.back}>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.back()}
+          accessibilityLabel="Wróć"
+          hitSlop={touchSlop(30)}
+          style={styles.back}
+        >
           <Ionicons name="chevron-back" size={22} color={colors.textPrimary} />
         </Pressable>
         <Text style={styles.title}>Progi warunków</Text>

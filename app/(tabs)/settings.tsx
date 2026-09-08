@@ -66,7 +66,11 @@ export default function SettingsScreen() {
         <Card variant="raised" style={styles.group}>
           <View style={styles.row}>
             <Text style={styles.rowLabel}>Automatyczna (GPS)</Text>
-            <Toggle value={autoLocation} onPress={toggleAutoLocation} />
+            <Toggle
+              value={autoLocation}
+              onPress={toggleAutoLocation}
+              label="Automatyczna lokalizacja (GPS)"
+            />
           </View>
 
           {autoLocation && !gpsFailed && (
@@ -93,7 +97,7 @@ export default function SettingsScreen() {
                 <Text style={styles.errorHint}>
                   Używam ostatnio wybranej miejscowości: {active.label}
                 </Text>
-                <Pressable onPress={retryGps}>
+                <Pressable accessibilityRole="button" onPress={retryGps}>
                   <Text style={styles.link}>Spróbuj ponownie</Text>
                 </Pressable>
               </View>
@@ -104,7 +108,7 @@ export default function SettingsScreen() {
             <>
               <Divider />
               <Link href="/location" asChild>
-                <Pressable style={styles.row}>
+                <Pressable accessibilityRole="button" style={styles.row}>
                   <Text style={styles.rowLabel}>Miejscowość</Text>
                   <View style={styles.rowValue}>
                     <Text style={styles.link}>{placeName}</Text>
@@ -126,7 +130,7 @@ export default function SettingsScreen() {
             onRemove={() => removeOpticsProfile(profile.id)}
           />
         ))}
-        <Pressable onPress={addOpticsProfile} style={styles.addProfile}>
+        <Pressable accessibilityRole="button" onPress={addOpticsProfile} style={styles.addProfile}>
           <Ionicons name="add" size={17} color={colors.purple} />
           <Text style={styles.link}>Dodaj zestaw</Text>
         </Pressable>
@@ -134,7 +138,7 @@ export default function SettingsScreen() {
         <SectionLabel style={styles.groupLabel}>Profil obserwatora</SectionLabel>
         <Card variant="raised" style={styles.group}>
           <Link href="/location?target=home" asChild>
-            <Pressable style={styles.row}>
+            <Pressable accessibilityRole="button" style={styles.row}>
               <View style={styles.rowText}>
                 <Text style={styles.rowLabel}>Punkt startowy</Text>
                 <Text style={styles.rowHint}>Stąd liczone są czasy dojazdu i powrotu</Text>
@@ -193,6 +197,7 @@ export default function SettingsScreen() {
             <Toggle
               value={config.session.overnight}
               onPress={() => updateConfig('session', { overnight: !config.session.overnight })}
+              label="Nocleg w terenie"
             />
           </View>
           <Divider />
@@ -221,7 +226,7 @@ export default function SettingsScreen() {
         <SectionLabel style={styles.groupLabel}>Miejscówki</SectionLabel>
         <Card variant="raised" style={styles.group}>
           <Link href="/sites" asChild>
-            <Pressable style={styles.row}>
+            <Pressable accessibilityRole="button" style={styles.row}>
               <View style={styles.rowText}>
                 <Text style={styles.rowLabel}>Katalog miejsc obserwacyjnych</Text>
                 <Text style={styles.rowHint}>
@@ -237,7 +242,7 @@ export default function SettingsScreen() {
         <SectionLabel style={styles.groupLabel}>Werdykt nocy</SectionLabel>
         <Card variant="raised" style={styles.group}>
           <Link href="/thresholds" asChild>
-            <Pressable style={styles.row}>
+            <Pressable accessibilityRole="button" style={styles.row}>
               <View style={styles.rowText}>
                 <Text style={styles.rowLabel}>Progi warunków</Text>
                 <Text style={styles.rowHint}>
@@ -255,7 +260,11 @@ export default function SettingsScreen() {
         <Card variant="raised" style={styles.group}>
           <View style={styles.row}>
             <Text style={styles.rowLabel}>Powiadomienia o eventach</Text>
-            <Toggle value={notifications} onPress={toggleNotifications} />
+            <Toggle
+              value={notifications}
+              onPress={toggleNotifications}
+              label="Powiadomienia o eventach"
+            />
           </View>
 
           {notifications && (
@@ -370,7 +379,12 @@ function RefreshStatusCard() {
         </>
       )}
       <Divider />
-      <Pressable onPress={refresh} style={styles.row} accessibilityLabel="Odśwież dane teraz">
+      <Pressable
+        accessibilityRole="button"
+        onPress={refresh}
+        style={styles.row}
+        accessibilityLabel="Odśwież dane teraz"
+      >
         <Text style={styles.rowLabel}>Odśwież teraz</Text>
         <Text style={styles.subValue}>{refreshing ? 'pobieram…' : 'pobierz'}</Text>
       </Pressable>
@@ -405,7 +419,12 @@ function OpticsProfileCard({
           accessibilityLabel="Nazwa zestawu"
         />
         {canRemove && (
-          <Pressable onPress={onRemove} accessibilityLabel="Usuń zestaw" style={styles.remove}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={onRemove}
+            accessibilityLabel="Usuń zestaw"
+            style={styles.remove}
+          >
             <Ionicons name="trash-outline" size={17} color={colors.textMuted} />
           </Pressable>
         )}

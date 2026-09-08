@@ -8,7 +8,7 @@ import { Card, Divider, SectionLabel } from '@/components/primitives';
 import { WEEKDAYS_SHORT, formatLongDate, formatMonth, isSameDay } from '@/lib/date';
 import { moonMonth, type MoonDay } from '@/lib/moon';
 import { useSettings } from '@/store/settings';
-import { HAIRLINE, colors, fonts, hexA, radius } from '@/theme';
+import { HAIRLINE, colors, fonts, hexA, radius, touchSlop } from '@/theme';
 
 export default function MoonCalendarScreen() {
   const router = useRouter();
@@ -41,7 +41,12 @@ export default function MoonCalendarScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} accessibilityLabel="Wróć">
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.back()}
+          accessibilityLabel="Wróć"
+          hitSlop={touchSlop(22)}
+        >
           <Ionicons name="arrow-back" size={22} color={colors.textPrimary} />
         </Pressable>
         <Text style={styles.title}>Kalendarz Księżyca</Text>
@@ -50,6 +55,7 @@ export default function MoonCalendarScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.monthNav}>
           <Pressable
+            accessibilityRole="button"
             onPress={() => shiftMonth(-1)}
             hitSlop={12}
             accessibilityLabel="Poprzedni miesiąc"
@@ -58,6 +64,7 @@ export default function MoonCalendarScreen() {
           </Pressable>
           <Text style={styles.monthLabel}>{formatMonth(cursor)}</Text>
           <Pressable
+            accessibilityRole="button"
             onPress={() => shiftMonth(1)}
             hitSlop={12}
             accessibilityLabel="Następny miesiąc"
@@ -116,6 +123,7 @@ function DayCell({
 
   return (
     <Pressable
+      accessibilityRole="button"
       onPress={onPress}
       style={[
         styles.cell,

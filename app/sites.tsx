@@ -12,7 +12,7 @@ import { compassLabel, type HorizonOverride } from '@/lib/horizon';
 import { capturePosition, type PositionFix } from '@/hooks/use-device-location';
 import { findPlaceById, type Coords } from '@/data/places';
 import { useSettings } from '@/store/settings';
-import { HAIRLINE, colors, fonts, radius } from '@/theme';
+import { HAIRLINE, colors, fonts, radius, touchSlop } from '@/theme';
 
 /**
  * Katalog miejscówek: dokąd realnie się jeździ i co o tych miejscach wiadomo.
@@ -71,7 +71,13 @@ export default function SitesScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} accessibilityLabel="Wróć" style={styles.back}>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.back()}
+          accessibilityLabel="Wróć"
+          hitSlop={touchSlop(30)}
+          style={styles.back}
+        >
           <Ionicons name="chevron-back" size={22} color={colors.textPrimary} />
         </Pressable>
         <Text style={styles.title}>Miejscówki</Text>
@@ -147,7 +153,7 @@ function CaptureCard({
   if (capture.state === 'idle' || capture.state === 'failed') {
     return (
       <>
-        <Pressable onPress={onCatch} style={styles.hereButton}>
+        <Pressable accessibilityRole="button" onPress={onCatch} style={styles.hereButton}>
           <Ionicons name="location" size={17} color={colors.purple} />
           <Text style={styles.hereLabel}>Jestem tutaj — zapisz to miejsce</Text>
         </Pressable>
@@ -191,7 +197,7 @@ function CaptureCard({
         placeholderTextColor={colors.textMuted}
       />
 
-      <Pressable onPress={() => onSaveNew(fix)} style={styles.primary}>
+      <Pressable accessibilityRole="button" onPress={() => onSaveNew(fix)} style={styles.primary}>
         <Text style={styles.primaryLabel}>Zapisz jako nowe miejsce</Text>
       </Pressable>
 
@@ -202,6 +208,7 @@ function CaptureCard({
             const shiftKm = distanceKm(site, fix.coords);
             return (
               <Pressable
+                accessibilityRole="button"
                 key={site.id}
                 onPress={() => onOverwrite(site, fix)}
                 style={styles.moveRow}
@@ -218,7 +225,7 @@ function CaptureCard({
         </>
       )}
 
-      <Pressable onPress={onCancel}>
+      <Pressable accessibilityRole="button" onPress={onCancel}>
         <Text style={styles.cancel}>Anuluj</Text>
       </Pressable>
     </Card>
@@ -262,7 +269,12 @@ function SiteCard({
           {site.name}
         </Text>
         <Badge label={bortle.label} color={bortle.color} />
-        <Pressable onPress={onRemove} accessibilityLabel={`Usuń ${site.name}`} hitSlop={8}>
+        <Pressable
+          accessibilityRole="button"
+          onPress={onRemove}
+          accessibilityLabel={`Usuń ${site.name}`}
+          hitSlop={touchSlop(15)}
+        >
           <Ionicons name="trash-outline" size={15} color={colors.textMuted} />
         </Pressable>
       </View>
@@ -354,7 +366,11 @@ function HorizonRow({
       <Text style={styles.sky}>{summary}</Text>
 
       {site.horizonOverrides.map((o, i) => (
-        <Pressable key={`${o.from}-${o.to}-${i}`} onPress={() => onRemoveOverride(i)}>
+        <Pressable
+          accessibilityRole="button"
+          key={`${o.from}-${o.to}-${i}`}
+          onPress={() => onRemoveOverride(i)}
+        >
           <Text style={styles.override}>
             {compassLabel(o.from)}–{compassLabel(o.to)} ({o.from}°–{o.to}°): przeszkoda do{' '}
             {o.altitude}° · dotknij, aby usunąć
@@ -387,7 +403,12 @@ function HorizonRow({
           placeholderTextColor={colors.textMuted}
           keyboardType="numeric"
         />
-        <Pressable onPress={add} style={styles.addOverride}>
+        <Pressable
+          accessibilityRole="button"
+          onPress={add}
+          accessibilityLabel="Dodaj korektę horyzontu"
+          style={styles.addOverride}
+        >
           <Ionicons name="add" size={16} color={colors.purple} />
         </Pressable>
       </View>

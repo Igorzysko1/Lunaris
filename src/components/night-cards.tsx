@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Card, Divider, SectionLabel } from '@/components/primitives';
@@ -37,7 +37,9 @@ export function NightRatingCard({
   return (
     <Card>
       <View style={styles.ratingTop}>
-        <View>
+        {/* Liczba i podpis pod nią to jedna informacja — osobno czytnik ekranu
+            ogłasza „72", a potem „Dobra noc", i nic ich nie wiąże. */}
+        <View accessible accessibilityLabel={`Ocena nocy ${data.rating} na 100, ${meta.label}`}>
           <SectionLabel>Ocena nocy</SectionLabel>
           <Animated.Text
             style={[
@@ -49,7 +51,11 @@ export function NightRatingCard({
           </Animated.Text>
           <Text style={styles.ratingLabel}>{meta.label}</Text>
         </View>
-        <View style={styles.alignRight}>
+        <View
+          style={styles.alignRight}
+          accessible
+          accessibilityLabel={`Zachmurzenie ${Math.round(forecast.avgCloud)} procent`}
+        >
           <Text style={styles.cloudsValue}>{Math.round(forecast.avgCloud)}%</Text>
           <Text style={styles.metricLabel}>chmury</Text>
         </View>
@@ -72,15 +78,29 @@ export function NightRatingCard({
 
 function Metric({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
-    <View>
+    // Podpis i liczba czytane osobno gubią związek — „Rosa", pauza, „1.4°".
+    <View accessible accessibilityLabel={`${label}: ${value}`}>
       <Text style={styles.metricLabel}>{label}</Text>
       <Text style={[styles.metricValue, color ? { color } : null]}>{value}</Text>
     </View>
   );
 }
 
-/** Księżyc nie każdej doby wschodzi i zachodzi — wtedy nie ma czego pokazać. */
-/** Słońce z efemeryd Open-Meteo, Księżyc liczony przez suncalc. */
+/**
+ * Powyżej tego powiększenia czcionki systemowej cztery kolumny przestają się
+ * mieścić i „Zach. Słońca" łamie się na trzy wiersze albo znika w wielokropku.
+ * Wtedy ten sam zestaw układamy dwa na dwa.
+ *
+ * Próg dobrany z tego, co faktycznie się mieści: przy 4 kolumnach na wąskim
+ * telefonie na etykietę zostaje niecałe 80 pt, a najdłuższa potrzebuje ich
+ * około 70 przy skali 1.0.
+ */
+const WRAP_ABOVE_FONT_SCALE = 1.3;
+
+/**
+ * Słońce z efemeryd Open-Meteo, Księżyc liczony przez suncalc. Księżyc nie
+ * każdej doby wschodzi i zachodzi — wtedy w komórce stoi kreska.
+ */
 export function AstroTimesRow({
   sunset,
   sunrise,
@@ -97,12 +117,22 @@ export function AstroTimesRow({
     { icon: 'arrow-up-outline', label: 'Wsch. Słońca', value: formatTimeOrDash(sunrise) },
   ] as const;
 
+  // Ustawienie systemowe, nie rozmiar okna — obrót telefonu nic tu nie zmienia,
+  // a podkręcona czcionka zmienia wszystko.
+  const wrapped = useWindowDimensions().fontScale > WRAP_ABOVE_FONT_SCALE;
+
   return (
-    <View style={styles.astroRow}>
+    <View style={[styles.astroRow, wrapped && styles.astroRowWrapped]}>
       {cells.map((item, i) => (
         <View
           key={item.label}
-          style={[styles.astroCell, i < cells.length - 1 && styles.astroCellBorder]}
+          style={[
+            styles.astroCell,
+            wrapped && styles.astroCellHalf,
+            // Kreski rozdzielają kolumny, więc po zawinięciu do dwóch rzędów
+            // przestają cokolwiek rozdzielać — zostaje sam odstęp.
+            !wrapped && i < cells.length - 1 && styles.astroCellBorder,
+          ]}
         >
           <View style={styles.astroLabelRow}>
             <Ionicons name={item.icon} size={13} color={colors.textMuted} />
@@ -116,10 +146,6 @@ export function AstroTimesRow({
 }
 
 /**
- * Cele na tę noc. Lista wynika ze sprzętu z konfiguracji i jakości nieba, więc po
- * zmianie apertury albo wyjeździe w ciemniejsze miejsce zmienia się sama.
- */
-/**
  * Spokój atmosfery — osobno od oceny nocy, bo odpowiada na inne pytanie.
  *
  * Ocena nocy mówi, czy warto jechać; seeing mówi, na ile warto podkręcić
@@ -132,7 +158,13 @@ export function SeeingCard({ seeing }: { seeing: Seeing }) {
 
   return (
     <Card>
-      <View style={styles.seeingHeader}>
+      {/* Wskaźnik jest wyłącznie graficzny: pięć kropek, z których część jest
+          zapalona. Bez etykiety czytnik ekranu nie ma czego ogłosić. */}
+      <View
+        style={styles.seeingHeader}
+        accessible
+        accessibilityLabel={`Spokój atmosfery ${seeing.index} na 5, ${seeing.label}`}
+      >
         <SectionLabel style={styles.seeingLabel}>Spokój atmosfery</SectionLabel>
         <View style={styles.seeingDots}>
           {dots.map((n) => (
@@ -150,13 +182,23 @@ export function SeeingCard({ seeing }: { seeing: Seeing }) {
 const SHOWN_TARGETS = 10;
 
 /**
- * Kiedy tej nocy patrzeć — po odcinku ponad horyzontem miejsca.
+ * Cały wiersz celu jednym zdaniem, dla czytnika ekranu.
  *
- * Rozróżniamy przejście przez horyzont od krawędzi nocy, bo to dwie różne
- * informacje. „Od 21:15" znaczy „wcześniej go tam nie ma", a „całą noc" znaczy
- * „kolejność zwiedzania jest dowolna" — na tym polega planowanie wyjazdu.
- * Godziny są bez nazw kierunków, bo te stoją już przy odrzuconych celach.
+ * Układ dwukolumnowy niesie znaczenie samym rozmieszczeniem: „22°" po prawej
+ * odnosi się do nazwy po lewej. Czytnik tego rozmieszczenia nie widzi, więc
+ * związek trzeba wypowiedzieć — stąd „najwyżej 22 stopnie" zamiast samego „22°".
  */
+function describeTarget(target: SkyTarget, showProfile: boolean): string {
+  const parts = [
+    target.name,
+    showProfile ? `${target.profileLabel} · ${target.detail}` : target.detail,
+    describeUpSpan(target.up),
+    `najwyżej ${Math.round(target.maxAltitude)} stopni, ${describePeak(target)}`,
+  ];
+
+  return parts.filter(Boolean).join('. ');
+}
+
 /**
  * Godzina pod wysokością maksymalną — i to musi być godzina **tej samej**
  * wysokości, którą widać obok.
@@ -174,6 +216,14 @@ function describePeak(target: SkyTarget): string {
   return transitInSight ? `góruje ${formatTime(transitAt)}` : `najwyżej ${formatTime(bestAt)}`;
 }
 
+/**
+ * Kiedy tej nocy patrzeć — po odcinku ponad horyzontem miejsca.
+ *
+ * Rozróżniamy przejście przez horyzont od krawędzi nocy, bo to dwie różne
+ * informacje. „Od 21:15" znaczy „wcześniej go tam nie ma", a „całą noc" znaczy
+ * „kolejność zwiedzania jest dowolna" — na tym polega planowanie wyjazdu.
+ * Godziny są bez nazw kierunków, bo te stoją już przy odrzuconych celach.
+ */
 function describeUpSpan(up: SkyTarget['up']): string {
   if (!up) return '';
   if (up.rises && up.sets) return `nad horyzontem ${formatTime(up.from)}–${formatTime(up.to)}`;
@@ -182,6 +232,10 @@ function describeUpSpan(up: SkyTarget['up']): string {
   return 'nad horyzontem całą noc';
 }
 
+/**
+ * Cele na tę noc. Lista wynika ze sprzętu z konfiguracji i jakości nieba, więc po
+ * zmianie apertury albo wyjeździe w ciemniejsze miejsce zmienia się sama.
+ */
 export function NightTargetsCard({ targets }: { targets: SkyTarget[] }) {
   const visible = targets.filter((t) => t.visible);
   const inReach = rankedTargets(targets, SHOWN_TARGETS);
@@ -210,6 +264,11 @@ export function NightTargetsCard({ targets }: { targets: SkyTarget[] }) {
           <View
             key={`${target.profileId}-${target.id}`}
             style={[styles.targetRow, i > 0 && styles.targetRowGap]}
+            // Jeden cel to jeden przystanek czytnika ekranu. Bez tego wiersz
+            // rozpada się na pięć osobnych fragmentów, z których „22°"
+            // i „najwyżej 04:12" nie mówią już, czego dotyczą.
+            accessible
+            accessibilityLabel={describeTarget(target, showProfile)}
           >
             <View style={styles.targetText}>
               <Text style={styles.targetName} numberOfLines={1}>
@@ -361,6 +420,16 @@ const styles = StyleSheet.create({
   astroCell: {
     flex: 1,
     alignItems: 'center',
+  },
+  astroRowWrapped: {
+    flexWrap: 'wrap',
+    rowGap: 14,
+  },
+  astroCellHalf: {
+    // Połowa szerokości zamiast `flex: 1` — inaczej cztery komórki i tak
+    // rozłożyłyby się w jednym rzędzie, tyle że węższym.
+    flexBasis: '50%',
+    flexGrow: 0,
   },
   astroCellBorder: {
     borderRightWidth: 1,

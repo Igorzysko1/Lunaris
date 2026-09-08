@@ -11,7 +11,7 @@ import { formatAge } from '@/lib/forecast-cache';
 import { explainScore, type SiteOutlook } from '@/lib/site-review';
 import { useSiteReview } from '@/hooks/use-site-review';
 import { useSettings } from '@/store/settings';
-import { HAIRLINE, colors, fonts, radius } from '@/theme';
+import { HAIRLINE, colors, fonts, radius, touchSlop } from '@/theme';
 
 /**
  * Przegląd miejscówek: gdzie tej nocy warto pojechać.
@@ -38,11 +38,23 @@ export default function ReviewScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} accessibilityLabel="Wróć" style={styles.back}>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.back()}
+          accessibilityLabel="Wróć"
+          hitSlop={touchSlop(30)}
+          style={styles.back}
+        >
           <Ionicons name="chevron-back" size={22} color={colors.textPrimary} />
         </Pressable>
         <Text style={styles.title}>Gdzie dziś jechać</Text>
-        <Pressable onPress={refresh} accessibilityLabel="Odśwież przegląd" style={styles.back}>
+        <Pressable
+          accessibilityRole="button"
+          onPress={refresh}
+          accessibilityLabel="Odśwież przegląd"
+          hitSlop={touchSlop(30)}
+          style={styles.back}
+        >
           <Ionicons name="refresh-outline" size={19} color={colors.purple} />
         </Pressable>
       </View>
@@ -69,7 +81,7 @@ export default function ReviewScreen() {
               Nie mam prognozy dla żadnej miejscówki i nie ma zapisu, z którego dałoby się ją
               odtworzyć.
             </Text>
-            <Pressable onPress={refresh}>
+            <Pressable accessibilityRole="button" onPress={refresh}>
               <Text style={styles.retry}>Spróbuj ponownie</Text>
             </Pressable>
           </Card>
@@ -103,7 +115,11 @@ export default function ReviewScreen() {
             {/* Złożone, a nie ukryte: jedyny przypadek, w którym ranking
                 decyduje za użytkownika, więc musi dać się rozwinąć. */}
             {review.dominated.length > 0 && (
-              <Pressable onPress={() => setShowDominated((v) => !v)} style={styles.foldRow}>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setShowDominated((v) => !v)}
+                style={styles.foldRow}
+              >
                 <Ionicons
                   name={showDominated ? 'chevron-down' : 'chevron-forward'}
                   size={15}
@@ -167,7 +183,7 @@ function OutlookRow({
   const window = outlook.verdict.window;
 
   return (
-    <Pressable onPress={onChoose}>
+    <Pressable accessibilityRole="button" onPress={onChoose}>
       <Card variant="raised" style={[styles.card, selected && styles.cardSelected]}>
         <View style={styles.cardTop}>
           <Text style={styles.name} numberOfLines={1}>

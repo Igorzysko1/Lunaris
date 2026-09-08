@@ -22,7 +22,7 @@ import { exportJournalToFile, loadJournal, saveNightLog } from '@/lib/journal-st
 import { lastObservedNight } from '@/lib/night-window';
 import { nightTargetsForProfiles } from '@/lib/sky-targets';
 import { useSettings } from '@/store/settings';
-import { HAIRLINE, colors, fonts, radius } from '@/theme';
+import { HAIRLINE, colors, fonts, radius, touchSlop } from '@/theme';
 
 /**
  * Zapis nocy: co naprawdę było widać.
@@ -149,7 +149,13 @@ export default function JournalScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} accessibilityLabel="Wróć" style={styles.back}>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.back()}
+          accessibilityLabel="Wróć"
+          hitSlop={touchSlop(34)}
+          style={styles.back}
+        >
           <Ionicons name="chevron-back" size={22} color={colors.textPrimary} />
         </Pressable>
         <Text style={styles.title}>Dziennik</Text>
@@ -230,7 +236,7 @@ export default function JournalScreen() {
           />
         </Card>
 
-        <Pressable onPress={save} style={[styles.action, styles.gap]}>
+        <Pressable accessibilityRole="button" onPress={save} style={[styles.action, styles.gap]}>
           <Ionicons name="save-outline" size={17} color={colors.bg} />
           <Text style={styles.actionText}>Zapisz noc</Text>
         </Pressable>
@@ -244,7 +250,7 @@ export default function JournalScreen() {
               ? 'Jeszcze żadnej zapisanej nocy.'
               : `${nights} ${nights === 1 ? 'zapisana noc' : 'zapisanych nocy'}.`}
           </Text>
-          <Pressable onPress={exportAll} style={styles.exportRow}>
+          <Pressable accessibilityRole="button" onPress={exportAll} style={styles.exportRow}>
             <Ionicons name="download-outline" size={16} color={colors.purple} />
             <Text style={styles.exportText}>Eksportuj do pliku</Text>
           </Pressable>
@@ -269,8 +275,11 @@ function OutcomeButton({
 }) {
   return (
     <Pressable
+      accessibilityRole="button"
       onPress={onPress}
       accessibilityLabel={label}
+      accessibilityState={{ selected: active }}
+      hitSlop={touchSlop(36)}
       style={[styles.outcome, active && { borderColor: tone, backgroundColor: `${tone}22` }]}
     >
       <Ionicons name={icon} size={16} color={active ? tone : colors.textMuted} />
@@ -294,9 +303,15 @@ function Scale({
       <View style={styles.scaleDots}>
         {[1, 2, 3, 4, 5].map((n) => (
           <Pressable
+            accessibilityRole="button"
             key={n}
             onPress={() => onChange(value === n ? null : n)}
             accessibilityLabel={`${label} ${n}`}
+            accessibilityState={{ selected: n === value }}
+            // Zapas w poziomie tylko do połowy odstępu (6 pt), bo kropki stoją
+            // w rzędzie — szerszy nachodziłby na sąsiednią i tapnięcie w szew
+            // przestawałoby być jednoznaczne.
+            hitSlop={{ top: 7, bottom: 7, left: 3, right: 3 }}
             style={[styles.scaleDot, value !== null && n <= value && styles.scaleDotOn]}
           >
             <Text
@@ -353,8 +368,11 @@ const styles = StyleSheet.create({
   scaleLabel: { fontFamily: fonts.sans, fontSize: 13, color: colors.textSecondary },
   scaleDots: { flexDirection: 'row', gap: 6 },
   scaleDot: {
-    width: 30,
-    height: 30,
+    // Minimum, a nie sztywny rozmiar: w środku stoi cyfra, więc przy podkręconej
+    // czcionce systemowej kwadrat ma urosnąć razem z nią, a nie ją przyciąć.
+    minWidth: 30,
+    minHeight: 30,
+    paddingHorizontal: 6,
     borderRadius: radius.md,
     borderWidth: HAIRLINE,
     borderColor: colors.border,

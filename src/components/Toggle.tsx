@@ -6,7 +6,22 @@ import { colors } from '@/theme';
 const KNOB_OFF = 3;
 const KNOB_ON = 21;
 
-export function Toggle({ value, onPress }: { value: boolean; onPress: () => void }) {
+/**
+ * `label` jest wymagana, bo bez niej czytnik ekranu ogłasza „przełącznik,
+ * włączony" i nic więcej. Widzący czyta podpis stojący obok w wierszu; czytnik
+ * traktuje przełącznik jako osobny element i tamtego podpisu do niego nie
+ * dołączy. Wymuszenie typem, a nie zaleceniem w komentarzu — kolejny wywołujący
+ * nie ma jak o niej zapomnieć.
+ */
+export function Toggle({
+  value,
+  onPress,
+  label,
+}: {
+  value: boolean;
+  onPress: () => void;
+  label: string;
+}) {
   const [knobLeft] = useState(() => new Animated.Value(value ? KNOB_ON : KNOB_OFF));
 
   useEffect(() => {
@@ -21,7 +36,12 @@ export function Toggle({ value, onPress }: { value: boolean; onPress: () => void
     <Pressable
       onPress={onPress}
       accessibilityRole="switch"
+      accessibilityLabel={label}
       accessibilityState={{ checked: value }}
+      // Sam tor ma 44×26 pt, czyli mniej niż wymagane 44 w pionie. Zapas
+      // dobieramy powiększeniem obszaru dotyku, a nie samego elementu: przycisk
+      // ma zostać tej wielkości, co reszta wiersza.
+      hitSlop={{ top: 9, bottom: 9, left: 0, right: 0 }}
       style={[
         styles.track,
         {

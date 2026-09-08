@@ -10,7 +10,7 @@ import { siteAsPlace, type ObservingSite } from '@/data/observing-sites';
 import { CITIES, GMINY, type Place } from '@/data/places';
 import { bortleMeta, distanceKm, formatDistance } from '@/lib/astro';
 import { useSettings, type ActiveLocation } from '@/store/settings';
-import { HAIRLINE, colors, fonts } from '@/theme';
+import { HAIRLINE, colors, fonts, touchSlop } from '@/theme';
 
 type PickerTab = 'sites' | 'cities' | 'gminy';
 
@@ -84,7 +84,12 @@ export default function LocationScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} accessibilityLabel="Wróć">
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.back()}
+          accessibilityLabel="Wróć"
+          hitSlop={touchSlop(22)}
+        >
           <Ionicons name="arrow-back" size={22} color={colors.textPrimary} />
         </Pressable>
         <Text style={styles.title}>{pickingHome ? 'Punkt startowy' : 'Wybierz lokalizację'}</Text>
@@ -126,7 +131,7 @@ export default function LocationScreen() {
             />
 
             {!pickingHome && (
-              <Pressable onPress={chooseGps} style={styles.gpsRow}>
+              <Pressable accessibilityRole="button" onPress={chooseGps} style={styles.gpsRow}>
                 <View style={styles.gpsLeft}>
                   <Ionicons name="navigate" size={18} color={colors.purple} />
                   <View>
@@ -195,7 +200,7 @@ function PlaceRow({
   const bortle = bortleMeta(place.bortle);
 
   return (
-    <Pressable onPress={onPress} style={styles.placeRow}>
+    <Pressable accessibilityRole="button" onPress={onPress} style={styles.placeRow}>
       <View style={styles.placeLeft}>
         <View style={styles.placeNameRow}>
           <Text style={[styles.placeName, selected && { color: colors.purple }]} numberOfLines={1}>

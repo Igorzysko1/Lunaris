@@ -27,7 +27,7 @@ import { useSessions } from '@/hooks/use-sessions';
 import { useNightData } from '@/hooks/use-night-data';
 import { useForecast } from '@/store/forecast';
 import { useSettings } from '@/store/settings';
-import { HAIRLINE, colors, fonts, radius } from '@/theme';
+import { HAIRLINE, colors, fonts, radius, touchSlop } from '@/theme';
 
 export default function NightScreen() {
   const router = useRouter();
@@ -102,7 +102,7 @@ export default function NightScreen() {
               {/* Prawdziwy powód, a nie jego streszczenie: bez niego nie da się
                   odróżnić awarii sieci od błędu w samej aplikacji. */}
               {cycle.lastError && <Text style={styles.errorDetail}>{cycle.lastError}</Text>}
-              <Pressable onPress={refresh}>
+              <Pressable accessibilityRole="button" onPress={refresh}>
                 <Text style={styles.retry}>Spróbuj ponownie</Text>
               </Pressable>
             </View>
@@ -113,7 +113,11 @@ export default function NightScreen() {
             ostrzeżeniem. Ostrzegamy dopiero wtedy, gdy odświeżenie zawiodło albo
             gdy dane przetrwały termin, w którym miały się zmienić. */}
         {status === 'ready' && savedAt && (failure || stale) && (
-          <Pressable onPress={refresh} style={[styles.staleBar, styles.gap]}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={refresh}
+            style={[styles.staleBar, styles.gap]}
+          >
             <Ionicons
               name={failure === 'offline' ? 'cloud-offline-outline' : 'warning-outline'}
               size={15}
@@ -179,6 +183,7 @@ export default function NightScreen() {
             {nextEvent && (
               <>
                 <Pressable
+                  accessibilityRole="button"
                   onPress={() => router.push('/review')}
                   style={[styles.reviewLink, styles.gap]}
                 >
@@ -193,6 +198,7 @@ export default function NightScreen() {
                 </Pressable>
 
                 <Pressable
+                  accessibilityRole="button"
                   onPress={() => router.push('/journal')}
                   style={[styles.reviewLink, styles.gap]}
                 >
@@ -259,7 +265,13 @@ function RefreshButton({ spinning, onPress }: { spinning: boolean; onPress: () =
   const rotate = spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
 
   return (
-    <Pressable onPress={onPress} style={styles.refreshButton} accessibilityLabel="Odśwież prognozę">
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={styles.refreshButton}
+      accessibilityLabel="Odśwież prognozę"
+      hitSlop={touchSlop(38)}
+    >
       <Animated.View style={{ transform: [{ rotate }] }}>
         <Ionicons name="refresh-outline" size={19} color={colors.purple} />
       </Animated.View>
@@ -325,7 +337,11 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   chartError: {
-    height: 120,
+    // Minimum, nie sztywna wysokość. Mieszczą się tu trzy różne komunikaty
+    // o błędzie plus przycisk ponowienia — a to jedyny stan ekranu, w którym
+    // przycięty tekst zostawia użytkownika bez wyjścia.
+    minHeight: 120,
+    paddingVertical: 16,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,

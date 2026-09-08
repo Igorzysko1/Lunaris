@@ -53,6 +53,11 @@ export function Pill({ label, active, onPress, fill }: PillProps) {
   return (
     <Pressable
       onPress={onPress}
+      accessibilityRole="button"
+      // Stan zaznaczenia niesie tu wyłącznie kolor obrysu i tła, więc bez tego
+      // czytnik ekranu odczytałby pięć jednakowych przycisków i ani słowa o tym,
+      // który jest wybrany.
+      accessibilityState={{ selected: active }}
       style={[
         styles.pill,
         fill ? styles.pillFill : styles.pillAuto,
