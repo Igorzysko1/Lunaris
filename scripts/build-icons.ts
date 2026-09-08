@@ -19,7 +19,8 @@
  * wystarczą, a jest o jeden zgadywany parametr mniej.
  *
  * Cztery pliki, bo każdy ma inne wymagania:
- *  - `icon.png`          — pełne tło, bez przezroczystości (wymóg iOS).
+ *  - `icon.png`          — pełne tło i **bez kanału alfa**: przezroczystość
+ *                          w ikonie iOS jest powodem odrzucenia w App Store.
  *  - `adaptive-icon.png` — sam kształt na przezroczystym tle; Android przycina
  *                          go maską, więc treść musi zmieścić się w bezpiecznym
  *                          okręgu (66% krawędzi), a tło daje `app.json`.
@@ -187,26 +188,43 @@ function chunk(type: string, data: Buffer): Buffer {
 }
 
 /**
- * Zapisuje RGBA jako PNG.
+ * Zapisuje piksele jako PNG.
+ *
+ * `alpha` decyduje o typie koloru i to nie jest optymalizacja rozmiaru:
+ * **ikona iOS nie może mieć kanału alfa** — przezroczystość jest tam powodem
+ * odrzucenia przy wysyłce do App Store. Pliki nieprzezroczyste zapisujemy więc
+ * jako RGB (typ 2), a nie jako RGBA z alfą ustawioną wszędzie na 255.
  *
  * Bez filtrowania wierszy (bajt 0 przed każdym): filtry istnieją po to, żeby
- * poprawić kompresję, a przy czterech okręgach i gradiencie zysk byłby żaden.
+ * poprawić kompresję, a przy kilku okręgach i gradiencie zysk byłby żaden.
  */
-function encodePng(pixels: Buffer, size: number): Buffer {
+function encodePng(pixels: Buffer, size: number, alpha: boolean): Buffer {
+  const channels = alpha ? 4 : 3;
+
   const header = Buffer.alloc(13);
   header.writeUInt32BE(size, 0);
   header.writeUInt32BE(size, 4);
   header[8] = 8; // bitów na kanał
-  header[9] = 6; // RGBA
+  header[9] = alpha ? 6 : 2; // RGBA albo RGB
   header[10] = 0; // deflate
   header[11] = 0; // filtr adaptacyjny
   header[12] = 0; // bez przeplotu
 
-  const stride = size * 4;
+  const stride = size * channels;
   const raw = Buffer.alloc((stride + 1) * size);
+
   for (let y = 0; y < size; y++) {
-    raw[y * (stride + 1)] = 0;
-    pixels.copy(raw, y * (stride + 1) + 1, y * stride, (y + 1) * stride);
+    const row = y * (stride + 1);
+    raw[row] = 0;
+
+    for (let x = 0; x < size; x++) {
+      const from = (y * size + x) * 4;
+      const to = row + 1 + x * channels;
+      raw[to] = pixels[from];
+      raw[to + 1] = pixels[from + 1];
+      raw[to + 2] = pixels[from + 2];
+      if (alpha) raw[to + 3] = pixels[from + 3];
+    }
   }
 
   return Buffer.concat([
@@ -241,7 +259,8 @@ const FILES: (Options & { path: string; note: string })[] = [
 ];
 
 for (const { path, size, scale, opaque, note } of FILES) {
-  const png = encodePng(render({ size, scale, opaque }), size);
+  // Kanał alfa tylko tam, gdzie tło daje system.
+  const png = encodePng(render({ size, scale, opaque }), size, !opaque);
   writeFileSync(path, png);
   process.stdout.write(
     `${path.padEnd(28)} ${size}×${size}  ${(png.length / 1024).toFixed(1)} kB  ${note}\n`,
