@@ -76,6 +76,26 @@ npm run build:horizon -- --lat 50.35 --lon 19.53   # maska terenu dla miejscówk
 npm run build:icons     # ikony aplikacji, ekran startowy, sylwetka powiadomień
 ```
 
+## Build na telefon
+
+Aplikacja korzysta z modułów natywnych (`expo-notifications`, `expo-location`), więc **Expo Go nie
+wystarcza do sprawdzenia wszystkiego** — powiadomienia wymagają własnego buildu. Katalogów
+`android/` i `ios/` nie ma w repozytorium: powstają na żądanie z `app.json` (`npx expo prebuild`),
+a źródłem prawdy jest konfiguracja, nie wygenerowany kod.
+
+```bash
+npm i -g eas-cli && eas login    # jednorazowo
+npm run build:dev                # dev client — do pracy i do testu terenowego
+npm run build:apk                # samodzielny APK do zainstalowania
+```
+
+Profile stoją w [`eas.json`](eas.json): `development` (dev client, APK), `preview` (APK do
+rozdania) i `production` (AAB pod Google Play, z automatycznym numerem wersji). Podpisywaniem
+zajmuje się EAS — klucz generuje się przy pierwszym buildzie i zostaje na koncie.
+
+Identyfikator aplikacji to `com.igormusial.lunaris`. Zmiana jest darmowa **teraz**; po pierwszej
+publikacji w Google Play pakietu nie da się już podmienić.
+
 ## Układ katalogów
 
 ```
