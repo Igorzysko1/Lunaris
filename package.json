@@ -18,7 +18,8 @@
     "report": "node --experimental-strip-types --no-warnings scripts/report.ts",
     "build:places": "node --experimental-strip-types --no-warnings scripts/build-places.ts",
     "build:sky-map": "node --experimental-strip-types --no-warnings scripts/build-sky-map.ts",
-    "build:horizon": "node --experimental-strip-types --no-warnings scripts/build-horizon.ts"
+    "build:horizon": "node --experimental-strip-types --no-warnings scripts/build-horizon.ts",
+    "build:icons": "node --experimental-strip-types --no-warnings scripts/build-icons.ts"
   },
   "dependencies": {
     "@expo-google-fonts/ibm-plex-mono": "^0.4.1",

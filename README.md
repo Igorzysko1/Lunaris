@@ -73,6 +73,7 @@ Uruchamiane rzadko, wynik idzie do repozytorium.
 npm run build:places    # miasta i gminy + Bortle z World Atlas
 npm run build:sky-map   # siatka jasności nieba dla obszaru dojazdowego
 npm run build:horizon -- --lat 50.35 --lon 19.53   # maska terenu dla miejscówki
+npm run build:icons     # ikony aplikacji i grafika ekranu startowego
 ```
 
 ## Układ katalogów
