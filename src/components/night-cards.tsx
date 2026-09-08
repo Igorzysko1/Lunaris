@@ -149,6 +149,39 @@ export function SeeingCard({ seeing }: { seeing: Seeing }) {
 /** Ile celów pokazujemy na karcie. Reszta zostaje policzona, ale niewypisana. */
 const SHOWN_TARGETS = 10;
 
+/**
+ * Kiedy tej nocy patrzeć — po odcinku ponad horyzontem miejsca.
+ *
+ * Rozróżniamy przejście przez horyzont od krawędzi nocy, bo to dwie różne
+ * informacje. „Od 21:15" znaczy „wcześniej go tam nie ma", a „całą noc" znaczy
+ * „kolejność zwiedzania jest dowolna" — na tym polega planowanie wyjazdu.
+ * Godziny są bez nazw kierunków, bo te stoją już przy odrzuconych celach.
+ */
+/**
+ * Godzina pod wysokością maksymalną — i to musi być godzina **tej samej**
+ * wysokości, którą widać obok.
+ *
+ * Górowanie bezwzględne bywa w biały dzień: we wrześniu Orion góruje po
+ * siódmej rano, długo po świcie. Podpisanie nim 22° osiągniętych o 04:12 dawało
+ * parę liczb, z których żadna nie opisywała drugiej. Gdy szczyt wypada poza
+ * odcinkiem widoczności, pokazujemy moment, w którym obiekt realnie stoi
+ * najwyżej — bo o niego chodzi przy planowaniu kolejności celów.
+ */
+function describePeak(target: SkyTarget): string {
+  const { up, transitAt, bestAt } = target;
+  const transitInSight = up && transitAt >= up.from && transitAt <= up.to;
+
+  return transitInSight ? `góruje ${formatTime(transitAt)}` : `najwyżej ${formatTime(bestAt)}`;
+}
+
+function describeUpSpan(up: SkyTarget['up']): string {
+  if (!up) return '';
+  if (up.rises && up.sets) return `nad horyzontem ${formatTime(up.from)}–${formatTime(up.to)}`;
+  if (up.rises) return `nad horyzontem od ${formatTime(up.from)}`;
+  if (up.sets) return `nad horyzontem do ${formatTime(up.to)}`;
+  return 'nad horyzontem całą noc';
+}
+
 export function NightTargetsCard({ targets }: { targets: SkyTarget[] }) {
   const visible = targets.filter((t) => t.visible);
   const inReach = rankedTargets(targets, SHOWN_TARGETS);
@@ -185,10 +218,11 @@ export function NightTargetsCard({ targets }: { targets: SkyTarget[] }) {
               <Text style={styles.targetDetail}>
                 {showProfile ? `${target.profileLabel} · ${target.detail}` : target.detail}
               </Text>
+              <Text style={styles.targetSpan}>{describeUpSpan(target.up)}</Text>
             </View>
             <View style={styles.alignRight}>
               <Text style={styles.targetAltitude}>{Math.round(target.maxAltitude)}°</Text>
-              <Text style={styles.targetTime}>góruje {formatTime(target.transitAt)}</Text>
+              <Text style={styles.targetTime}>{describePeak(target)}</Text>
             </View>
           </View>
         ))
@@ -441,6 +475,14 @@ const styles = StyleSheet.create({
     lineHeight: 17,
     color: colors.textMuted,
     marginTop: 4,
+  },
+  targetSpan: {
+    // Mono jak przy każdej godzinie w aplikacji — cyfry mają stać w kolumnie,
+    // żeby dało się przebiec listę wzrokiem zamiast czytać wiersz po wierszu.
+    fontFamily: fonts.mono,
+    fontSize: 11,
+    color: colors.textMuted,
+    marginTop: 3,
   },
   targetsMore: {
     fontFamily: fonts.sans,

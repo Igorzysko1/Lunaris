@@ -1,6 +1,7 @@
 /**
  * Co da się obejrzeć danej nocy: planety i obiekty głębokiego nieba, każde
- * z godziną górowania, najwyższym położeniem w oknie nocy oraz wschodem i zachodem.
+ * z godziną górowania, najwyższym położeniem w oknie nocy oraz odcinkiem nocy,
+ * w którym obiekt stoi ponad horyzontem tego miejsca.
  *
  * Planety i DSO idą jedną ścieżką: obiekty katalogowe rejestrujemy w Astronomy
  * Engine przez `DefineStar` i dalej pytamy o nie tak samo jak o planety. Dzięki temu
@@ -68,6 +69,28 @@ const PLANETS: { body: Body; name: string }[] = [
  */
 const STAR_SLOT: Body = Body.Star1;
 
+/**
+ * Odcinek nocy, w którym obiekt stoi ponad horyzontem **tego miejsca** — czyli
+ * ponad maską terenu, a nie ponad matematycznym horyzontem.
+ *
+ * To rozróżnienie jest całym sensem tego pola. Wschód geometryczny Oriona
+ * o 21:14 jest prawdziwy i bezużyteczny, jeśli w tym azymucie stoi ściana lasu
+ * do 18° — realnie obiekt wychodzi zza niej godzinę później. Maska zna wysokość
+ * przeszkody dla każdego azymutu, więc odcinek liczymy względem niej.
+ *
+ * `rises` i `sets` odróżniają faktyczne przejście przez horyzont od obcięcia
+ * krawędzią nocy: bez nich „od 18:00" znaczyłoby raz „wtedy wzeszedł", a raz
+ * „wtedy zrobiło się ciemno", a to dwie różne informacje dla planującego.
+ */
+export type UpSpan = {
+  from: Date;
+  to: Date;
+  /** `from` to przejście ponad horyzont, a nie początek okna nocy. */
+  rises: boolean;
+  /** `to` to zejście za horyzont, a nie koniec okna nocy. */
+  sets: boolean;
+};
+
 export type SkyTarget = {
   id: string;
   name: string;
@@ -82,6 +105,11 @@ export type SkyTarget = {
   maxAltitude: number;
   /** Azymut w tym właśnie momencie — po nim sprawdzamy przeszkodę terenową. */
   bestAzimuth: number;
+  /**
+   * Od kiedy do kiedy tej nocy obiekt jest ponad horyzontem miejsca.
+   * `null`, gdy nie wychodzi ponad niego ani na chwilę.
+   */
+  up: UpSpan | null;
   /** Jasność obiektu w magnitudo — dla planet liczona na moment okna. */
   magnitude: number;
   /**
@@ -139,6 +167,7 @@ export type TargetGeometry = {
   bestAt: Date;
   maxAltitude: number;
   bestAzimuth: number;
+  up: UpSpan | null;
 };
 
 type TargetBase = {
@@ -166,34 +195,123 @@ function positionOf(
 }
 
 /**
- * Najwyższe położenie obiektu w oknie nocy, moment i kierunek.
- *
- * Azymut bierzemy z tej samej próbki co maksimum: przeszkodę sprawdzamy w tym
- * kierunku, w którym obiekt stoi najwyżej, bo to jego najlepsza szansa.
+ * Do jakiej dokładności zawężamy moment przejścia przez horyzont. Minuta, bo
+ * dalej rachunek przestaje odpowiadać rzeczywistości: maska terenu ma jedną
+ * wartość na stopień azymutu, a las nie rośnie z dokładnością do sekundy.
  */
-function bestInWindow(
+const CROSSING_PRECISION_MS = 60_000;
+
+/** Czy obiekt stoi w tym momencie ponad horyzontem miejsca. */
+function clearsHorizon(body: Body, at: Date, observer: Observer, horizon: SiteHorizon): boolean {
+  const { altitude, azimuth } = positionOf(body, at, observer);
+  return altitude >= horizon(azimuth).altitude;
+}
+
+/**
+ * Moment przejścia przez horyzont między dwiema próbkami, zawężony bisekcją.
+ *
+ * Same próbki są co kwadrans, a to za mało na godzinę wschodu: obiekt nisko nad
+ * horyzontem wznosi się o kilka stopni na kwadrans, więc błąd wypadałby większy
+ * niż różnica między czystym polem a linią lasu.
+ *
+ * Zwracany moment leży zawsze po stronie `above`, czyli **wewnątrz** odcinka
+ * widoczności. Wolimy powiedzieć „od 21:15" o obiekcie widocznym od 21:14 niż
+ * odwrotnie — obietnica ma być spełniona, a nie napięta.
+ */
+function crossingBetween(
+  body: Body,
+  below: Date,
+  above: Date,
+  observer: Observer,
+  horizon: SiteHorizon,
+): Date {
+  let lo = below.getTime();
+  let hi = above.getTime();
+
+  while (Math.abs(hi - lo) > CROSSING_PRECISION_MS) {
+    const mid = (lo + hi) / 2;
+    if (clearsHorizon(body, new Date(mid), observer, horizon)) hi = mid;
+    else lo = mid;
+  }
+
+  return new Date(hi);
+}
+
+/**
+ * Przebieg obiektu przez noc: najwyższe położenie oraz odcinek ponad horyzontem.
+ *
+ * Jedno przejście po próbkach na oba pytania, bo efemerydy są tu najdroższe —
+ * osobna pętla na wschód podwoiłaby koszt listy celów bez żadnego zysku.
+ *
+ * Azymut maksimum bierzemy z tej samej próbki co wysokość: przeszkodę
+ * sprawdzamy w tym kierunku, w którym obiekt stoi najwyżej, bo to jego
+ * najlepsza szansa.
+ *
+ * Odcinek liczymy jako pierwszą i ostatnią próbkę ponad horyzontem, a nie jako
+ * ciąg odcinków. Obiekt schowany w środku nocy za pojedynczym wcięciem maski
+ * wypadnie więc widoczny przez cały czas — świadome uproszczenie: takie wcięcie
+ * trwa kwadranse, a lista celów przed wyjazdem ma odpowiadać na pytanie „kiedy
+ * w ogóle patrzeć", nie prowadzić za rękę co pół godziny.
+ */
+function scanNight(
   body: Body,
   window: NightWindow,
   observer: Observer,
-): { at: Date; altitude: number; azimuth: number } {
-  let best = { at: window.from, altitude: -90, azimuth: 0 };
+  horizon: SiteHorizon,
+): { best: { at: Date; altitude: number; azimuth: number }; up: UpSpan | null } {
+  const samples = sampleNight(window).map((at) => {
+    const { altitude, azimuth } = positionOf(body, at, observer);
+    return { at, altitude, azimuth, up: altitude >= horizon(azimuth).altitude };
+  });
 
-  for (const sample of sampleNight(window)) {
-    const { altitude, azimuth } = positionOf(body, sample, observer);
-    if (altitude > best.altitude) best = { at: sample, altitude, azimuth };
+  let best = { at: window.from, altitude: -90, azimuth: 0 };
+  for (const sample of samples) {
+    if (sample.altitude > best.altitude) {
+      best = { at: sample.at, altitude: sample.altitude, azimuth: sample.azimuth };
+    }
   }
 
-  return best;
+  const first = samples.findIndex((sample) => sample.up);
+  if (first === -1) return { best, up: null };
+
+  let last = samples.length - 1;
+  while (!samples[last].up) last--;
+
+  // Krawędź okna to nie wschód: obiekt widoczny od pierwszej próbki był już nad
+  // horyzontem, zanim zrobiło się ciemno.
+  const rises = first > 0;
+  const sets = last < samples.length - 1;
+
+  return {
+    best,
+    up: {
+      from: rises
+        ? crossingBetween(body, samples[first - 1].at, samples[first].at, observer, horizon)
+        : window.from,
+      to: sets
+        ? crossingBetween(body, samples[last + 1].at, samples[last].at, observer, horizon)
+        : window.to,
+      rises,
+      sets,
+    },
+  };
 }
 
-/** Położenie obiektu tej nocy — część rachunku niezależna od sprzętu. */
+/**
+ * Położenie obiektu tej nocy — część rachunku niezależna od sprzętu.
+ *
+ * Maska horyzontu wchodzi tutaj, a nie do warstwy sprzętowej, bo należy do
+ * miejsca: ten sam las zasłania obiekt lornetce i teleskopowi tak samo. Dzięki
+ * temu przy dwóch zestawach odcinek widoczności liczy się raz.
+ */
 function geometryOf(
   body: Body,
   base: TargetBase,
   window: NightWindow,
   observer: Observer,
+  horizon: SiteHorizon,
 ): TargetGeometry {
-  const best = bestInWindow(body, window, observer);
+  const { best, up } = scanNight(body, window, observer, horizon);
   const transit = SearchHourAngle(body, observer, 0, window.from);
 
   return {
@@ -203,10 +321,16 @@ function geometryOf(
     bestAt: best.at,
     maxAltitude: best.altitude,
     bestAzimuth: best.azimuth,
+    up,
   };
 }
 
-function dsoGeometry(dso: DeepSkyObject, window: NightWindow, observer: Observer): TargetGeometry {
+function dsoGeometry(
+  dso: DeepSkyObject,
+  window: NightWindow,
+  observer: Observer,
+  horizon: SiteHorizon,
+): TargetGeometry {
   DefineStar(STAR_SLOT, dso.raHours, dso.dec, dso.distanceLy);
 
   return geometryOf(
@@ -222,6 +346,7 @@ function dsoGeometry(dso: DeepSkyObject, window: NightWindow, observer: Observer
     },
     window,
     observer,
+    horizon,
   );
 }
 
@@ -231,7 +356,11 @@ function dsoGeometry(dso: DeepSkyObject, window: NightWindow, observer: Observer
  * To najdroższa część rachunku — efemerydy — i jedyna, która nie zależy od
  * zestawu, więc przy wielu zestawach liczy się raz i jest współdzielona.
  */
-function nightGeometry(window: NightWindow, coords: Coords): TargetGeometry[] {
+function nightGeometry(
+  window: NightWindow,
+  coords: Coords,
+  horizon: SiteHorizon,
+): TargetGeometry[] {
   const observer = observerOf(coords);
 
   const planets = PLANETS.map(({ body, name }) => {
@@ -249,10 +378,11 @@ function nightGeometry(window: NightWindow, coords: Coords): TargetGeometry[] {
       },
       window,
       observer,
+      horizon,
     );
   });
 
-  const deepSky = DEEP_SKY_OBJECTS.map((dso) => dsoGeometry(dso, window, observer));
+  const deepSky = DEEP_SKY_OBJECTS.map((dso) => dsoGeometry(dso, window, observer, horizon));
 
   return [...planets, ...deepSky];
 }
@@ -287,7 +417,11 @@ function applyReach(
   const outOfReach = (() => {
     // Jeden warunek zamiast dwóch: maska rządzi tam, gdzie jest, a próg zapasowy
     // tam, gdzie jej nie ma. Różni je tylko to, jak nazywamy powód.
-    if (geometry.maxAltitude < skyline.altitude) {
+    //
+    // Pytamy o odcinek widoczności, a nie o samą wysokość maksimum, bo maska ma
+    // inną wartość dla każdego azymutu: obiekt mógł minąć próg gdzie indziej niż
+    // w punkcie górowania. Brak odcinka znaczy „ani przez chwilę tej nocy".
+    if (!geometry.up) {
       return skyline.fromTerrain ? ('behind-horizon' as const) : ('too-low' as const);
     }
 
@@ -323,6 +457,7 @@ function applyReach(
     bestAt: geometry.bestAt,
     maxAltitude: geometry.maxAltitude,
     bestAzimuth: geometry.bestAzimuth,
+    up: geometry.up,
     visible: outOfReach === null,
     outOfReach,
     horizonAltitude: outOfReach === 'behind-horizon' ? skyline.altitude : null,
@@ -364,7 +499,7 @@ export function nightTargetsForProfiles(
   bortle: number,
   horizon: SiteHorizon = FLAT_HORIZON,
 ): SkyTarget[] {
-  const geometry = nightGeometry(window, coords);
+  const geometry = nightGeometry(window, coords, horizon);
 
   return profiles
     .flatMap((profile) => {

@@ -11,9 +11,12 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
+import { Body, DefineStar, Equator, Horizon, Observer } from 'astronomy-engine';
+
 import { DEEP_SKY_OBJECTS } from '../src/data/deep-sky.ts';
+import { DEFAULT_HORIZON, horizonOf } from '../src/lib/horizon.ts';
 import { DEFAULT_OPTICS, surfaceBrightness, type Optics } from '../src/lib/optics.ts';
-import { nightTargetsForProfiles, rankedTargets } from '../src/lib/sky-targets.ts';
+import { nightTargetsForProfiles, rankedTargets, type SkyTarget } from '../src/lib/sky-targets.ts';
 
 const BLEDOWSKA = { lat: 50.35, lon: 19.53 };
 /** Styczniowa noc: długa, więc przez okno przewija się pół katalogu. */
@@ -22,6 +25,27 @@ const NIGHT = { from: new Date(2026, 0, 16, 18, 0), to: new Date(2026, 0, 17, 6,
 /** Jeden zestaw sprzętu — tą samą ścieżką, którą liczy aplikacja. */
 const targetsFor = (optics: Optics = DEFAULT_OPTICS, bortle = 4) =>
   nightTargetsForProfiles(NIGHT, BLEDOWSKA, [{ id: 'test', label: '', optics }], bortle);
+
+/**
+ * Wysokość celu liczona niezależnie od modułu, który testujemy — inaczej test
+ * potwierdzałby sam siebie. To druga droga do tej samej liczby: prosto
+ * z Astronomy Engine, bez próbkowania i bez bisekcji.
+ */
+function altitudeAt(target: SkyTarget, at: Date): number {
+  const observer = new Observer(BLEDOWSKA.lat, BLEDOWSKA.lon, 0);
+
+  const body = target.id.startsWith('planet-')
+    ? (target.id.slice('planet-'.length) as Body)
+    : (() => {
+        const dso = DEEP_SKY_OBJECTS.find((o) => o.id === target.id);
+        assert.ok(dso, target.id);
+        DefineStar(Body.Star1, dso.raHours, dso.dec, dso.distanceLy);
+        return Body.Star1;
+      })();
+
+  const equator = Equator(body, at, observer, true, true);
+  return Horizon(at, observer, equator.ra, equator.dec, 'normal').altitude;
+}
 
 describe('katalog obiektów', () => {
   it('identyfikatory są unikalne — dziennik będzie się do nich odwoływał latami', () => {
@@ -153,5 +177,81 @@ describe('rankedTargets', () => {
       ranked.some((t) => t.maxAltitude < 40),
       'brak celu nisko wśród najjaśniejszych',
     );
+  });
+});
+
+describe('odcinek widoczności', () => {
+  it('każdy cel w zasięgu ma odcinek, a odrzucony przez horyzont go nie ma', () => {
+    // To ta sama informacja z dwóch stron: „nie wychodzi ponad horyzont miejsca"
+    // i „odpadł przez horyzont" muszą znaczyć dokładnie to samo, bo werdykt
+    // liczy się właśnie z odcinka.
+    for (const target of targetsFor()) {
+      if (target.outOfReach === 'too-low' || target.outOfReach === 'behind-horizon') {
+        assert.equal(target.up, null, target.id);
+      } else {
+        assert.ok(target.up, target.id);
+      }
+    }
+  });
+
+  it('odcinek mieści się w oknie nocy', () => {
+    for (const { id, up } of targetsFor()) {
+      if (!up) continue;
+      assert.ok(up.from >= NIGHT.from && up.to <= NIGHT.to, id);
+      assert.ok(up.from < up.to, id);
+    }
+  });
+
+  it('obiekt okołobiegunowy stoi nad horyzontem całą noc', () => {
+    // h+χ Persei ma deklinację ~+57°, więc z Polski nie schodzi poniżej 15°
+    // nawet w dolnym górowaniu. Odcinek jest wtedy całą nocą, a nie wschodem.
+    const perseus = targetsFor().find((t) => t.id === 'hchi');
+    assert.ok(perseus?.up, 'brak h+χ Persei wśród celów');
+
+    assert.equal(perseus.up.rises, false);
+    assert.equal(perseus.up.sets, false);
+    assert.deepEqual([perseus.up.from, perseus.up.to], [NIGHT.from, NIGHT.to]);
+  });
+
+  it('wschód w środku nocy wypada tam, gdzie obiekt faktycznie przekracza próg', () => {
+    // Sprawdzamy sam moment, a nie tylko flagę: kwadrans przed nim obiekt ma
+    // być pod progiem, a kwadrans po nim nad. Bisekcja psuje się po cichu —
+    // flaga `rises` zostaje prawdziwa, a godzina przestaje cokolwiek znaczyć.
+    const rising = targetsFor().filter((t) => t.up?.rises);
+    assert.ok(rising.length > 0, 'noc testowa nie ma żadnego wschodu');
+
+    const QUARTER_MS = 15 * 60_000;
+    for (const target of rising) {
+      const at = target.up!.from.getTime();
+      assert.ok(
+        altitudeAt(target, new Date(at + QUARTER_MS)) > DEFAULT_HORIZON,
+        `${target.id}: kwadrans po wschodzie wciąż pod progiem`,
+      );
+      assert.ok(
+        altitudeAt(target, new Date(at - QUARTER_MS)) < DEFAULT_HORIZON,
+        `${target.id}: kwadrans przed wschodem już nad progiem`,
+      );
+    }
+  });
+
+  it('maska terenu przesuwa wschód, a nie tylko odrzuca cele', () => {
+    // Cały sens liczenia odcinka względem maski: las na wschodzie nie sprawia,
+    // że obiekt jest niewidoczny — sprawia, że wychodzi zza niego później.
+    const forest = horizonOf(null, [{ from: 45, to: 135, altitude: 25 }]);
+    const flat = targetsFor();
+    const masked = nightTargetsForProfiles(
+      NIGHT,
+      BLEDOWSKA,
+      [{ id: 'test', label: '', optics: DEFAULT_OPTICS }],
+      4,
+      forest,
+    );
+
+    const delayed = flat.filter((t) => {
+      const other = masked.find((m) => m.id === t.id);
+      return t.up?.rises && other?.up?.rises && other.up.from > t.up.from;
+    });
+
+    assert.ok(delayed.length > 0, 'żaden wschód nie przesunął się przez las na wschodzie');
   });
 });
