@@ -57,6 +57,13 @@ export type ObservingSite = {
 /**
  * Punkt wyjścia, z rozpoznania w promieniu ~1,5 h od Jaworzna. Wartości domyślne,
  * nie założenia kodu — użytkownik może je nadpisać, a listę rozszerzyć.
+ *
+ * **Tatrzański Park Narodowy jest tu nieobecny celowo.** Poruszanie się po parku
+ * poza godzinami udostępnienia jest zabronione, a obserwacja to z definicji noc
+ * — więc żadna maska horyzontu ani poprawka Bortle'a nie zrobi z tego miejsca
+ * możliwego do użycia. Notatka stoi tutaj, bo Siwa Polana była najciemniejszym
+ * punktem katalogu (~21,4 mag/arcsec²) i bez tego zdania wróci na listę przy
+ * pierwszym szukaniu ciemnego nieba. Zasięg w górach domyka Hala Lipowska.
  */
 export const DEFAULT_SITES: ObservingSite[] = [
   {
@@ -107,20 +114,6 @@ export const DEFAULT_SITES: ObservingSite[] = [
     bortle: 4,
     walkMinutes: 5,
     notes: '',
-    accuracyM: null,
-    horizonMask: null,
-    horizonOverrides: [],
-  },
-  {
-    id: 'site-siwa-polana',
-    name: 'Siwa Polana / Kiry (TPN)',
-    region: 'małopolskie',
-    lat: 49.2717,
-    lon: 19.7906,
-    bortle: 4,
-    walkMinutes: 10,
-    notes:
-      'Najciemniejszy punkt katalogu (mapa: ~21,4 mag/arcsec², tuż pod progiem Bortle 3), ale i najdalszy — ~110 km. Parking TPN przy wejściu do Doliny Chochołowskiej, stanowisko na skraju polany, kilka minut od auta. W parku obowiązuje ruch po szlakach i zakaz biwakowania: rozstawiać się przy drodze/polanie, nie schodzić w teren. Horyzont zamknięty od południa grzbietami — cele nisko nad południem odpadają, zysk jest w zenicie.',
     accuracyM: null,
     horizonMask: null,
     horizonOverrides: [],

@@ -14,12 +14,19 @@
  *   npm run brief -- --site=bledowska
  *   npm run brief -- --lat 50.35 --lon 19.53 --nights 3 --pretty
  *   npm run brief -- --site=bledowska --config ~/lunaris.json --notices ~/.lunaris-notices.json
+ *   npm run brief -- --site=bledowska --narrative ~/Dysk/Obserwacje/propozycje/2026-01-16.json
  */
 
 import { readFileSync, writeFileSync } from 'node:fs';
 
 import { findPlaceById, nearestPlace, type Coords } from '../src/data/places.ts';
 import { buildBrief } from '../src/lib/brief.ts';
+import {
+  attachNarrative,
+  narrativeMatches,
+  parseNarrative,
+  type Narrative,
+} from '../src/lib/narrative.ts';
 import { DEFAULT_CONFIG, mergeConfig, type LunarisConfig } from '../src/lib/config.ts';
 import type { NoticeLog } from '../src/lib/event-review.ts';
 import { upcomingEvents } from '../src/lib/events.ts';
@@ -86,6 +93,35 @@ function loadNotices(path: string | undefined): NoticeLog {
     // że przegląd zgłosi coś drugi raz — pomyłka w dobrą stronę.
     return {};
   }
+}
+
+/**
+ * Komentarz agenta, jeśli jest.
+ *
+ * Nie przerywa niczego: brak pliku, zepsuty JSON i dokument niezgodny ze
+ * schematem kończą się tak samo — brief wychodzi bez narracji. To ta sama
+ * reguła, którą kieruje się aplikacja: brak warstwy narracyjnej degraduje wynik
+ * do surowych okien, nie do błędu. Zastrzeżenia idą na stderr, żeby dało się
+ * poznać, że agent psuje kontrakt, a cron mimo to dostał użyteczny brief na
+ * stdout.
+ */
+function loadNarrative(path: string | undefined): Narrative | null {
+  if (!path) return null;
+
+  let raw: unknown;
+  try {
+    raw = JSON.parse(readFileSync(path, 'utf8'));
+  } catch (error) {
+    process.stderr.write(`Pomijam narrację z ${path}: ${(error as Error).message}\n`);
+    return null;
+  }
+
+  const { narrative, problems } = parseNarrative(raw);
+  for (const problem of problems) {
+    process.stderr.write(`Narracja ${path}: ${problem.path || '<korzeń>'} — ${problem.reason}\n`);
+  }
+
+  return narrative;
 }
 
 const args = parseArgs(process.argv.slice(2));
@@ -180,4 +216,16 @@ if (noticesPath) {
   writeFileSync(noticesPath, JSON.stringify(noticeLog, null, 2));
 }
 
-process.stdout.write(JSON.stringify(brief, null, args.has('pretty') ? 2 : undefined) + '\n');
+const narrative = loadNarrative(args.get('narrative'));
+
+// Literówka w identyfikatorze miejsca kasowałaby całą narrację bez słowa —
+// a to jedyny przypadek, w którym dokument jest poprawny i mimo to nieużyty.
+if (narrative && !narrativeMatches(brief, narrative)) {
+  process.stderr.write(
+    `Narracja dotyczy miejsca „${narrative.site}", a brief liczy „${brief.site.id}" — pomijam.\n`,
+  );
+}
+
+const output = attachNarrative(brief, narrative);
+
+process.stdout.write(JSON.stringify(output, null, args.has('pretty') ? 2 : undefined) + '\n');
