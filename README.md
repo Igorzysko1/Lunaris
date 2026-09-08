@@ -31,7 +31,7 @@ dane, które mogą je nastroić, to odpowiedź na pytanie „widziałeś?" — s
 
 ## Uruchomienie
 
-Wymagany Node **≥ 22.6** (skrypty i testy chodzą na `--experimental-strip-types`).
+Wymagany Node **≥ 22.13** (Expo SDK 57) — skrypty i testy chodzą na `--experimental-strip-types`.
 
 ```bash
 npm install
@@ -156,8 +156,10 @@ autora, gdy API go zwraca.
 
 Projekt prywatny, jeden użytkownik, bez wydania. Rzeczy świadomie niezrobione:
 
-- **Powiadomienia** są zaplanowane i uzgadniane z systemem, ale w Expo Go nie odpalą się
-  w pełni — potrzebny jest dev build. Decyzja, co i kiedy ma zabrzmieć, siedzi w
+- **Powiadomienia wymagają własnego buildu.** Na Androidzie w Expo Go `expo-notifications` nie
+  istnieje — od SDK 53 rzuca już przy ładowaniu modułu, więc aplikacja wykrywa to środowisko
+  i **nie sięga po niego wcale** (dynamiczny import za bramką `NOTIFICATIONS_AVAILABLE`), a ekran
+  Ustawień mówi o tym wprost. Decyzja, co i kiedy ma zabrzmieć, siedzi w
   [`notification-plan.ts`](src/lib/notification-plan.ts) i jest pokryta testami; niesprawdzone
   zostaje samo wywołanie systemowe.
 - **Zadanie w tle** nie jest jeszcze podpięte: plan powstaje przy odświeżeniu cyklu, czyli po

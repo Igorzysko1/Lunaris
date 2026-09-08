@@ -7,12 +7,6 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
-    "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#0A0A14"
-    },
     "ios": {
       "bundleIdentifier": "com.igormusial.lunaris",
       "supportsTablet": true
@@ -23,13 +17,21 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0A0A14"
       },
-      "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#0A0A14",
+          "imageWidth": 220
+        }
+      ],
       "expo-router",
       "expo-font",
       [
@@ -44,7 +46,8 @@
           "icon": "./assets/notification-icon.png",
           "color": "#7F77DD"
         }
-      ]
+      ],
+      "expo-status-bar"
     ]
   }
 }

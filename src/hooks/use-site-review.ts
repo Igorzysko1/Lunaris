@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as SunCalc from 'suncalc';
 
 import { findPlaceById, type Coords } from '@/data/places';
@@ -13,7 +13,7 @@ import {
 } from '@/lib/daily-cycle';
 import { loadCycleState, loadForecast, saveCycleState, saveForecast } from '@/lib/forecast-cache';
 import { assumedNextDay } from '@/lib/session-engine';
-import { reviewNights, type NightReview } from '@/lib/site-review';
+import { reviewNights } from '@/lib/site-review';
 import { skyQualityAt } from '@/lib/sky-map';
 import { ForecastError, fetchUpcomingNightsForPoints, type NightSlice } from '@/lib/weather';
 
@@ -37,9 +37,19 @@ export type ReviewStatus = 'loading' | 'ready' | 'error';
  * pobranie nie kasuje tego, co już mamy, a przegląd potrafi pokazać część
  * miejsc z prognozą i resztę jako brakujące, zamiast nie pokazać niczego.
  */
+/** Stała pustka — nowa `Map` przy każdym renderze psułaby zależności `useMemo`. */
+const EMPTY_FORECASTS: Map<string, NightSlice[]> = new Map();
+
 export function useSiteReview(config: LunarisConfig) {
-  const [status, setStatus] = useState<ReviewStatus>('loading');
-  const [reviews, setReviews] = useState<NightReview[]>([]);
+  /**
+   * Wynik ostatniego pobrania razem z kluczem żądania, którego dotyczy.
+   *
+   * Status **wyliczamy** z porównania kluczy, zamiast ustawiać `'loading'` na
+   * początku efektu. Ustawienie go wprost wymusza dodatkowy render przy każdej
+   * zmianie wejścia, a to samo da się odczytać z danych: skoro wczytany klucz
+   * różni się od bieżącego, to znaczy, że pobranie trwa.
+   */
+  const [outcome, setOutcome] = useState<{ key: string; status: 'ready' | 'error' } | null>(null);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [attempt, setAttempt] = useState(0);
 
@@ -56,10 +66,26 @@ export function useSiteReview(config: LunarisConfig) {
   // renderze store'u, a pobierać trzeba na nowo tylko po zmianie zestawu miejsc.
   const siteKey = sites.map((s) => `${s.id}:${s.lat},${s.lon}`).join('|');
 
+  /** Tożsamość pobrania: zmiana któregokolwiek składnika znaczy nowe żądanie. */
+  const requestKey = `${siteKey}|${hour}|${attempt}`;
+
+  // Pusty katalog nie ma czego pobierać ani na co czekać.
+  const empty = sites.length === 0;
+  const status: ReviewStatus = empty
+    ? 'ready'
+    : outcome?.key === requestKey
+      ? outcome.status
+      : 'loading';
+
   const homePlace = config.observer.homePlaceId ? findPlaceById(config.observer.homePlaceId) : null;
   const home: Coords | null = homePlace ? { lat: homePlace.lat, lon: homePlace.lon } : null;
 
-  const [forecasts, setForecasts] = useState<Map<string, NightSlice[]>>(new Map());
+  const [loaded, setLoaded] = useState<Map<string, NightSlice[]>>(new Map());
+  const setForecasts = setLoaded;
+
+  // Po skasowaniu wszystkich miejsc prognozy nie mają do czego należeć —
+  // wyliczamy pustkę, zamiast czyścić stan w efekcie.
+  const forecasts = empty ? EMPTY_FORECASTS : loaded;
 
   useEffect(() => {
     const controller = new AbortController();
@@ -67,14 +93,10 @@ export function useSiteReview(config: LunarisConfig) {
     const force = forced.current;
     forced.current = false;
 
-    setStatus('loading');
-
-    if (sites.length === 0) {
-      setForecasts(new Map());
-      setSavedAt(null);
-      setStatus('ready');
-      return;
-    }
+    // Pusty katalog obsługuje wyliczenie `empty` powyżej — tutaj nie ma nic
+    // do ustawienia, a ustawianie czegokolwiek synchronicznie kosztowałoby
+    // dodatkowy render.
+    if (sites.length === 0) return;
 
     const points = sites.map((s) => ({ lat: s.lat, lon: s.lon }));
 
@@ -112,7 +134,7 @@ export function useSiteReview(config: LunarisConfig) {
       if (cached.size > 0) {
         setForecasts(cached);
         setSavedAt(oldest);
-        setStatus('ready');
+        setOutcome({ key: requestKey, status: 'ready' });
       }
 
       const stored = (await loadCycleState(SOURCE)) ?? EMPTY_CYCLE_STATE;
@@ -126,7 +148,7 @@ export function useSiteReview(config: LunarisConfig) {
       // znaczy, że porównanie i tak byłoby ułomne.
       const plan = planAppFetch(decision, complete, force);
       if (plan === 'give-up') {
-        if (cached.size === 0) setStatus('error');
+        if (cached.size === 0) setOutcome({ key: requestKey, status: 'error' });
         return;
       }
       if (plan === 'skip') return;
@@ -150,7 +172,7 @@ export function useSiteReview(config: LunarisConfig) {
 
         setForecasts(fresh);
         setSavedAt(null);
-        setStatus('ready');
+        setOutcome({ key: requestKey, status: 'ready' });
         void saveCycleState(SOURCE, markSuccess(attempted, new Date()));
       } catch (error) {
         if (!active || (error instanceof Error && error.name === 'AbortError')) return;
@@ -160,7 +182,7 @@ export function useSiteReview(config: LunarisConfig) {
         void saveCycleState(SOURCE, markFailure(attempted, reason, rateLimited));
 
         // Nieudane pobranie nie kasuje tego, co już mamy z dysku.
-        if (cached.size === 0) setStatus('error');
+        if (cached.size === 0) setOutcome({ key: requestKey, status: 'error' });
       }
     };
 
@@ -175,10 +197,15 @@ export function useSiteReview(config: LunarisConfig) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [siteKey, hour, attempt]);
 
-  useEffect(() => {
-    if (status === 'loading') return;
-
-    setReviews(
+  /**
+   * Werdykty są **czystą funkcją** wczytanych prognoz i konfiguracji, więc
+   * liczymy je przy renderze zamiast trzymać w stanie i ustawiać w efekcie.
+   * Tamten układ dawał dodatkowy render i okno, w którym widać było ranking
+   * policzony ze starych progów. Zmiana progu przestawia go teraz natychmiast —
+   * bez pobierania czegokolwiek.
+   */
+  const reviews = useMemo(
+    () =>
       reviewNights({
         sites,
         forecasts,
@@ -193,11 +220,9 @@ export function useSiteReview(config: LunarisConfig) {
         // do katalogu; szacunek zostaje dla punktów spoza wgranej mapy.
         bortleFor: (site) => skyQualityAt(site.lat, site.lon, site.bortle).bortle,
       }),
-    );
-    // Werdykty liczą się z danych z pamięci, więc zmiana progu przestawia ranking
-    // natychmiast — bez pobierania czegokolwiek.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [forecasts, config, home?.lat, home?.lon, status]);
+    [forecasts, config, home?.lat, home?.lon],
+  );
 
   return { status, reviews, savedAt, refresh, refreshing: status === 'loading' };
 }

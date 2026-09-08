@@ -4,19 +4,54 @@
  * Sama nie podejmuje **żadnej** decyzji: co i kiedy ma zabrzmieć, rozstrzyga
  * `notification-plan.ts`, który jest czysty i pokryty testami. Tutaj zostaje
  * tylko to, czego nie da się uruchomić bez telefonu — uprawnienia, kanał
- * Androida i właściwe wywołania systemowe. Ten podział jest celowy: gdyby
- * reguły siedziały tutaj, jedynym sposobem ich sprawdzenia byłoby czekanie do
- * nocy z telefonem w ręku.
+ * Androida i właściwe wywołania systemowe.
  *
- * Nic tu nie rzuca. Powiadomienia są udogodnieniem — odmowa uprawnień,
- * niedostępny moduł czy pełna kolejka systemowa nie mogą przewrócić ekranu,
- * który bez nich działa tak samo.
+ * ## Dlaczego moduł ładuje się leniwie
+ *
+ * Od SDK 53 `expo-notifications` **wywala się na Androidzie w Expo Go** — i to
+ * już przy rejestracji modułu, a nie przy pierwszym wywołaniu. Zwykły
+ * `import ... from 'expo-notifications'` na górze pliku wystarczał więc, żeby
+ * cała aplikacja padała przy starcie z „uncaught error", zanim jakikolwiek
+ * `try` zdążył cokolwiek złapać. Bramka środowiska sprawdzana **przed**
+ * dynamicznym importem jest jedynym miejscem, w którym da się to zatrzymać.
+ *
+ * Nic tu nie rzuca. Powiadomienia są udogodnieniem — brak modułu, odmowa
+ * uprawnień czy pełna kolejka systemowa nie mogą przewrócić ekranu, który bez
+ * nich działa tak samo.
  */
 
-import * as Notifications from 'expo-notifications';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { Platform } from 'react-native';
 
 import { reconcile, type PlannedNotification } from './notification-plan';
+
+/**
+ * Czy w tym środowisku wolno w ogóle sięgnąć po moduł powiadomień.
+ *
+ * `storeClient` to Expo Go. Na Androidzie moduł jest tam martwy — nie
+ * „ograniczony", tylko rzucający przy ładowaniu — więc traktujemy go jak
+ * nieistniejący. Na iOS i we własnym buildzie działa normalnie.
+ */
+export const NOTIFICATIONS_AVAILABLE = !(
+  Platform.OS === 'android' && Constants.executionEnvironment === ExecutionEnvironment.StoreClient
+);
+
+/**
+ * Moduł wczytywany na żądanie. `null`, gdy środowisko go nie ma — wtedy cała
+ * warstwa jest cichym brakiem działania, a nie awarią.
+ */
+type NotificationsModule = typeof import('expo-notifications');
+
+let cached: Promise<NotificationsModule | null> | null = null;
+
+function notifications(): Promise<NotificationsModule | null> {
+  if (!NOTIFICATIONS_AVAILABLE) return Promise.resolve(null);
+
+  // Import trzymamy w zmiennej: powtórne wywołanie ma dostać ten sam moduł,
+  // a nie ponawiać ładowanie przy każdym przebiegu cyklu.
+  cached ??= import('expo-notifications').catch(() => null);
+  return cached;
+}
 
 /**
  * Kanał na Androidzie. Od API 26 powiadomienie bez kanału nie pojawia się
@@ -35,12 +70,12 @@ type PlanData = { planId: string };
 
 let channelReady = false;
 
-async function ensureChannel(): Promise<void> {
+async function ensureChannel(api: NotificationsModule): Promise<void> {
   if (Platform.OS !== 'android' || channelReady) return;
 
-  await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
+  await api.setNotificationChannelAsync(CHANNEL_ID, {
     name: 'Noce i zjawiska',
-    importance: Notifications.AndroidImportance.DEFAULT,
+    importance: api.AndroidImportance.DEFAULT,
     // Bez wibracji i bez światła: powiadomienie przychodzi wieczorem, często
     // wtedy, gdy telefon leży obok śpiącego domownika.
     vibrationPattern: [0],
@@ -57,11 +92,14 @@ async function ensureChannel(): Promise<void> {
  */
 export async function requestPermission(): Promise<boolean> {
   try {
-    const current = await Notifications.getPermissionsAsync();
+    const api = await notifications();
+    if (!api) return false;
+
+    const current = await api.getPermissionsAsync();
     if (current.granted) return true;
     if (!current.canAskAgain) return false;
 
-    const asked = await Notifications.requestPermissionsAsync();
+    const asked = await api.requestPermissionsAsync();
     return asked.granted;
   } catch {
     return false;
@@ -69,8 +107,8 @@ export async function requestPermission(): Promise<boolean> {
 }
 
 /** Co system aktualnie trzyma — po naszych identyfikatorach, nie po systemowych. */
-async function scheduledPlanIds(): Promise<Map<string, string>> {
-  const pending = await Notifications.getAllScheduledNotificationsAsync();
+async function scheduledPlanIds(api: NotificationsModule): Promise<Map<string, string>> {
+  const pending = await api.getAllScheduledNotificationsAsync();
   const byPlanId = new Map<string, string>();
 
   for (const item of pending) {
@@ -81,7 +119,15 @@ async function scheduledPlanIds(): Promise<Map<string, string>> {
   return byPlanId;
 }
 
-export type SyncResult = { scheduled: number; cancelled: number; permitted: boolean };
+export type SyncResult = {
+  scheduled: number;
+  cancelled: number;
+  permitted: boolean;
+  /** `false` znaczy „to środowisko nie ma powiadomień", a nie „nie udało się". */
+  available: boolean;
+};
+
+const NOTHING: SyncResult = { scheduled: 0, cancelled: 0, permitted: false, available: false };
 
 /**
  * Doprowadza stan systemu do planu.
@@ -92,44 +138,52 @@ export type SyncResult = { scheduled: number; cancelled: number; permitted: bool
  * a `reconcile` je kasuje.
  */
 export async function syncNotifications(plan: PlannedNotification[]): Promise<SyncResult> {
-  const empty: SyncResult = { scheduled: 0, cancelled: 0, permitted: false };
-
   try {
+    const api = await notifications();
+    if (!api) return NOTHING;
+
     // Pusty plan to też polecenie: skasuj wszystko. Wykonujemy je bez pytania
     // o zgodę — cofnięcie obietnicy nie wymaga uprawnień.
     const permitted = plan.length === 0 || (await requestPermission());
 
-    const present = await scheduledPlanIds();
+    const present = await scheduledPlanIds(api);
     const { schedule, cancel } = reconcile(plan, [...present.keys()]);
 
     for (const planId of cancel) {
       const systemId = present.get(planId);
-      if (systemId) await Notifications.cancelScheduledNotificationAsync(systemId);
+      if (systemId) await api.cancelScheduledNotificationAsync(systemId);
     }
 
-    if (!permitted) return { scheduled: 0, cancelled: cancel.length, permitted: false };
+    if (!permitted) {
+      return { scheduled: 0, cancelled: cancel.length, permitted: false, available: true };
+    }
 
-    await ensureChannel();
+    await ensureChannel(api);
 
     for (const notification of schedule) {
-      await Notifications.scheduleNotificationAsync({
+      await api.scheduleNotificationAsync({
         content: {
           title: notification.title,
           body: notification.body,
           data: { planId: notification.id } satisfies PlanData,
         },
         trigger: {
-          type: Notifications.SchedulableTriggerInputTypes.DATE,
+          type: api.SchedulableTriggerInputTypes.DATE,
           date: notification.at,
           channelId: CHANNEL_ID,
         },
       });
     }
 
-    return { scheduled: schedule.length, cancelled: cancel.length, permitted: true };
+    return {
+      scheduled: schedule.length,
+      cancelled: cancel.length,
+      permitted: true,
+      available: true,
+    };
   } catch {
-    // Moduł bywa niedostępny — w Expo Go część funkcji powiadomień nie działa,
-    // a użytkownik ma wtedy zobaczyć aplikację, a nie awarię.
-    return empty;
+    // Ostatnia siatka: gdyby moduł jednak zawiódł w środowisku, które uznaliśmy
+    // za sprawne, użytkownik ma zobaczyć aplikację, a nie awarię.
+    return NOTHING;
   }
 }

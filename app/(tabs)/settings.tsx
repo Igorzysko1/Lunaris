@@ -17,6 +17,7 @@ import {
 } from '@/lib/optics';
 import { formatShortDate } from '@/lib/date';
 import { formatAge } from '@/lib/forecast-cache';
+import { NOTIFICATIONS_AVAILABLE } from '@/lib/notification-store';
 import { useForecast } from '@/store/forecast';
 import { LEAD_TIMES, useSettings } from '@/store/settings';
 import { colors, fonts } from '@/theme';
@@ -259,6 +260,15 @@ export default function SettingsScreen() {
 
         <SectionLabel style={styles.groupLabel}>Powiadomienia</SectionLabel>
         <Card variant="raised" style={styles.group}>
+          {/* Przełącznik zostaje włączalny: ustawienie jest zapamiętywane i
+              zadziała po zainstalowaniu własnego buildu. Milczenie o tym, że
+              w Expo Go nic nie zabrzmi, byłoby obietnicą bez pokrycia. */}
+          {!NOTIFICATIONS_AVAILABLE && (
+            <Text style={styles.notice}>
+              W Expo Go powiadomienia nie działają — Android stracił je w SDK 53. Ustawienie
+              zapamiętamy, zadziała po zainstalowaniu własnego buildu.
+            </Text>
+          )}
           <View style={styles.row}>
             <Text style={styles.rowLabel}>Powiadomienia o eventach</Text>
             <Toggle
@@ -544,6 +554,13 @@ const styles = StyleSheet.create({
   rowText: {
     flex: 1,
     paddingRight: 12,
+  },
+  notice: {
+    fontFamily: fonts.sans,
+    fontSize: 12,
+    lineHeight: 17,
+    color: colors.amber,
+    marginBottom: 12,
   },
   rowHint: {
     fontFamily: fonts.sans,

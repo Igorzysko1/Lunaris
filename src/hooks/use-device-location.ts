@@ -16,22 +16,19 @@ export type DeviceLocation = {
  * Prawdziwa pozycja urządzenia. Pytamy o nią dopiero, gdy użytkownik włączy GPS —
  * nie zaczepiamy go promptem o uprawnienia przy pierwszym uruchomieniu.
  */
+const IDLE: DeviceLocation = { status: 'idle', coords: null, label: null };
+
 export function useDeviceLocation(enabled: boolean): DeviceLocation & { retry: () => void } {
-  const [state, setState] = useState<DeviceLocation>({
-    status: 'idle',
-    coords: null,
-    label: null,
-  });
+  const [state, setState] = useState<DeviceLocation>(IDLE);
   const [attempt, setAttempt] = useState(0);
 
   const retry = useCallback(() => setAttempt((n) => n + 1), []);
 
   useEffect(() => {
-    if (!enabled) {
-      // Wyłączony GPS ma natychmiast wyczyścić pozycję, a nie zostawić starą.
-      setState({ status: 'idle', coords: null, label: null });
-      return;
-    }
+    // Wyłączony GPS nie ma czego pobierać. Stanu tu **nie zerujemy**: zrobienie
+    // tego wprost w efekcie wymusza dodatkowy render, a wynik jest wyliczalny
+    // z samego `enabled` — patrz wartość zwracana.
+    if (!enabled) return;
 
     let active = true;
 
@@ -69,7 +66,11 @@ export function useDeviceLocation(enabled: boolean): DeviceLocation & { retry: (
     };
   }, [enabled, attempt]);
 
-  return { ...state, retry };
+  // Przy wyłączonym GPS-ie nie ma pozycji i nie ma czego ładować — to wynika
+  // z samego przełącznika, więc liczymy to tutaj zamiast pilnować stanu
+  // w efekcie. Przy okazji znika okno, w którym po wyłączeniu widać jeszcze
+  // starą pozycję, bo efekt nie zdążył jej wyczyścić.
+  return { ...(enabled ? state : IDLE), retry };
 }
 
 /** Pozycja złapana na żądanie, razem z tym, jak bardzo można jej ufać. */
