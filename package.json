@@ -15,6 +15,7 @@
     "test": "TZ=Europe/Warsaw node --experimental-strip-types --no-warnings --test tests/*.test.ts",
     "weather": "node --experimental-strip-types --no-warnings scripts/check-weather.ts",
     "brief": "node --experimental-strip-types --no-warnings scripts/brief.ts",
+    "report": "node --experimental-strip-types --no-warnings scripts/report.ts",
     "build:places": "node --experimental-strip-types --no-warnings scripts/build-places.ts",
     "build:sky-map": "node --experimental-strip-types --no-warnings scripts/build-sky-map.ts",
     "build:horizon": "node --experimental-strip-types --no-warnings scripts/build-horizon.ts"

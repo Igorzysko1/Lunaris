@@ -91,6 +91,26 @@ export type UpSpan = {
   sets: boolean;
 };
 
+/**
+ * Nazwa obiektu po samym identyfikatorze.
+ *
+ * Potrzebna wszędzie tam, gdzie zapis przeżył sesję i został sam klucz: dziennik
+ * pamięta `m57`, a nie „M57 — Mgławica Pierścień". Mieszka tutaj, bo to ten
+ * moduł identyfikatory nadaje — trzymanie odwrotnego przekształcenia gdzie
+ * indziej znaczyłoby, że przy zmianie kształtu klucza psuje się coś w drugim
+ * pliku i nikt tego nie łączy.
+ *
+ * Nieznany identyfikator wraca bez zmian. Katalog rośnie i bywa przycinany,
+ * a zapis sprzed roku ma się nadal czytać — choćby surowo.
+ */
+export function targetLabel(id: string): string {
+  const planet = PLANETS.find((p) => `planet-${p.body}` === id);
+  if (planet) return planet.name;
+
+  const dso = DEEP_SKY_OBJECTS.find((o) => o.id === id);
+  return dso ? `${dso.designation} — ${dso.name}` : id;
+}
+
 export type SkyTarget = {
   id: string;
   name: string;

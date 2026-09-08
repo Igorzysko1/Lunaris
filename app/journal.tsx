@@ -19,6 +19,12 @@ import {
   type TargetObservation,
 } from '@/lib/journal';
 import { exportJournalToFile, loadJournal, saveNightLog } from '@/lib/journal-store';
+import {
+  buildMonthlyReport,
+  monthKeyOf,
+  monthLabel,
+  type MonthlyReport,
+} from '@/lib/monthly-report';
 import { lastObservedNight } from '@/lib/night-window';
 import { nightTargetsForProfiles } from '@/lib/sky-targets';
 import { useSettings } from '@/store/settings';
@@ -46,6 +52,10 @@ export default function JournalScreen() {
   const [seeing, setSeeing] = useState<number | null>(null);
   const [note, setNote] = useState('');
   const [saved, setSaved] = useState<string | null>(null);
+
+  // Podgląd bieżącego miesiąca liczony tym samym rachunkiem co pełny raport
+  // z CLI — inaczej po pierwszej poprawce zestawienia rozjechałyby się.
+  const month = useMemo(() => buildMonthlyReport(journal, monthKeyOf(new Date())), [journal]);
 
   const { lat, lon } = active.coords;
 
@@ -243,6 +253,9 @@ export default function JournalScreen() {
 
         {saved && <Text style={styles.saved}>{saved}</Text>}
 
+        <SectionLabel style={styles.sectionLabel}>Ten miesiąc</SectionLabel>
+        <MonthSummary report={month} />
+
         <SectionLabel style={styles.sectionLabel}>Cały dziennik</SectionLabel>
         <Card style={styles.gap}>
           <Text style={styles.summary}>
@@ -254,9 +267,65 @@ export default function JournalScreen() {
             <Ionicons name="download-outline" size={16} color={colors.purple} />
             <Text style={styles.exportText}>Eksportuj do pliku</Text>
           </Pressable>
+          {/* Pełny raport — z notatkami i listą obiektów — renderuje CLI
+              z wyeksportowanego pliku, nie z pamięci telefonu. Dzięki temu da
+              się go zrobić z kopii sprzed pół roku i wyjdzie identyczny. */}
+          <Text style={styles.exportHint}>
+            Pełny raport miesięczny: npm run report -- --journal &lt;plik&gt;
+          </Text>
         </Card>
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+/**
+ * Podgląd bieżącego miesiąca.
+ *
+ * Świadomie **skrót, nie raport**: liczby, które mówią, czy miesiąc idzie dobrze,
+ * bez notatek i bez list obiektów. Pełny render robi CLI z wyeksportowanego
+ * pliku — telefon w rękawicach nie jest miejscem na czytanie trzech ekranów
+ * tekstu, a plik da się otworzyć rano przy kawie.
+ */
+function MonthSummary({ report }: { report: MonthlyReport }) {
+  const { nightsOut, observations, firstTimes, bestNight } = report;
+
+  if (nightsOut === 0) {
+    return (
+      <Card style={styles.gap}>
+        <Text style={styles.summary}>{monthLabel(report.month)} — ani jednej zapisanej nocy.</Text>
+      </Card>
+    );
+  }
+
+  return (
+    <Card style={styles.gap}>
+      <View style={styles.monthRow}>
+        <MonthStat value={String(nightsOut)} label={nightsOut === 1 ? 'noc' : 'nocy'} />
+        <MonthStat value={String(observations.seen)} label="trafionych" />
+        {/* Pierwsze razy to jedyna miara postępu, jaką te dane niosą: liczba
+            podejść rośnie od samego wyjeżdżania. */}
+        <MonthStat value={String(firstTimes.length)} label="pierwszy raz" />
+      </View>
+
+      {bestNight && (
+        <Text style={styles.monthBest}>
+          Najlepsza noc: {formatShortDate(new Date(`${bestNight.id}T12:00:00`))},{' '}
+          {bestNight.siteName}
+          {' — '}
+          {bestNight.seen} {bestNight.seen === 1 ? 'obiekt' : 'obiektów'}.
+        </Text>
+      )}
+    </Card>
+  );
+}
+
+function MonthStat({ value, label }: { value: string; label: string }) {
+  return (
+    <View accessible accessibilityLabel={`${value} ${label}`} style={styles.monthStat}>
+      <Text style={styles.monthValue}>{value}</Text>
+      <Text style={styles.monthLabel}>{label}</Text>
+    </View>
   );
 }
 
@@ -358,6 +427,42 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  monthRow: {
+    flexDirection: 'row',
+    // Zawijanie, a nie trzy sztywne kolumny: przy podkręconej czcionce
+    // systemowej liczby schodzą do drugiego rzędu zamiast się przycinać.
+    flexWrap: 'wrap',
+    rowGap: 12,
+  },
+  monthStat: {
+    flexGrow: 1,
+    flexBasis: '33%',
+  },
+  monthValue: {
+    fontFamily: fonts.monoMedium,
+    fontSize: 22,
+    color: colors.teal,
+  },
+  monthLabel: {
+    fontFamily: fonts.sans,
+    fontSize: 12,
+    color: colors.textMuted,
+    marginTop: 2,
+  },
+  monthBest: {
+    fontFamily: fonts.sans,
+    fontSize: 12,
+    lineHeight: 17,
+    color: colors.textSecondary,
+    marginTop: 14,
+  },
+  exportHint: {
+    fontFamily: fonts.mono,
+    fontSize: 11,
+    lineHeight: 16,
+    color: colors.textMuted,
+    marginTop: 10,
   },
   scaleRow: {
     flexDirection: 'row',
