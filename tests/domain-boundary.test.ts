@@ -27,6 +27,7 @@ const PLATFORM_MODULES = new Set([
   'settings-storage.ts',
   'notice-store.ts',
   'journal-store.ts',
+  'notification-store.ts',
 ]);
 
 function domainFiles(): { path: string; name: string; source: string }[] {

@@ -98,6 +98,17 @@ export type ConditionThresholds = {
    * użytkownik chce wiedzieć, a decyzję podejmuje sam. Sto wyłącza wyjątek.
    */
   exceptionalRating: number;
+  /**
+   * Ocena nocy, od której warto obudzić telefon.
+   *
+   * Osobna od `exceptionalRating` i wyraźnie niższa, bo odpowiada na inne
+   * pytanie. Tamta znaczy „warto zarwać noc" i z definicji zdarza się rzadko;
+   * ta znaczy „zapowiada się dobrze, przygotuj się". Wspólny próg oznaczałby
+   * powiadomienie kilka razy w roku, czyli funkcję, o której istnieniu
+   * użytkownik zdąży zapomnieć. Sto wycisza zapowiedzi nocy, zostawiając same
+   * zjawiska.
+   */
+  notifyRating: number;
 };
 
 /** Reguły wynikające z kalendarza następnego dnia. */
@@ -177,6 +188,7 @@ export const DEFAULT_CONFIG: LunarisConfig = {
     dewWarningSpreadC: 2,
     travelPenaltyPerHour: 10,
     exceptionalRating: 85,
+    notifyRating: 70,
   },
   calendar: {
     rejectBeforeHour: 8,
@@ -219,6 +231,7 @@ export const CONFIG_LIMITS = {
     dewWarningSpreadC: { min: 0, max: 15 },
     travelPenaltyPerHour: { min: 0, max: 50 },
     exceptionalRating: { min: 0, max: 100 },
+    notifyRating: { min: 0, max: 100 },
   },
   sites: {
     bortle: { min: 1, max: 9 },
@@ -441,6 +454,11 @@ export function clampConfig(config: LunarisConfig): LunarisConfig {
         config.conditions.exceptionalRating,
         l.conditions.exceptionalRating,
         d.conditions.exceptionalRating,
+      ),
+      notifyRating: clampNumber(
+        config.conditions.notifyRating,
+        l.conditions.notifyRating,
+        d.conditions.notifyRating,
       ),
     },
     calendar: {

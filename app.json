@@ -35,6 +35,13 @@
         {
           "locationAlwaysAndWhenInUsePermission": "Lunaris używa Twojej lokalizacji, żeby pokazać prognozę i jakość nieba dla miejsca, w którym jesteś."
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#7F77DD"
+        }
       ]
     ]
   }

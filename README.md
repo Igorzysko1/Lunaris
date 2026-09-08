@@ -73,7 +73,7 @@ Uruchamiane rzadko, wynik idzie do repozytorium.
 npm run build:places    # miasta i gminy + Bortle z World Atlas
 npm run build:sky-map   # siatka jasności nieba dla obszaru dojazdowego
 npm run build:horizon -- --lat 50.35 --lon 19.53   # maska terenu dla miejscówki
-npm run build:icons     # ikony aplikacji i grafika ekranu startowego
+npm run build:icons     # ikony aplikacji, ekran startowy, sylwetka powiadomień
 ```
 
 ## Układ katalogów
@@ -136,7 +136,12 @@ autora, gdy API go zwraca.
 
 Projekt prywatny, jeden użytkownik, bez wydania. Rzeczy świadomie niezrobione:
 
-- **Powiadomienia i zadanie w tle** wymagają dev buildu — w Expo Go nie zadziałają.
+- **Powiadomienia** są zaplanowane i uzgadniane z systemem, ale w Expo Go nie odpalą się
+  w pełni — potrzebny jest dev build. Decyzja, co i kiedy ma zabrzmieć, siedzi w
+  [`notification-plan.ts`](src/lib/notification-plan.ts) i jest pokryta testami; niesprawdzone
+  zostaje samo wywołanie systemowe.
+- **Zadanie w tle** nie jest jeszcze podpięte: plan powstaje przy odświeżeniu cyklu, czyli po
+  otwarciu aplikacji.
 - **Progi nie są skalibrowane.** Domyślne wartości są ostrożne i czekają na dane z dziennika.
 - **Jasność powierzchniowa liczona jest ze średniej po całej powierzchni**, więc nie odróżnia M31
   — rozlanej, ale z jasnym jądrem — od dowolnej galaktyki w Pannie. Naprawa wymaga pola, którego

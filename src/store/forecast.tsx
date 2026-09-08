@@ -24,6 +24,8 @@ import {
 import { reviewEvents } from '@/lib/event-review';
 import { upcomingEvents } from '@/lib/events';
 import { planNights } from '@/lib/night-plan';
+import { planNotifications } from '@/lib/notification-plan';
+import { syncNotifications } from '@/lib/notification-store';
 import {
   loadNoticeLog,
   loadNoticePlan,
@@ -87,6 +89,9 @@ async function runEventReview(input: {
   walkMinutes: number;
   config: LunarisConfig;
   leadTime: LeadTime;
+  /** Przełącznik z ustawień — wyłączony kasuje to, co wisi w systemie. */
+  notifications: boolean;
+  siteName: string;
 }): Promise<StoredNotice[]> {
   const { bundle, coords, bortle, walkMinutes, config, leadTime } = input;
   const now = new Date();
@@ -95,7 +100,7 @@ async function runEventReview(input: {
 
   const events = upcomingEvents(now, coords);
 
-  const verdicts = planNights({
+  const planned = planNights({
     nights: bundle.nights,
     target: coords,
     home: homePlace ? { lat: homePlace.lat, lon: homePlace.lon } : null,
@@ -103,7 +108,9 @@ async function runEventReview(input: {
     bortle,
     walkMinutes,
     events,
-  }).map((planned) => planned.verdict);
+  });
+
+  const verdicts = planned.map((night) => night.verdict);
 
   const { notices, log } = reviewEvents({
     now,
@@ -116,6 +123,36 @@ async function runEventReview(input: {
 
   await saveNoticeLog(log);
   await saveNoticePlan(notices);
+
+  // Powiadomienia planujemy tutaj, a nie w ekranie: cykl jest jedynym miejscem,
+  // w którym wiadomo, że werdykty są świeże. Plan liczy się od zera dla
+  // aktywnego punktu, więc zmiana miejscówki przeplanowuje się sama —
+  // powiadomienia starego miejsca po prostu nie znajdą się w nowym planie.
+  await syncNotifications(
+    planNotifications({
+      now,
+      enabled: input.notifications,
+      leadHours: leadHours(leadTime),
+      notices: notices.map((notice) => ({
+        eventId: notice.event.id,
+        reason: notice.reason,
+        title: notice.title,
+        body: notice.body,
+        notifyAt: notice.notifyAt,
+        eventAt: notice.event.at,
+      })),
+      nights: planned.map(({ verdict, rating }) => ({
+        from: verdict.night.from,
+        to: verdict.night.to,
+        status: verdict.status,
+        rating,
+        windowFrom: verdict.window?.from ?? null,
+        windowTo: verdict.window?.to ?? null,
+      })),
+      minRating: config.conditions.notifyRating,
+      siteName: input.siteName,
+    }),
+  );
 
   return loadNoticePlan();
 }
@@ -162,6 +199,7 @@ export function ForecastProvider({ children }: { children: ReactNode }) {
     config,
     leadTime,
     notifications,
+    siteName: active.label,
   });
 
   useEffect(() => {
@@ -171,8 +209,9 @@ export function ForecastProvider({ children }: { children: ReactNode }) {
       config,
       leadTime,
       notifications,
+      siteName: active.label,
     };
-  }, [active.bortle, active.walkMinutes, config, leadTime, notifications]);
+  }, [active.bortle, active.walkMinutes, active.label, config, leadTime, notifications]);
 
   /** Ręczne odświeżenie pomija terminarz — użytkownik wie więcej niż zegar. */
   const forced = useRef(false);
@@ -258,6 +297,8 @@ export function ForecastProvider({ children }: { children: ReactNode }) {
             walkMinutes: review.walkMinutes,
             config: review.config,
             leadTime: review.leadTime,
+            notifications: review.notifications,
+            siteName: review.siteName,
           });
           if (active) setNotices(planned);
         }

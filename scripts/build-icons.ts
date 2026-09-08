@@ -26,6 +26,8 @@
  *                          okręgu (66% krawędzi), a tło daje `app.json`.
  *  - `splash-icon.png`   — kształt na przezroczystym tle, skalowany `contain`.
  *  - `favicon.png`       — 48 px, czyli test czytelności całego pomysłu.
+ *  - `notification-icon.png` — sylwetka dla paska stanu Androida; liczy się
+ *                          z niej sam kanał alfa.
  */
 
 import { writeFileSync } from 'node:fs';
@@ -256,6 +258,16 @@ const FILES: (Options & { path: string; note: string })[] = [
     note: 'ekran startowy',
   },
   { path: 'assets/favicon.png', size: 48, scale: 0.3, opaque: true, note: 'zakładka przeglądarki' },
+  {
+    path: 'assets/notification-icon.png',
+    // Android bierze z tego pliku wyłącznie kanał alfa i maluje sylwetkę na
+    // biało. Bez własnej ikony użyłby ikony aplikacji, a ta jest pełnokolorowym
+    // kwadratem — na pasku stanu wyszedłby z niej biały prostokąt.
+    size: 96,
+    scale: 0.34,
+    opaque: false,
+    note: 'sylwetka na pasku stanu (Android)',
+  },
 ];
 
 for (const { path, size, scale, opaque, note } of FILES) {

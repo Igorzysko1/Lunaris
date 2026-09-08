@@ -42,6 +42,14 @@ export type PlannedNight = {
   feltTemperature: number | null;
   /** Cele w zasięgu któregokolwiek z zestawów. Puste, gdy nocy nie ma. */
   targets: SkyTarget[];
+  /**
+   * Ocena nocy 0–100 — ta sama, którą widać na ekranie.
+   *
+   * Zwracana, bo poza werdyktem korzysta z niej wyjątek od skracania sesji
+   * i próg powiadomień. Liczona i tak, więc chowanie jej zmuszałoby wywołujących
+   * do policzenia jej po swojemu — a wtedy przestałaby być tą samą liczbą.
+   */
+  rating: number;
   /** Prognoza na tę dobę jest już orientacyjna. */
   uncertain: boolean;
   /**
@@ -149,6 +157,7 @@ export function planNights({
 
     return {
       verdict,
+      rating,
       seeing: seeingOver(inWindow),
       minTemperature: inWindow.length ? Math.min(...inWindow.map((h) => h.temperature)) : null,
       feltTemperature: inWindow.length
