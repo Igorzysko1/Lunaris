@@ -122,8 +122,14 @@ i etykiet dostępności. Psują się cicho, więc są sprawdzane maszynowo.
 | [GUGiK / PZGiK](https://www.geoportal.gov.pl)                         | NMPT i NMT pod maski horyzontu                                 | bezpłatnie, bez klucza |
 | GeoNames, OpenStreetMap                                               | gminy i miasta                                                 | CC BY / ODbL           |
 | [Astronomy Engine](https://github.com/cosinekitty/astronomy), suncalc | efemerydy liczone lokalnie                                     | MIT                    |
+| [NASA APOD](https://apod.nasa.gov)                                    | zdjęcie dnia na ekranie Noc                                    | wg autora zdjęcia      |
 
-Żaden z tych serwisów nie wymaga klucza API. Atrybucja jest też w aplikacji, w Ustawieniach.
+Atrybucja jest też w aplikacji, w Ustawieniach.
+
+Klucza wymaga tylko APOD i domyślnie idzie na `DEMO_KEY`, który działa bez rejestracji — przy
+pobraniu raz na dobę limit wystarcza z zapasem. Własny klucz z [api.nasa.gov](https://api.nasa.gov)
+podaje się w `EXPO_PUBLIC_NASA_KEY`. Zdjęcia bywają cudzą własnością, dlatego karta pokazuje podpis
+autora, gdy API go zwraca.
 
 ## Stan i ograniczenia
 

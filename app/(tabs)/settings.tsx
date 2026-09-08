@@ -33,6 +33,7 @@ const DATA_SOURCES = [
   { name: 'World Atlas 2024', use: 'jasność nieba, skala Bortle’a' },
   { name: 'GUGiK', use: 'model terenu pod maskę horyzontu' },
   { name: 'Astronomy Engine, suncalc', use: 'efemerydy liczone lokalnie' },
+  { name: 'NASA APOD', use: 'zdjęcie dnia · prawa przy autorze zdjęcia' },
 ] as const;
 
 export default function SettingsScreen() {

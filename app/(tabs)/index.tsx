@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
+import { ApodCard } from '@/components/ApodCard';
 import { CloudCoverChart } from '@/components/CloudCoverChart';
 import { EventCard } from '@/components/EventCard';
 import {
@@ -23,6 +24,7 @@ import { formatAge } from '@/lib/forecast-cache';
 import { horizonOf } from '@/lib/horizon';
 import { currentNightWindow } from '@/lib/night-window';
 import { nightTargetsForProfiles } from '@/lib/sky-targets';
+import { useApod } from '@/hooks/use-apod';
 import { useSessions } from '@/hooks/use-sessions';
 import { useNightData } from '@/hooks/use-night-data';
 import { useForecast } from '@/store/forecast';
@@ -38,6 +40,8 @@ export default function NightScreen() {
   );
   const sessions = useSessions(active.coords, active.bortle, config, active.walkMinutes);
   const { cycle } = useForecast();
+  // Ozdoba, nie dana wejściowa: `null` znaczy „nie ma karty", a nie „błąd".
+  const apod = useApod();
 
   const { lat, lon } = active.coords;
   const nextEvent = useMemo(() => upcomingEvents(new Date(), { lat, lon })[0] ?? null, [lat, lon]);
@@ -232,6 +236,15 @@ export default function NightScreen() {
                   event={nextEvent}
                   timeLabel={`${dayBucket(nextEvent.at)} · ${formatTime(nextEvent.at)}`}
                 />
+
+                {/* Na samym dole i bez żadnego stanu ładowania: ekran odpowiada
+                    na pytanie „czy jechać", a to jedyna karta, która na nie nie
+                    odpowiada. Gdy jej nie ma, nic się nie zmienia. */}
+                {apod && (
+                  <View style={styles.apodGap}>
+                    <ApodCard apod={apod} />
+                  </View>
+                )}
               </>
             )}
           </View>
@@ -329,6 +342,9 @@ const styles = StyleSheet.create({
   },
   gap: {
     marginBottom: 16,
+  },
+  apodGap: {
+    marginTop: 20,
   },
   moonGap: {
     marginBottom: 20,

@@ -191,6 +191,35 @@ export async function loadCycleState(source: string): Promise<CycleState | null>
   }
 }
 
+/**
+ * Zdjęcie dnia NASA. Osobny klucz, bo to jedyne dane sieciowe niezwiązane
+ * z miejscem: obowiązuje je ten sam zapis, ale nie ta sama współrzędna.
+ */
+const APOD_KEY = 'lunaris.apod';
+
+/**
+ * Zdjęcie dnia zmienia się raz na dobę, więc zapis starszy niż doba i tak nie
+ * jest już „dniem dzisiejszym". Trzymamy go mimo to trochę dłużej: stare zdjęcie
+ * z podpisaną datą jest lepsze niż pusta dziura po wyjeździe bez zasięgu.
+ */
+const APOD_MAX_AGE_HOURS = 72;
+
+export async function saveApod<T>(payload: T): Promise<void> {
+  try {
+    await AsyncStorage.setItem(APOD_KEY, serialize(payload, new Date()));
+  } catch {
+    // patrz saveForecast
+  }
+}
+
+export async function loadApod<T>(): Promise<CacheHit<T> | null> {
+  try {
+    return parse<T>(await AsyncStorage.getItem(APOD_KEY), new Date(), APOD_MAX_AGE_HOURS);
+  } catch {
+    return null;
+  }
+}
+
 /** np. „sprzed 3 godzin" — do etykiety nad danymi z zapisu. */
 export function formatAge(savedAt: Date, now: Date = new Date()): string {
   const minutes = Math.max(0, Math.round((now.getTime() - savedAt.getTime()) / 60_000));
