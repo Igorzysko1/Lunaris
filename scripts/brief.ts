@@ -15,6 +15,7 @@
  *   npm run brief -- --lat 50.35 --lon 19.53 --nights 3 --pretty
  *   npm run brief -- --site=bledowska --config ~/lunaris.json --notices ~/.lunaris-notices.json
  *   npm run brief -- --site=bledowska --narrative ~/Dysk/Obserwacje/propozycje/2026-01-16.json
+ *   npm run brief -- --site=bledowska --calendar
  */
 
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -28,6 +29,10 @@ import {
   type Narrative,
 } from '../src/lib/narrative.ts';
 import { DEFAULT_CONFIG, mergeConfig, type LunarisConfig } from '../src/lib/config.ts';
+import { nextDayFromCalendar, type CalendarEntry } from '../src/lib/calendar.ts';
+import { fetchDayEntries } from '../src/lib/google-calendar.ts';
+import { accessToken, readClient, readRefreshToken } from '../src/lib/google-oauth.ts';
+import { assumedNextDay } from '../src/lib/session-engine.ts';
 import type { NoticeLog } from '../src/lib/event-review.ts';
 import { upcomingEvents } from '../src/lib/events.ts';
 import { skyQualityAt } from '../src/lib/sky-map.ts';
@@ -190,6 +195,51 @@ try {
 const now = new Date();
 const noticesPath = args.get('notices');
 
+/**
+ * Kalendarz następnego dnia dla każdej z nocy.
+ *
+ * Pobieramy z góry, bo rachunek nocy jest synchroniczny — i tak jest lepiej:
+ * jedno zapytanie na dobę zamiast zapytania w środku pętli werdyktów.
+ *
+ * Doba, której nie udało się pobrać, **nie trafia do mapy**. Rozstrzygnięcie
+ * wraca wtedy do założenia z konfiguracji, bo brak odpowiedzi nie może udawać
+ * wolnego poranka — to jedyny błąd w tej ścieżce, który cicho obiecywałby noce
+ * nie do wzięcia.
+ */
+async function loadCalendar(nights: { night: { to: Date } }[]) {
+  const client = readClient();
+  const refresh = readRefreshToken();
+
+  if (!client || !refresh) {
+    fail('Brak autoryzacji Google. Uruchom najpierw: npm run google:auth');
+  }
+
+  const token = await accessToken(client, refresh);
+  if (!token) fail('Nie udało się odświeżyć tokenu Google. Spróbuj ponownie: npm run google:auth');
+
+  const byDay = new Map<string, CalendarEntry[]>();
+  let missing = 0;
+
+  for (const { night } of nights) {
+    const key = night.to.toDateString();
+    if (byDay.has(key)) continue;
+
+    const entries = await fetchDayEntries(token, night.to);
+    if (entries === null) missing += 1;
+    else byDay.set(key, entries);
+  }
+
+  if (missing > 0) {
+    process.stderr.write(
+      `Nie pobrałem kalendarza dla ${missing} dób — tam obowiązuje założenie.\n`,
+    );
+  }
+
+  return byDay;
+}
+
+const calendar = args.has('calendar') ? await loadCalendar(bundle.nights) : null;
+
 const { brief, noticeLog } = buildBrief({
   now,
   site: {
@@ -206,6 +256,14 @@ const { brief, noticeLog } = buildBrief({
   config,
   leadHours,
   previousNotices: loadNotices(noticesPath),
+  // Bez `--calendar` zostaje `assumedNextDay`; z nim — prawdziwe godziny,
+  // ale tylko dla dób, które udało się pobrać.
+  nextDay: calendar
+    ? (night) => {
+        const entries = calendar.get(night.to.toDateString());
+        return entries ? nextDayFromCalendar(night, entries) : assumedNextDay(night, config);
+      }
+    : undefined,
 });
 
 // Pamięć przeglądu zapisujemy dopiero po zbudowaniu briefu: gdyby rachunek padł

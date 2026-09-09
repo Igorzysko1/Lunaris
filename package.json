@@ -18,6 +18,7 @@
     "weather": "node --experimental-strip-types --no-warnings scripts/check-weather.ts",
     "brief": "node --experimental-strip-types --no-warnings scripts/brief.ts",
     "report": "node --experimental-strip-types --no-warnings scripts/report.ts",
+    "google:auth": "node --experimental-strip-types --no-warnings scripts/google-auth.ts",
     "build:places": "node --experimental-strip-types --no-warnings scripts/build-places.ts",
     "build:sky-map": "node --experimental-strip-types --no-warnings scripts/build-sky-map.ts",
     "build:horizon": "node --experimental-strip-types --no-warnings scripts/build-horizon.ts",

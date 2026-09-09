@@ -21,8 +21,14 @@ import { computeNightRating, feltTemperature } from './astro.ts';
 import type { LunarisConfig } from './config.ts';
 import { windLimitKmh } from './optics.ts';
 import { seeingOver, type Seeing } from './seeing.ts';
-import { assumedNextDay, evaluateNight, type NightVerdict } from './session-engine.ts';
+import {
+  assumedNextDay,
+  evaluateNight,
+  type NextDay,
+  type NightVerdict,
+} from './session-engine.ts';
 import { nightTargetsForProfiles, type SkyTarget } from './sky-targets.ts';
+import type { NightWindow } from './night-window.ts';
 import type { NightSlice } from './weather.ts';
 
 /**
@@ -84,6 +90,15 @@ export type NightPlanInput = {
    * a wtedy silnik skraca dla snu nawet noc zaćmienia.
    */
   events?: AstroEvent[];
+  /**
+   * Kalendarz następnego dnia. Domyślnie **założenie z konfiguracji** — realny
+   * kalendarz wstrzykuje ten, kto potrafi go pobrać, czyli CLI albo aplikacja.
+   *
+   * Wstrzykiwane, a nie pobierane tutaj, z tego samego powodu co pozycja
+   * Księżyca: rachunek nocy ma zostać czysty i policzalny bez sieci. Dzięki temu
+   * niedostępny kalendarz nie psuje werdyktu, tylko cofa go do założenia.
+   */
+  nextDay?: (night: NightWindow) => NextDay;
 };
 
 export function planNights({
@@ -94,6 +109,7 @@ export function planNights({
   bortle,
   walkMinutes,
   events = [],
+  nextDay,
 }: NightPlanInput): PlannedNight[] {
   // Okno oceniamy najłagodniejszym progiem wiatru spośród zestawów — noc dobra
   // dla sprzętu na statywie nie ma przepadać przez to, że w konfiguracji stoi
@@ -144,7 +160,7 @@ export function planNights({
       },
       target,
       home,
-      nextDay: assumedNextDay(night, config),
+      nextDay: nextDay?.(night) ?? assumedNextDay(night, config),
       events: nightEvents,
       rating,
       windLimitKmh: windLimit,

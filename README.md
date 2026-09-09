@@ -54,6 +54,10 @@ to na stdout, a nie po miesiącu nieudanych wyjazdów.
 npm run brief -- --site=bledowska --nights 3 --pretty
 npm run brief -- --lat 50.35 --lon 19.53 --notices ~/.lunaris-notices.json
 
+# Werdykt z prawdziwym kalendarzem zamiast założonej godziny pobudki.
+npm run google:auth                                # raz, otwiera przeglądarkę
+npm run brief -- --site=bledowska --calendar
+
 # Raport miesięczny z wyeksportowanego dziennika.
 npm run report -- --journal ~/Pobrane/lunaris-dziennik-2026-09-08.json --month 2026-04
 
@@ -144,8 +148,14 @@ i etykiet dostępności. Psują się cicho, więc są sprawdzane maszynowo.
 | GeoNames, OpenStreetMap                                               | gminy i miasta                                                 | CC BY / ODbL           |
 | [Astronomy Engine](https://github.com/cosinekitty/astronomy), suncalc | efemerydy liczone lokalnie                                     | MIT                    |
 | [NASA APOD](https://apod.nasa.gov)                                    | zdjęcie dnia na ekranie Noc                                    | wg autora zdjęcia      |
+| Google Calendar                                                       | realna godzina pobudki zamiast założenia                       | dane użytkownika       |
 
 Atrybucja jest też w aplikacji, w Ustawieniach.
+
+Kalendarz wymaga jednorazowej autoryzacji OAuth: klienta typu „aplikacja komputerowa" tworzy się
+w Google Cloud Console, a poświadczenia trafiają do `~/.lunaris/google-client.json` (uprawnienia
+`600`, poza repozytorium). `npm run google:auth` wymienia je na token odświeżania. Bez `--calendar`
+nic z tego nie jest potrzebne — obowiązuje wtedy założenie z konfiguracji.
 
 Klucza wymaga tylko APOD i domyślnie idzie na `DEMO_KEY`, który działa bez rejestracji — przy
 pobraniu raz na dobę limit wystarcza z zapasem. Własny klucz z [api.nasa.gov](https://api.nasa.gov)

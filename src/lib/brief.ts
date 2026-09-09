@@ -18,7 +18,7 @@ import type { Coords } from '../data/places.ts';
 import type { LunarisConfig } from './config.ts';
 import { formatTime } from './date.ts';
 import { reviewEvents, type NoticeLog } from './event-review.ts';
-import { planNights } from './night-plan.ts';
+import { planNights, type NightPlanInput } from './night-plan.ts';
 import { rankedTargets } from './sky-targets.ts';
 import type { Rejection, SessionPlan, Warning } from './session-engine.ts';
 import type { NightSlice } from './weather.ts';
@@ -110,6 +110,8 @@ export type BriefInput = {
   leadHours: number;
   /** Pamięć poprzednich przebiegów; pusta, gdy cron uruchamia się pierwszy raz. */
   previousNotices?: NoticeLog;
+  /** Realny kalendarz następnego dnia; bez niego obowiązuje założenie. */
+  nextDay?: NightPlanInput['nextDay'];
 };
 
 /** Daty w powodzie odrzucenia i w ostrzeżeniach też muszą wyjść jako ISO. */
@@ -189,6 +191,7 @@ export function buildBrief(input: BriefInput): BriefResult {
     // Bez zjawisk żadna noc nie byłaby „niepowtarzalna", a wtedy silnik
     // skróciłby dla snu nawet noc zaćmienia.
     events,
+    nextDay: input.nextDay,
   });
 
   const briefNights: BriefNight[] = planned.map(

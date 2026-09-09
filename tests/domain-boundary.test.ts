@@ -28,6 +28,7 @@ const PLATFORM_MODULES = new Set([
   'notice-store.ts',
   'journal-store.ts',
   'notification-store.ts',
+  'google-oauth.ts',
 ]);
 
 function domainFiles(): { path: string; name: string; source: string }[] {
