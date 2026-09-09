@@ -58,6 +58,11 @@ npm run brief -- --lat 50.35 --lon 19.53 --notices ~/.lunaris-notices.json
 npm run google:auth                                # raz, otwiera przeglądarkę
 npm run brief -- --site=bledowska --calendar
 
+# Rezerwacja sesji w kalendarzu. Bez --confirm tylko pokazuje, co powstanie.
+npm run book -- --site=bledowska
+npm run book -- --site=bledowska --confirm
+npm run book -- --site=bledowska --cancel     # odwołuje i usuwa wpis
+
 # Raport miesięczny z wyeksportowanego dziennika.
 npm run report -- --journal ~/Pobrane/lunaris-dziennik-2026-09-08.json --month 2026-04
 
