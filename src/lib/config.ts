@@ -113,12 +113,16 @@ export type ConditionThresholds = {
 
 /** Reguły wynikające z kalendarza następnego dnia. */
 export type CalendarThresholds = {
-  /** Pierwsze wydarzenie przed tą godziną — sesja odrzucona poza warunkami wybitnymi. */
-  rejectBeforeHour: number;
-  /** Do tej godziny dopuszczona wyłącznie lokalizacja domyślna, z ostrzeżeniem. */
+  /**
+   * Do tej godziny pierwszego wydarzenia dokładamy ostrzeżenie i sugestię
+   * bliskiej lokalizacji.
+   *
+   * **Ostrzeżenie, nie odrzucenie.** Wcześniej stał obok próg `rejectBeforeHour`,
+   * który kasował noc, gdy poranek zaczynał się za wcześnie. Robił to samo co
+   * przycinanie sesji dla snu, tylko skokowo — więc zniknął razem z progiem
+   * `exceptionalMaxCloud`, który był dla niego jedyną furtką.
+   */
   homeOnlyBeforeHour: number;
-  /** Zachmurzenie, przy którym noc jest na tyle wyjątkowa, że łamie regułę godzin. */
-  exceptionalMaxCloud: number;
   /**
    * Zakładana godzina pierwszego obowiązku w dzień roboczy.
    *
@@ -191,9 +195,7 @@ export const DEFAULT_CONFIG: LunarisConfig = {
     notifyRating: 70,
   },
   calendar: {
-    rejectBeforeHour: 8,
     homeOnlyBeforeHour: 10,
-    exceptionalMaxCloud: 10,
     assumedFirstEventHour: 8,
     weekendDaysOff: true,
   },
@@ -244,9 +246,7 @@ export const CONFIG_LIMITS = {
     hourOfDay: { min: 0, max: 23 },
   },
   calendar: {
-    rejectBeforeHour: { min: 0, max: 23 },
     homeOnlyBeforeHour: { min: 0, max: 23 },
-    exceptionalMaxCloud: { min: 0, max: 100 },
     assumedFirstEventHour: { min: 0, max: 23 },
   },
 } as const;
@@ -353,20 +353,10 @@ export function clampConfig(config: LunarisConfig): LunarisConfig {
   };
 
   const calendar = {
-    rejectBeforeHour: clampNumber(
-      config.calendar.rejectBeforeHour,
-      l.calendar.rejectBeforeHour,
-      d.calendar.rejectBeforeHour,
-    ),
     homeOnlyBeforeHour: clampNumber(
       config.calendar.homeOnlyBeforeHour,
       l.calendar.homeOnlyBeforeHour,
       d.calendar.homeOnlyBeforeHour,
-    ),
-    exceptionalMaxCloud: clampNumber(
-      config.calendar.exceptionalMaxCloud,
-      l.calendar.exceptionalMaxCloud,
-      d.calendar.exceptionalMaxCloud,
     ),
     assumedFirstEventHour: clampNumber(
       config.calendar.assumedFirstEventHour,
@@ -461,11 +451,7 @@ export function clampConfig(config: LunarisConfig): LunarisConfig {
         d.conditions.notifyRating,
       ),
     },
-    calendar: {
-      ...calendar,
-      // „Tylko dom" jest łagodniejsze od odrzucenia, więc nie może wypadać wcześniej.
-      homeOnlyBeforeHour: Math.max(calendar.homeOnlyBeforeHour, calendar.rejectBeforeHour),
-    },
+    calendar,
     refresh: {
       // Pełna godzina: cykl porównuje znaczniki z terminem, a termin z ułamkiem
       // godziny nie dałby się zapisać w interfejsie ani sensownie odczytać.

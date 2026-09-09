@@ -117,9 +117,9 @@ export type BriefInput = {
 /** Daty w powodzie odrzucenia i w ostrzeżeniach też muszą wyjść jako ISO. */
 function plainRejection(rejection: Rejection | null): Record<string, unknown> | null {
   if (!rejection) return null;
-  return rejection.kind === 'early-calendar'
-    ? { ...rejection, firstEventAt: iso(rejection.firstEventAt) }
-    : { ...rejection };
+  // Żaden powód odrzucenia nie niesie już daty — wszystkie są liczbami albo
+  // etykietami. Gdyby doszedł taki z `Date`, trzeba go tu zamienić na ISO.
+  return { ...rejection };
 }
 
 /**

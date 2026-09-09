@@ -349,40 +349,49 @@ describe('evaluateNight — zjawiska w sesji', () => {
 });
 
 describe('evaluateNight — kalendarz i sen', () => {
-  it('wydarzenie przed godziną odrzucenia przekreśla wyjazd', () => {
+  it('wczesny poranek skraca sesję, zamiast ją przekreślać', () => {
+    // Sedno zmiany. Wcześniej stał tu próg: pierwsze wydarzenie przed ósmą
+    // znaczyło „nie jedziesz", choćby sesja i sen mieściły się bez problemu.
+    // Widać to było na prawdziwym kalendarzu — spotkanie o 7:40 kasowało
+    // trzygodzinne okno. Teraz decyduje rachunek: okno kończy się tak, żeby
+    // zdążyć się wyspać.
+    // Długa noc, bo tylko na niej reguła snu w ogóle wiąże — patrz `sleepBound`.
+    const early = evaluateNight(
+      sleepBound({ nextDay: { firstEventAt: new Date(2026, 0, 16, 7, 0), dayOff: false } }),
+    );
+    const late = evaluateNight(
+      sleepBound({ nextDay: { firstEventAt: new Date(2026, 0, 16, 12, 0), dayOff: false } }),
+    );
+
+    assert.equal(early.status, 'go');
+    assert.ok(early.window, 'okno powinno zostać, tylko krótsze');
+    assert.ok(
+      early.window.to < late.window!.to,
+      'wcześniejszy poranek nie skrócił sesji względem późniejszego',
+    );
+  });
+
+  it('odrzuca dopiero wtedy, gdy sesja nie mieści się w minimum', () => {
+    // Powód niesie liczbę, a nie próg: „zostałoby 2.1 h snu" mówi więcej niż
+    // „bo kalendarz", i to on rozstrzyga, czy warto odpuścić.
+    const verdict = evaluateNight(
+      sleepBound({ nextDay: { firstEventAt: new Date(2026, 0, 16, 2, 0), dayOff: false } }),
+    );
+
+    assert.equal(verdict.status, 'no-go');
+    assert.equal(verdict.rejection?.kind, 'not-enough-sleep');
+  });
+
+  it('wczesny poranek zostaje wypowiedziany, a nie przemilczany', () => {
+    // Jedyny moment, w którym użytkownik może sam odpuścić — więc godzina
+    // musi być widoczna.
     const verdict = evaluateNight(
       input({ nextDay: { firstEventAt: new Date(2026, 0, 16, 7, 0), dayOff: false } }),
     );
 
-    assert.equal(verdict.status, 'no-go');
-    assert.equal(verdict.rejection?.kind, 'early-calendar');
-    // Okno i plan zostają — użytkownik ma zobaczyć, co traci.
-    assert.ok(verdict.window);
-    assert.ok(verdict.plan);
-  });
-
-  it('noc wybitna łamie regułę wczesnego poranka', () => {
-    const verdict = evaluateNight(
-      input({
-        nextDay: { firstEventAt: new Date(2026, 0, 16, 7, 0), dayOff: false },
-        events: [UNIQUE_EVENT],
-      }),
-    );
-
-    assert.equal(verdict.status, 'go');
-  });
-
-  it('sama czysta pogoda nie czyni nocy wybitną', () => {
-    // Bez niepowtarzalnego zjawiska reguła kalendarzowa zostaje w mocy —
-    // inaczej łamałaby ją każda bezksiężycowa noc.
-    const verdict = evaluateNight(
-      input({
-        nextDay: { firstEventAt: new Date(2026, 0, 16, 7, 0), dayOff: false },
-        events: [],
-      }),
-    );
-
-    assert.equal(verdict.rejection?.kind, 'early-calendar');
+    const warning = verdict.warnings.find((w) => w.kind === 'home-only');
+    assert.ok(warning, 'brak ostrzeżenia o wczesnym poranku');
+    assert.deepEqual(warning.firstEventAt, new Date(2026, 0, 16, 7, 0));
   });
 
   it('dzień wolny znosi regułę godzin', () => {

@@ -64,8 +64,6 @@ export function describeRejection(rejection: Rejection): string {
       return `Najdłuższe pogodne okno to ${formatDuration(rejection.longestMinutes)} — za krótko.`;
     case 'not-enough-sleep':
       return `Zostałoby ${rejection.sleepHours.toFixed(1)} h snu przed pobudką.`;
-    case 'early-calendar':
-      return `Pierwsze jutrzejsze wydarzenie o ${formatTime(rejection.firstEventAt)}.`;
   }
 }
 

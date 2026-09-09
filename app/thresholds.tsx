@@ -149,28 +149,13 @@ export default function ThresholdsScreen() {
         <SectionLabel style={styles.groupLabel}>Kalendarz następnego dnia</SectionLabel>
         <Card variant="raised" style={styles.group}>
           <NumberRow
-            label="Odrzuć przed godziną"
-            unit=":00"
-            value={calendar.rejectBeforeHour}
-            limits={limits.calendar.rejectBeforeHour}
-            onCommit={(rejectBeforeHour) => updateConfig('calendar', { rejectBeforeHour })}
-          />
-          <Divider />
-          <NumberRow
             label="Tylko dom przed"
             unit=":00"
             value={calendar.homeOnlyBeforeHour}
             limits={limits.calendar.homeOnlyBeforeHour}
             onCommit={(homeOnlyBeforeHour) => updateConfig('calendar', { homeOnlyBeforeHour })}
           />
-          <Divider />
-          <NumberRow
-            label="Warunki wybitne: chmury"
-            unit="%"
-            value={calendar.exceptionalMaxCloud}
-            limits={limits.calendar.exceptionalMaxCloud}
-            onCommit={(exceptionalMaxCloud) => updateConfig('calendar', { exceptionalMaxCloud })}
-          />
+
           <Divider />
           <NumberRow
             label="Zakładana pierwsza godzina"

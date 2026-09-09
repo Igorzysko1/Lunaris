@@ -29,8 +29,7 @@ export type Rejection =
   | { kind: 'no-forecast' }
   | { kind: 'conditions'; blocker: Blocker }
   | { kind: 'window-too-short'; longestMinutes: number }
-  | { kind: 'not-enough-sleep'; sleepHours: number }
-  | { kind: 'early-calendar'; firstEventAt: Date };
+  | { kind: 'not-enough-sleep'; sleepHours: number };
 
 export type Warning =
   | { kind: 'dew'; minSpreadC: number }
@@ -275,23 +274,6 @@ function planFor(window: ObservingWindow, input: NightInput): SessionPlan {
 }
 
 /**
- * Noc na tyle wyjątkowa, że łamie regułę wczesnego poranka: czysto, bez Księżyca
- * i ze zjawiskiem, które w tym miesiącu się nie powtórzy. Wszystkie trzy naraz —
- * sama czysta pogoda zdarza się zbyt często, żeby uzasadniać nieprzespaną noc.
- */
-function isExceptional(hours: NightHour[], input: NightInput, window: ObservingWindow): boolean {
-  if (!input.events.some((e) => e.unique)) return false;
-
-  const inWindow = hours.filter((h) => h.at >= window.from && h.at <= window.to);
-  const clearEnough =
-    inWindow.length > 0 &&
-    inWindow.every((h) => h.cloud <= input.config.calendar.exceptionalMaxCloud);
-  const moonAway = inWindow.every((h) => !input.moon.upAt(h.at));
-
-  return clearEnough && moonAway;
-}
-
-/**
  * O ile wolno przeciągnąć sesję, żeby złapać zjawisko tuż za jej końcem.
  * Godzina to granica, poza którą „jeszcze chwilę" przestaje być chwilą.
  */
@@ -306,11 +288,11 @@ const EVENT_MENTION_MS = 90 * MINUTE_MS;
 /**
  * Czy noc jest warta nieprzespanej nocy.
  *
- * To osobne pojęcie niż `isExceptional`, i celowo łagodniejsze. Tamto rozstrzyga,
- * czy złamać regułę wczesnego poranka — decyzję ciężką, bo dotyczy obowiązków
- * następnego dnia. To rozstrzyga tylko, czy skracać sesję: noc wybitna albo
+ * Rozstrzyga wyłącznie o skracaniu sesji, a nie o wyjeździe: noc wybitna albo
  * zjawisko, które się nie powtórzy, mają być pokazane w całości, a użytkownik
- * sam zdecyduje, ile z niej weźmie.
+ * sam zdecyduje, ile z niej weźmie. Od kiedy kalendarz przestał odrzucać noce,
+ * jest to jedyne miejsce, w którym „wyjątkowość" cokolwiek zmienia — wcześniej
+ * była też furtką dla progu wczesnego poranka.
  */
 function worthLosingSleep(input: NightInput): 'rating' | 'phenomenon' | null {
   if (input.events.some((e) => e.unique)) return 'phenomenon';
@@ -571,18 +553,25 @@ export function evaluateNight(input: NightInput): NightVerdict {
   const plan = planFor(observing, input);
   const withPlan = { night, window: observing, plan, warnings };
 
-  // Kalendarz następnego dnia: godzina pierwszego wydarzenia rządzi wyjazdem.
+  /*
+   * Kalendarz następnego dnia **nie odrzuca już nocy**.
+   *
+   * Stała tu wcześniej reguła „pierwsze wydarzenie przed ósmą znaczy nie
+   * jedziesz", z furtką dla nocy wyjątkowych. Była starsza od przycinania sesji
+   * i po jego wprowadzeniu robiła to samo drugi raz, tylko gorzej: progiem
+   * zamiast rachunkiem. Widać to było na prawdziwym kalendarzu — spotkanie
+   * o 7:40 kasowało trzygodzinną sesję, w której sen i tak się mieścił, bo
+   * okno zostało już przycięte.
+   *
+   * Teraz decyduje arytmetyka: `latestEndForSleep` cofa się od wymuszonej
+   * pobudki, sesja zostaje skrócona, a odrzucenie pada wyłącznie wtedy, gdy nie
+   * mieści się w minimum — z powodem `not-enough-sleep` i konkretną liczbą
+   * godzin zamiast „bo kalendarz". Wcześnie rano wciąż zostaje ostrzeżenie
+   * z godziną, żeby użytkownik mógł odpuścić sam.
+   */
   const firstEvent = nextDay.firstEventAt;
   if (firstEvent && !nextDay.dayOff) {
     const hour = firstEvent.getHours() + firstEvent.getMinutes() / 60;
-
-    if (hour < config.calendar.rejectBeforeHour && !isExceptional(hours, input, observing)) {
-      return {
-        ...withPlan,
-        status: 'no-go',
-        rejection: { kind: 'early-calendar', firstEventAt: firstEvent },
-      };
-    }
 
     if (hour < config.calendar.homeOnlyBeforeHour) {
       warnings.push({ kind: 'home-only', firstEventAt: firstEvent });

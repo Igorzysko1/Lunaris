@@ -129,13 +129,20 @@ describe('clampConfig', () => {
     assert.ok(clamped.session.maxDurationMinutes >= clamped.session.minDurationMinutes);
   });
 
-  it('godzina „tylko dom" nie wypada przed godziną odrzucenia', () => {
-    const config = clone(DEFAULT_CONFIG);
-    config.calendar.rejectBeforeHour = 11;
-    config.calendar.homeOnlyBeforeHour = 6;
+  it('konfiguracja sprzed usunięcia progu odrzucenia wczytuje się bez śladu po nim', () => {
+    // `rejectBeforeHour` i `exceptionalMaxCloud` zniknęły razem z regułą, którą
+    // obsługiwały. Zapisane ustawienia użytkownika wciąż je zawierają, więc
+    // scalanie musi je po prostu pominąć, a nie wywrócić się na nieznanym polu.
+    const stored = {
+      ...clone(DEFAULT_CONFIG),
+      calendar: { ...DEFAULT_CONFIG.calendar, rejectBeforeHour: 11, exceptionalMaxCloud: 5 },
+    };
 
-    const clamped = clampConfig(config);
-    assert.equal(clamped.calendar.homeOnlyBeforeHour, 11);
+    const merged = mergeConfig(stored);
+
+    assert.equal('rejectBeforeHour' in merged.calendar, false);
+    assert.equal('exceptionalMaxCloud' in merged.calendar, false);
+    assert.equal(merged.calendar.homeOnlyBeforeHour, DEFAULT_CONFIG.calendar.homeOnlyBeforeHour);
   });
 
   it('lista zestawów nigdy nie jest pusta', () => {
