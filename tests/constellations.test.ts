@@ -196,6 +196,22 @@ describe('co dziś nad głową', () => {
     assert.match(text, /na (N|NE|E|SE|S|SW|W|NW)/);
   });
 
+  it('wrześniowa noc daje kilkanaście gwiazdozbiorów nie do pomylenia', () => {
+    // Karta wypisuje wszystkie łatwe, więc ich liczba przesądza o jej
+    // użyteczności. Sztywne „pierwsze sześć" chowało Wielki Wóz i Oriona —
+    // dokładnie to, co uczący się chce nazwać.
+    const september = { from: new Date(2026, 8, 9, 21, 4), to: new Date(2026, 8, 10, 4, 14) };
+    const easy = constellationsTonight(september, BLEDOWSKA).filter(
+      (c) => c.constellation.ease === 1,
+    );
+    const names = easy.map((c) => c.constellation.name);
+
+    assert.ok(easy.length >= 10, `tylko ${easy.length} łatwych gwiazdozbiorów`);
+    for (const expected of ['Wielka Niedźwiedzica', 'Łabędź', 'Kasjopeja', 'Pegaz']) {
+      assert.ok(names.includes(expected), `brak: ${expected}`);
+    }
+  });
+
   it('pusty katalog nie wywraca rachunku', () => {
     assert.deepEqual(constellationsTonight(NIGHT, BLEDOWSKA, []), []);
   });

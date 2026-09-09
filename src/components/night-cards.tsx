@@ -179,8 +179,16 @@ export function SeeingCard({ seeing }: { seeing: Seeing }) {
   );
 }
 
-/** Ile gwiazdozbiorów pokazujemy. Sześć mieści się bez przewijania i wystarcza na noc. */
-const SHOWN_CONSTELLATIONS = 6;
+/**
+ * Wypisujemy **wszystkie nie do pomylenia**, nie pierwsze N.
+ *
+ * Sztywna szóstka wyglądała rozsądnie i w praktyce chowała Wielki Wóz, Oriona
+ * i Pegaza, bo dziś nad horyzontem stoi piętnaście łatwych gwiazdozbiorów.
+ * Karta ma pomagać nazywać to, co widać nad głową — ucinanie takiej listy
+ * w połowie przeczy jej celowi. Reszta, trudniejsza do rozpoznania, zostaje
+ * policzona i wspomniana jednym wierszem.
+ */
+const UNMISTAKABLE = 1;
 
 /**
  * Co dziś nad głową — warstwa orientacyjna dla uczącego się nieba.
@@ -193,11 +201,14 @@ const SHOWN_CONSTELLATIONS = 6;
 export function ConstellationsCard({ tonight }: { tonight: ConstellationTonight[] }) {
   if (tonight.length === 0) return null;
 
+  const shown = tonight.filter((entry) => entry.constellation.ease === UNMISTAKABLE);
+  const rest = tonight.length - shown.length;
+
   return (
     <Card>
       <SectionLabel style={styles.targetsLabel}>Co dziś nad głową</SectionLabel>
 
-      {tonight.slice(0, SHOWN_CONSTELLATIONS).map((entry, i) => (
+      {shown.map((entry, i) => (
         <View
           key={entry.constellation.id}
           style={i > 0 && styles.constellationGap}
@@ -214,6 +225,13 @@ export function ConstellationsCard({ tonight }: { tonight: ConstellationTonight[
           <Text style={styles.constellationHint}>{entry.constellation.hint}</Text>
         </View>
       ))}
+
+      {rest > 0 && (
+        <Text style={styles.targetsMore}>
+          …i {rest} {rest === 1 ? 'dalszy gwiazdozbiór' : 'dalszych gwiazdozbiorów'} nad horyzontem
+          — trudniejszych do rozpoznania.
+        </Text>
+      )}
     </Card>
   );
 }
