@@ -25,6 +25,11 @@ bo jeden przypadkowy import wywraca uruchomienie poza Metro, a `tsc` tego nie za
 **Ciężkie dane liczą się przed wydaniem, nie na telefonie.** Mapa jasności nieba i maski horyzontu
 powstają skryptami z surowych rastrów; aplikacja dostaje gotowe liczby.
 
+**Aplikacja mówi też do uczącego się.** Lista celów odpowiada na „co złapię lornetką", ale
+pytanie wcześniejsze brzmi „co to świeci nad głową" — stąd
+[warstwa orientacyjna](src/lib/constellations.ts) z gwiazdozbiorami tej nocy. Powstała po
+pierwszym wyjeździe w teren, bo dotąd aplikacja zakładała, że wiesz, gdzie szukać.
+
 **Dziennik obserwacji jest sprzężeniem zwrotnym.** Zasięg sprzętu i progi to przybliżenia. Jedyne
 dane, które mogą je nastroić, to odpowiedź na pytanie „widziałeś?" — stąd
 [dziennik](src/lib/journal.ts) i [raport miesięczny](src/lib/monthly-report.ts).

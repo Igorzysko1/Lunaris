@@ -9,6 +9,7 @@ import { CloudCoverChart } from '@/components/CloudCoverChart';
 import { EventCard } from '@/components/EventCard';
 import {
   AstroTimesRow,
+  ConstellationsCard,
   MoonPhaseCard,
   NightRatingCard,
   NightSkeleton,
@@ -22,6 +23,7 @@ import { dayBucket, formatLongDate, formatTime } from '@/lib/date';
 import { upcomingEvents } from '@/lib/events';
 import { formatAge } from '@/lib/forecast-cache';
 import { horizonOf } from '@/lib/horizon';
+import { constellationsTonight } from '@/lib/constellations';
 import { currentNightWindow } from '@/lib/night-window';
 import { nightTargetsForProfiles } from '@/lib/sky-targets';
 import { useApod } from '@/hooks/use-apod';
@@ -48,6 +50,13 @@ export default function NightScreen() {
 
   // Cele zależą od miejsca, jakości nieba i sprzętu — nie od prognozy, więc liczą
   // się lokalnie i nie czekają na Open-Meteo.
+  // Warstwa orientacyjna: nie zależy od prognozy ani od sprzętu, tylko od nieba
+  // nad tym miejscem — liczy się lokalnie i nie czeka na sieć.
+  const constellations = useMemo(
+    () => constellationsTonight(currentNightWindow(new Date(), { lat, lon }), { lat, lon }),
+    [lat, lon],
+  );
+
   const targets = useMemo(
     () =>
       nightTargetsForProfiles(
@@ -174,6 +183,11 @@ export default function NightScreen() {
             </View>
 
             <View style={styles.gap}>
+              {/* Orientacja przed polowaniem: żeby szukać M13, trzeba
+                  najpierw wiedzieć, gdzie jest Herkules. */}
+              <View style={styles.gap}>
+                <ConstellationsCard tonight={constellations} />
+              </View>
               <NightTargetsCard targets={targets} />
             </View>
 

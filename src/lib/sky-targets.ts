@@ -318,6 +318,41 @@ function scanNight(
 }
 
 /**
+ * Przebieg dowolnego punktu nieba przez noc, bez oglądania się na sprzęt.
+ *
+ * Wystawione, bo tego samego rachunku potrzebuje warstwa orientacyjna:
+ * gwiazdozbiór to dla efemeryd zwykły punkt o danej rektascensji i deklinacji,
+ * tyle że nie pytamy o niego „czy zmieści się w lornetce", lecz „gdzie stoi".
+ * Drugie skanowanie nocy obok tego byłoby tą samą pętlą po próbkach, napisaną
+ * raz jeszcze i rozjeżdżającą się przy pierwszej poprawce.
+ *
+ * `distanceLy` jest nieobowiązkowa: dla obiektów tak odległych paralaksa nic nie
+ * zmienia, a dla gwiazdozbiorów nie ma nawet sensu, bo ich gwiazdy leżą
+ * w zupełnie różnych odległościach.
+ */
+export function skyPathOverNight(
+  point: { raHours: number; dec: number; distanceLy?: number },
+  window: NightWindow,
+  coords: Coords,
+  horizon: SiteHorizon = FLAT_HORIZON,
+): Omit<TargetGeometry, 'base'> {
+  const observer = observerOf(coords);
+  DefineStar(STAR_SLOT, point.raHours, point.dec, point.distanceLy ?? 1000);
+
+  const { best, up } = scanNight(STAR_SLOT, window, observer, horizon);
+  const transit = SearchHourAngle(STAR_SLOT, observer, 0, window.from);
+
+  return {
+    transitAt: transit.time.date,
+    transitAltitude: transit.hor.altitude,
+    bestAt: best.at,
+    maxAltitude: best.altitude,
+    bestAzimuth: best.azimuth,
+    up,
+  };
+}
+
+/**
  * Położenie obiektu tej nocy — część rachunku niezależna od sprzętu.
  *
  * Maska horyzontu wchodzi tutaj, a nie do warstwy sprzętowej, bo należy do

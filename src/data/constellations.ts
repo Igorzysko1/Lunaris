@@ -1,0 +1,545 @@
+/**
+ * Gwiazdozbiory widoczne z Polski — warstwa orientacyjna, nie katalog celów.
+ *
+ * Powstała z uwagi po pierwszym wyjeździe: „obserwowałem raczej konstelacje,
+ * bo wciąż się uczę". Reszta aplikacji odpowiada na pytanie „co złapię
+ * lornetką", a to jest pytanie wcześniejsze — **co to świeci nad głową i w którą
+ * stronę patrzeć**. Bez tej warstwy lista dziesięciu obiektów Messiera jest dla
+ * uczącego się nie do użycia, bo nie wie jeszcze, gdzie ich szukać.
+ *
+ * ## Kotwicą jest najjaśniejsza gwiazda, a nie środek gwiazdozbioru
+ *
+ * To decyzja, nie uproszczenie. Gwiazdozbiór rozciąga się na dwadzieścia do
+ * czterdziestu stopni i jego środek geometryczny zwykle nie ma czego pokazać —
+ * a szuka się go po jasnej gwieździe: Wegi, Deneba, Arktura. Kotwica ma więc
+ * odpowiadać na „na co patrzeć", nie „gdzie jest środek obszaru".
+ *
+ * Konsekwencja jest taka, że kotwica bywa daleko od obiektów leżących w tym
+ * samym gwiazdozbiorze — Spica stoi 20° od gromady galaktyk w Pannie. Test
+ * sprawdza więc zgodność z hojną tolerancją: łapie pomyłkę o pół nieba, nie
+ * o kilka stopni.
+ *
+ * Współrzędne J2000, w godzinach rektascensji i stopniach deklinacji.
+ */
+
+export type Constellation = {
+  id: string;
+  /** Nazwa polska — ta, której użyje początkujący. */
+  name: string;
+  /** Nazwa łacińska, bo pod nią wszystko znajdzie w atlasach i aplikacjach. */
+  latin: string;
+  /** Gwiazda, po której się go znajduje. */
+  star: string;
+  raHours: number;
+  dec: number;
+  /** Jedno zdanie: po czym poznać i co w środku warto obejrzeć. */
+  hint: string;
+  /**
+   * Jak łatwo go rozpoznać: 1 — nie do pomylenia, 2 — trzeba wiedzieć czego
+   * szukać, 3 — trudny, bez jasnego kształtu.
+   *
+   * Bez tego pola porządek po samej wysokości podsuwał uczącemu się najpierw
+   * Jaszczurkę i Żyrafę, bo okołobiegunowe przechodzą przez zenit — a to
+   * dokładnie te dwa, przy których w podpowiedzi stoi „wąski zygzak"
+   * i „ubogi obszar". Wysokość mówi, czy **da się** patrzeć; ta liczba mówi,
+   * czy jest po czym się zorientować.
+   */
+  ease: 1 | 2 | 3;
+};
+
+/**
+ * Wybór ograniczony do tych, które z Polski da się realnie zobaczyć — reszta
+ * albo nie wschodzi, albo ledwie muska horyzont i obiecywanie jej byłoby
+ * wysyłaniem w las.
+ */
+export const CONSTELLATIONS: Constellation[] = [
+  // — okołobiegunowe: widoczne całą noc, przez cały rok —
+  {
+    id: 'uma',
+    name: 'Wielka Niedźwiedzica',
+    latin: 'Ursa Major',
+    star: 'Alioth',
+    raHours: 12.9,
+    dec: 55.96,
+    hint: 'Wielki Wóz. Od dwóch tylnych kół prosta linia prowadzi do Gwiazdy Polarnej.',
+    ease: 1,
+  },
+  {
+    id: 'umi',
+    name: 'Mała Niedźwiedzica',
+    latin: 'Ursa Minor',
+    star: 'Polaris',
+    raHours: 2.53,
+    dec: 89.26,
+    hint: 'Gwiazda Polarna stoi prawie w osi świata — wskazuje północ i nie wędruje po niebie.',
+    ease: 1,
+  },
+  {
+    id: 'cas',
+    name: 'Kasjopeja',
+    latin: 'Cassiopeia',
+    star: 'Schedar',
+    raHours: 0.675,
+    dec: 56.54,
+    hint: 'Litera W po przeciwnej stronie Polarnej niż Wielki Wóz. W środku gromady M52 i M103.',
+    ease: 1,
+  },
+  {
+    id: 'cep',
+    name: 'Cefeusz',
+    latin: 'Cepheus',
+    star: 'Alderamin',
+    raHours: 21.31,
+    dec: 62.59,
+    hint: 'Domek z dachem między Kasjopeją a Smokiem.',
+    ease: 2,
+  },
+  {
+    id: 'dra',
+    name: 'Smok',
+    latin: 'Draco',
+    star: 'Eltanin',
+    raHours: 17.943,
+    dec: 51.49,
+    hint: 'Długi wąż owijający się wokół Małej Niedźwiedzicy.',
+    ease: 2,
+  },
+  {
+    id: 'per',
+    name: 'Perseusz',
+    latin: 'Perseus',
+    star: 'Mirfak',
+    raHours: 3.405,
+    dec: 49.86,
+    hint: 'Między Kasjopeją a Woźnicą. Podwójna Gromada h+χ to najlepszy cel lornetkowy nieba.',
+    ease: 1,
+  },
+  {
+    id: 'cam',
+    name: 'Żyrafa',
+    latin: 'Camelopardalis',
+    star: 'β Cam',
+    raHours: 5.057,
+    dec: 60.44,
+    hint: 'Ubogi obszar między Woźnicą a Polarną — dobry sprawdzian ciemności nieba.',
+    ease: 3,
+  },
+  {
+    id: 'lac',
+    name: 'Jaszczurka',
+    latin: 'Lacerta',
+    star: 'α Lac',
+    raHours: 22.522,
+    dec: 50.28,
+    hint: 'Wąski zygzak między Łabędziem a Kasjopeją.',
+    ease: 3,
+  },
+
+  // — lato i wczesna jesień —
+  {
+    id: 'cyg',
+    name: 'Łabędź',
+    latin: 'Cygnus',
+    star: 'Deneb',
+    raHours: 20.69,
+    dec: 45.28,
+    hint: 'Krzyż Północy lecący wzdłuż Drogi Mlecznej. Deneb to róg Trójkąta Letniego.',
+    ease: 1,
+  },
+  {
+    id: 'lyr',
+    name: 'Lutnia',
+    latin: 'Lyra',
+    star: 'Wega',
+    raHours: 18.615,
+    dec: 38.78,
+    hint: 'Wega świeci najjaśniej w letnim niebie. Obok mały równoległobok, w nim M57.',
+    ease: 1,
+  },
+  {
+    id: 'aql',
+    name: 'Orzeł',
+    latin: 'Aquila',
+    star: 'Altair',
+    raHours: 19.846,
+    dec: 8.87,
+    hint: 'Altair z dwiema gwiazdami po bokach — trzeci róg Trójkąta Letniego.',
+    ease: 1,
+  },
+  {
+    id: 'her',
+    name: 'Herkules',
+    latin: 'Hercules',
+    star: 'Kornephoros',
+    raHours: 16.504,
+    dec: 21.49,
+    hint: 'Trapez zwany Kluczem. Na jego krawędzi M13 — najjaśniejsza gromada kulista nieba północnego.',
+    ease: 2,
+  },
+  {
+    id: 'oph',
+    name: 'Wężownik',
+    latin: 'Ophiuchus',
+    star: 'Rasalhague',
+    raHours: 17.582,
+    dec: 12.56,
+    hint: 'Wielki pięciobok nad Skorpionem, pełen gromad kulistych.',
+    ease: 2,
+  },
+  {
+    id: 'ser',
+    name: 'Wąż',
+    latin: 'Serpens',
+    star: 'Unukalhai',
+    raHours: 15.738,
+    dec: 6.43,
+    hint: 'Jedyny gwiazdozbiór z dwóch osobnych części — po obu stronach Wężownika.',
+    ease: 2,
+  },
+  {
+    id: 'sge',
+    name: 'Strzała',
+    latin: 'Sagitta',
+    star: 'γ Sge',
+    raHours: 19.979,
+    dec: 19.49,
+    hint: 'Malutka strzała między Łabędziem a Orłem. Łatwa do przeoczenia i łatwa do polubienia.',
+    ease: 2,
+  },
+  {
+    id: 'vul',
+    name: 'Lisek',
+    latin: 'Vulpecula',
+    star: 'α Vul',
+    raHours: 19.478,
+    dec: 24.66,
+    hint: 'Blady obszar nad Strzałą; mieszka w nim Wieszak i mgławica Hantle.',
+    ease: 2,
+  },
+  {
+    id: 'del',
+    name: 'Delfin',
+    latin: 'Delphinus',
+    star: 'Rotanev',
+    raHours: 20.625,
+    dec: 14.6,
+    hint: 'Zwarty rombik ze „ogonem" na wschód od Orła — wygląda dokładnie jak delfin.',
+    ease: 2,
+  },
+  {
+    id: 'crb',
+    name: 'Korona Północna',
+    latin: 'Corona Borealis',
+    star: 'Alphecca',
+    raHours: 15.578,
+    dec: 26.71,
+    hint: 'Wyraźny półokrąg między Wolarzem a Herkulesem.',
+    ease: 1,
+  },
+  {
+    id: 'boo',
+    name: 'Wolarz',
+    latin: 'Boötes',
+    star: 'Arktur',
+    raHours: 14.261,
+    dec: 19.18,
+    hint: 'Latawiec z pomarańczowym Arkturem u dołu. Znajdziesz go, przedłużając dyszel Wielkiego Wozu.',
+    ease: 1,
+  },
+  {
+    id: 'sco',
+    name: 'Skorpion',
+    latin: 'Scorpius',
+    star: 'Antares',
+    raHours: 16.49,
+    dec: -26.43,
+    hint: 'Czerwony Antares nisko nad południem — z Polski widać tylko głowę i serce.',
+    ease: 1,
+  },
+  {
+    id: 'sgr',
+    name: 'Strzelec',
+    latin: 'Sagittarius',
+    star: 'Nunki',
+    raHours: 18.921,
+    dec: -26.3,
+    hint: 'Czajnik nisko nad południem, w kierunku środka Galaktyki. Latem najbogatszy rejon nieba.',
+    ease: 2,
+  },
+  {
+    id: 'sct',
+    name: 'Tarcza',
+    latin: 'Scutum',
+    star: 'α Sct',
+    raHours: 18.586,
+    dec: -8.24,
+    hint: 'Mały gwiazdozbiór na jasnej chmurze Drogi Mlecznej, z gromadą M11.',
+    ease: 2,
+  },
+  {
+    id: 'lib',
+    name: 'Waga',
+    latin: 'Libra',
+    star: 'Zubeneschamali',
+    raHours: 15.283,
+    dec: -9.38,
+    hint: 'Czworobok na zachód od Skorpiona.',
+    ease: 2,
+  },
+
+  // — jesień —
+  {
+    id: 'peg',
+    name: 'Pegaz',
+    latin: 'Pegasus',
+    star: 'Enif',
+    raHours: 21.736,
+    dec: 9.88,
+    hint: 'Wielki Kwadrat Pegaza — najłatwiejszy punkt odniesienia jesiennego nieba.',
+    ease: 1,
+  },
+  {
+    id: 'and',
+    name: 'Andromeda',
+    latin: 'Andromeda',
+    star: 'Alpheratz',
+    raHours: 0.139,
+    dec: 29.09,
+    hint: 'Wychodzi z rogu Kwadratu Pegaza. Dwa skoki w bok i widać M31 gołym okiem.',
+    ease: 1,
+  },
+  {
+    id: 'tri',
+    name: 'Trójkąt',
+    latin: 'Triangulum',
+    star: 'β Tri',
+    raHours: 2.159,
+    dec: 34.99,
+    hint: 'Trzy gwiazdy pod Andromedą; obok galaktyka M33.',
+    ease: 2,
+  },
+  {
+    id: 'psc',
+    name: 'Ryby',
+    latin: 'Pisces',
+    star: 'η Psc',
+    raHours: 1.525,
+    dec: 15.35,
+    hint: 'Blada wstęga pod Kwadratem Pegaza — potrzebuje naprawdę ciemnego nieba.',
+    ease: 2,
+  },
+  {
+    id: 'cet',
+    name: 'Wieloryb',
+    latin: 'Cetus',
+    star: 'Deneb Kaitos',
+    raHours: 0.727,
+    dec: -17.99,
+    hint: 'Rozległy i ubogi, nisko nad południem jesienią.',
+    ease: 2,
+  },
+  {
+    id: 'aqr',
+    name: 'Wodnik',
+    latin: 'Aquarius',
+    star: 'Sadalsuud',
+    raHours: 21.526,
+    dec: -5.57,
+    hint: 'Rozlany obszar między Pegazem a Koziorożcem.',
+    ease: 2,
+  },
+  {
+    id: 'cap',
+    name: 'Koziorożec',
+    latin: 'Capricornus',
+    star: 'Deneb Algedi',
+    raHours: 21.784,
+    dec: -16.13,
+    hint: 'Duży trójkąt nisko nad południem późnym latem.',
+    ease: 2,
+  },
+  {
+    id: 'ari',
+    name: 'Baran',
+    latin: 'Aries',
+    star: 'Hamal',
+    raHours: 2.119,
+    dec: 23.46,
+    hint: 'Trzy gwiazdy w łuku między Andromedą a Bykiem.',
+    ease: 2,
+  },
+
+  // — zima —
+  {
+    id: 'ori',
+    name: 'Orion',
+    latin: 'Orion',
+    star: 'Rigel',
+    raHours: 5.242,
+    dec: -8.2,
+    hint: 'Trzy gwiazdy Pasa. Pod nimi mieczyk z M42 — mgławicą widoczną przez każdą lornetkę.',
+    ease: 1,
+  },
+  {
+    id: 'tau',
+    name: 'Byk',
+    latin: 'Taurus',
+    star: 'Aldebaran',
+    raHours: 4.599,
+    dec: 16.51,
+    hint: 'Pomarańczowy Aldebaran w literze V, a obok Plejady — najładniejszy cel lornetkowy zimy.',
+    ease: 1,
+  },
+  {
+    id: 'aur',
+    name: 'Woźnica',
+    latin: 'Auriga',
+    star: 'Kapella',
+    raHours: 5.278,
+    dec: 46.0,
+    hint: 'Pięciobok wysoko zimą, z trzema gromadami otwartymi: M36, M37 i M38.',
+    ease: 1,
+  },
+  {
+    id: 'gem',
+    name: 'Bliźnięta',
+    latin: 'Gemini',
+    star: 'Polluks',
+    raHours: 7.755,
+    dec: 28.03,
+    hint: 'Kastor i Polluks obok siebie. U stóp gromada M35.',
+    ease: 1,
+  },
+  {
+    id: 'cma',
+    name: 'Wielki Pies',
+    latin: 'Canis Major',
+    star: 'Syriusz',
+    raHours: 6.752,
+    dec: -16.72,
+    hint: 'Syriusz — najjaśniejsza gwiazda całego nieba, nisko na południowy wschód od Oriona.',
+    ease: 1,
+  },
+  {
+    id: 'cmi',
+    name: 'Mały Pies',
+    latin: 'Canis Minor',
+    star: 'Procjon',
+    raHours: 7.655,
+    dec: 5.22,
+    hint: 'Dwie gwiazdy; Procjon domyka Trójkąt Zimowy z Syriuszem i Betelgezą.',
+    ease: 1,
+  },
+  {
+    id: 'mon',
+    name: 'Jednorożec',
+    latin: 'Monoceros',
+    star: 'β Mon',
+    raHours: 6.48,
+    dec: -7.03,
+    hint: 'Blady obszar w środku Trójkąta Zimowego, na Drodze Mlecznej.',
+    ease: 2,
+  },
+  {
+    id: 'lep',
+    name: 'Zając',
+    latin: 'Lepus',
+    star: 'Arneb',
+    raHours: 5.545,
+    dec: -17.82,
+    hint: 'Tuż pod stopami Oriona.',
+    ease: 2,
+  },
+  {
+    id: 'pup',
+    name: 'Rufa',
+    latin: 'Puppis',
+    star: 'Okolice M46 i M47',
+    raHours: 7.7,
+    dec: -15.0,
+    hint: 'Z Polski widać tylko północny skraj, ale są w nim dwie ładne gromady otwarte.',
+    ease: 3,
+  },
+  {
+    id: 'cnc',
+    name: 'Rak',
+    latin: 'Cancer',
+    star: 'Tarf',
+    raHours: 8.275,
+    dec: 9.19,
+    hint: 'Ciemny i niepozorny między Bliźniętami a Lwem; w środku Żłóbek, czyli M44.',
+    ease: 2,
+  },
+  {
+    id: 'lyn',
+    name: 'Ryś',
+    latin: 'Lynx',
+    star: 'α Lyn',
+    raHours: 9.351,
+    dec: 34.39,
+    hint: 'Ledwie widoczna smuga między Woźnicą a Wielką Niedźwiedzicą.',
+    ease: 3,
+  },
+
+  // — wiosna —
+  {
+    id: 'leo',
+    name: 'Lew',
+    latin: 'Leo',
+    star: 'Regulus',
+    raHours: 10.139,
+    dec: 11.97,
+    hint: 'Sierp jak odwrócony znak zapytania, zakończony Regulusem. Pod nim grupa galaktyk.',
+    ease: 1,
+  },
+  {
+    id: 'vir',
+    name: 'Panna',
+    latin: 'Virgo',
+    star: 'Spika',
+    raHours: 13.42,
+    dec: -11.16,
+    hint: 'Spika nisko na południu, ale gromada galaktyk leży wyżej, w stronę Warkocza Bereniki.',
+    ease: 2,
+  },
+  {
+    id: 'com',
+    name: 'Warkocz Bereniki',
+    latin: 'Coma Berenices',
+    star: 'β Com',
+    raHours: 13.198,
+    dec: 27.88,
+    hint: 'Rozsypana garść słabych gwiazd — w lornetce wygląda jak obłoczek.',
+    ease: 2,
+  },
+  {
+    id: 'cvn',
+    name: 'Psy Gończe',
+    latin: 'Canes Venatici',
+    star: 'Cor Caroli',
+    raHours: 12.934,
+    dec: 38.32,
+    hint: 'Dwie gwiazdy pod dyszlem Wielkiego Wozu; obok galaktyka Wir i gromada M3.',
+    ease: 2,
+  },
+  {
+    id: 'hya',
+    name: 'Hydra',
+    latin: 'Hydra',
+    star: 'Alphard',
+    raHours: 9.46,
+    dec: -8.66,
+    hint: 'Najdłuższy gwiazdozbiór nieba — ciągnie się przez ćwierć widnokręgu.',
+    ease: 2,
+  },
+  {
+    id: 'crv',
+    name: 'Kruk',
+    latin: 'Corvus',
+    star: 'Gienah',
+    raHours: 12.263,
+    dec: -17.54,
+    hint: 'Mały wyraźny czworobok nisko pod Panną.',
+    ease: 2,
+  },
+];

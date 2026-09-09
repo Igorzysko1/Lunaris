@@ -6,6 +6,7 @@ import { Card, Divider, SectionLabel } from '@/components/primitives';
 import { dewRiskColor, ratingMeta } from '@/lib/astro';
 import { formatTime, formatTimeOrDash } from '@/lib/date';
 import type { Moon } from '@/lib/moon';
+import { describeWhereToLook, type ConstellationTonight } from '@/lib/constellations';
 import { describeSeeing, type Seeing } from '@/lib/seeing';
 import { describeOutOfReach, rankedTargets, type SkyTarget } from '@/lib/sky-targets';
 import type { NightData } from '@/hooks/use-night-data';
@@ -174,6 +175,45 @@ export function SeeingCard({ seeing }: { seeing: Seeing }) {
       </View>
       <Text style={styles.seeingValue}>{seeing.label}</Text>
       <Text style={styles.seeingDetail}>{describeSeeing(seeing)}</Text>
+    </Card>
+  );
+}
+
+/** Ile gwiazdozbiorów pokazujemy. Sześć mieści się bez przewijania i wystarcza na noc. */
+const SHOWN_CONSTELLATIONS = 6;
+
+/**
+ * Co dziś nad głową — warstwa orientacyjna dla uczącego się nieba.
+ *
+ * Stoi **nad** listą celów, bo odpowiada na wcześniejsze pytanie: żeby szukać
+ * M13, trzeba najpierw wiedzieć, gdzie jest Herkules. Powstała po pierwszym
+ * wyjeździe w teren, z uwagi „obserwowałem raczej konstelacje, bo wciąż się
+ * uczę" — dotąd aplikacja mówiła wyłącznie do kogoś, kto poluje na obiekty.
+ */
+export function ConstellationsCard({ tonight }: { tonight: ConstellationTonight[] }) {
+  if (tonight.length === 0) return null;
+
+  return (
+    <Card>
+      <SectionLabel style={styles.targetsLabel}>Co dziś nad głową</SectionLabel>
+
+      {tonight.slice(0, SHOWN_CONSTELLATIONS).map((entry, i) => (
+        <View
+          key={entry.constellation.id}
+          style={i > 0 && styles.constellationGap}
+          // Nazwa, położenie i podpowiedź to jedna informacja — czytnik ekranu
+          // ma je przeczytać razem, a nie jako trzy oderwane fragmenty.
+          accessible
+          accessibilityLabel={`${entry.constellation.name}. ${describeWhereToLook(entry)} ${entry.constellation.hint}`}
+        >
+          <View style={styles.constellationHead}>
+            <Text style={styles.constellationName}>{entry.constellation.name}</Text>
+            <Text style={styles.constellationLatin}>{entry.constellation.latin}</Text>
+          </View>
+          <Text style={styles.constellationWhere}>{describeWhereToLook(entry)}</Text>
+          <Text style={styles.constellationHint}>{entry.constellation.hint}</Text>
+        </View>
+      ))}
     </Card>
   );
 }
@@ -450,6 +490,38 @@ const styles = StyleSheet.create({
     fontFamily: fonts.monoMedium,
     fontSize: 13,
     color: colors.textPrimary,
+  },
+  constellationGap: {
+    marginTop: 16,
+  },
+  constellationHead: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'baseline',
+    gap: 8,
+  },
+  constellationName: {
+    fontFamily: fonts.sansMedium,
+    fontSize: 15,
+    color: colors.textPrimary,
+  },
+  constellationLatin: {
+    fontFamily: fonts.sans,
+    fontSize: 12,
+    color: colors.textMuted,
+  },
+  constellationWhere: {
+    fontFamily: fonts.mono,
+    fontSize: 11,
+    color: colors.teal,
+    marginTop: 3,
+  },
+  constellationHint: {
+    fontFamily: fonts.sans,
+    fontSize: 12,
+    lineHeight: 17,
+    color: colors.textSecondary,
+    marginTop: 4,
   },
   targetsLabel: {
     marginBottom: 12,
