@@ -7,7 +7,12 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { currentNightWindow, nightWindow, sampleNight } from '../src/lib/night-window.ts';
+import {
+  currentNightWindow,
+  nightDaysBefore,
+  nightWindow,
+  sampleNight,
+} from '../src/lib/night-window.ts';
 
 const KATOWICE = { lat: 50.259, lon: 19.021 };
 const LONGYEARBYEN = { lat: 78.22, lon: 15.65 };
@@ -121,5 +126,43 @@ describe('sampleNight', () => {
   it('okno zerowej długości daje jedną próbkę', () => {
     const at = new Date(2026, 0, 15, 22, 0);
     assert.equal(sampleNight({ from: at, to: at }).length, 1);
+  });
+});
+
+describe('nightDaysBefore', () => {
+  it('cofa o zadaną liczbę dób', () => {
+    const night = nightWindow(new Date(2026, 8, 9), KATOWICE);
+    const earlier = nightDaysBefore(night, KATOWICE, 1);
+
+    assert.equal(earlier.from.getDate(), 8);
+    // Zmierzch przesuwa się przez rok, więc godzina nie musi być ta sama —
+    // ale różnica ma być rzędu minut, nie godzin.
+    assert.ok(Math.abs(minutesBetween(earlier.from, night.from) - 24 * 60) < 20);
+  });
+
+  it('zero i wartości ujemne zostawiają noc bez zmian', () => {
+    const night = nightWindow(new Date(2026, 8, 9), KATOWICE);
+
+    assert.deepEqual(nightDaysBefore(night, KATOWICE, 0), night);
+    assert.deepEqual(nightDaysBefore(night, KATOWICE, -3), night);
+  });
+
+  it('doba zmiany czasu nie gubi ani nie dubluje nocy', () => {
+    // W Polsce czas zmienia się w ostatnią niedzielę października — ta doba ma
+    // 25 godzin. Odejmowanie 24 godzin zamiast doby kalendarzowej zostawiłoby
+    // tu tę samą datę i noc przepadłaby przy cofaniu.
+    const after = nightWindow(new Date(2026, 9, 26), KATOWICE);
+    const dates = [1, 2, 3].map((back) => nightDaysBefore(after, KATOWICE, back).from.getDate());
+
+    assert.deepEqual(dates, [25, 24, 23]);
+  });
+
+  it('cofanie krok po kroku daje to samo co skok o kilka dób', () => {
+    const night = nightWindow(new Date(2026, 8, 9), KATOWICE);
+
+    let stepwise = night;
+    for (let i = 0; i < 3; i++) stepwise = nightDaysBefore(stepwise, KATOWICE, 1);
+
+    assert.deepEqual(stepwise, nightDaysBefore(night, KATOWICE, 3));
   });
 });

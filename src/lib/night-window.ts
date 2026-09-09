@@ -86,6 +86,27 @@ export function lastObservedNight(now: Date, coords: Coords): NightWindow {
   return now < current.from ? nightWindow(noonOf(now, -1), coords) : current;
 }
 
+/**
+ * Noc oddalona o zadaną liczbę dób wstecz.
+ *
+ * Potrzebne dziennikowi: zapis powstaje czasem dzień czy dwa po powrocie, a do
+ * wczoraj nie da się już dojść przez `lastObservedNight`, bo ta po zmierzchu
+ * przeskakuje na noc bieżącą. Bez tego obserwacja sprzed doby jest nie do
+ * wpisania — wyszło to dopiero przy pierwszym prawdziwym wyjeździe.
+ *
+ * Doby odejmujemy kalendarzowo, a nie przez 24 godziny: w dobie zmiany czasu
+ * jest ich 23 albo 25, więc arytmetyka na milisekundach gubiłaby albo dublowała
+ * noc raz na pół roku.
+ */
+export function nightDaysBefore(night: NightWindow, coords: Coords, daysBack: number): NightWindow {
+  if (daysBack <= 0) return night;
+
+  const evening = new Date(night.from);
+  evening.setDate(evening.getDate() - daysBack);
+
+  return nightWindow(evening, coords);
+}
+
 /** Próbki co 15 minut w oknie nocy — gęstość wystarczająca dla pytania „czy było widać". */
 export function sampleNight(window: NightWindow): Date[] {
   const STEP_MS = 15 * 60_000;

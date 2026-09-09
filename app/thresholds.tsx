@@ -168,9 +168,9 @@ export default function ThresholdsScreen() {
           />
           <Divider />
           <Text style={styles.note}>
-            Wcześniejsze wydarzenie odrzuca sesję, chyba że noc jest wybitna: zachmurzenie poniżej
-            progu, Księżyc pod horyzontem i zjawisko niepowtarzalne w tym miesiącu. Zakładana
-            godzina obowiązuje w dni robocze do czasu podpięcia prawdziwego kalendarza.
+            Wczesny poranek nie odrzuca już nocy — sesja zostaje skrócona tak, żeby zmieścił się
+            sen, a „nie jedź” pada dopiero, gdy nie mieści się w minimum. Zakładana godzina
+            obowiązuje tam, gdzie nie udało się odczytać kalendarza.
           </Text>
         </Card>
       </ScrollView>

@@ -25,7 +25,7 @@ import {
   monthLabel,
   type MonthlyReport,
 } from '@/lib/monthly-report';
-import { lastObservedNight } from '@/lib/night-window';
+import { lastObservedNight, nightDaysBefore } from '@/lib/night-window';
 import { nightTargetsForProfiles } from '@/lib/sky-targets';
 import { useSettings } from '@/store/settings';
 import { HAIRLINE, colors, fonts, radius, touchSlop } from '@/theme';
@@ -41,6 +41,14 @@ import { HAIRLINE, colors, fonts, radius, touchSlop } from '@/theme';
  * Trzy stany przy każdym celu, w tym jeden domyślny: brak odpowiedzi. Milczenie
  * nie jest danymi i nie może udawać, że cel odpadł.
  */
+/**
+ * Jak daleko wstecz wolno cofnąć zapis.
+ *
+ * Dwa tygodnie, bo dalej pamięć o tym, co było widać, przestaje być danymi —
+ * a dziennik istnieje po to, żeby stroić progi, nie żeby uzupełniać kalendarz.
+ */
+const MAX_DAYS_BACK = 14;
+
 export default function JournalScreen() {
   const router = useRouter();
   const { active, config } = useSettings();
@@ -53,6 +61,15 @@ export default function JournalScreen() {
   const [note, setNote] = useState('');
   const [saved, setSaved] = useState<string | null>(null);
 
+  /**
+   * O ile dób wstecz cofnięty jest zapisywany wieczór; zero to noc ostatnia.
+   *
+   * Wyszło z pierwszego wyjazdu: `lastObservedNight` po zmierzchu przeskakuje
+   * na noc bieżącą, więc obserwacja sprzed doby przestawała być do wpisania.
+   * Zapis powstaje czasem dzień czy dwa po powrocie i to jest normalne.
+   */
+  const [daysBack, setDaysBack] = useState(0);
+
   // Podgląd bieżącego miesiąca liczony tym samym rachunkiem co pełny raport
   // z CLI — inaczej po pierwszej poprawce zestawienia rozjechałyby się.
   const month = useMemo(() => buildMonthlyReport(journal, monthKeyOf(new Date())), [journal]);
@@ -60,7 +77,11 @@ export default function JournalScreen() {
   const { lat, lon } = active.coords;
 
   // Noc, która właśnie się skończyła albo właśnie trwa — nie ta nadchodząca.
-  const night = useMemo(() => lastObservedNight(new Date(), { lat, lon }), [lat, lon]);
+  const latest = useMemo(() => lastObservedNight(new Date(), { lat, lon }), [lat, lon]);
+  const night = useMemo(
+    () => nightDaysBefore(latest, { lat, lon }, daysBack),
+    [latest, lat, lon, daysBack],
+  );
   const moonIllumination = Math.round(SunCalc.getMoonIllumination(night.from).fraction * 100);
 
   const targets = useMemo(
@@ -95,13 +116,22 @@ export default function JournalScreen() {
 
       // Noc już zapisana wraca do edycji z tym, co w niej stoi — uzupełnienie
       // po tygodniu jest normalne i nie może zaczynać od pustej listy.
+      //
+      // Noc **niezapisana** musi natomiast wyczyścić formularz. Dopóki noc była
+      // jedna, brak wpisu wystarczyło zignorować; odkąd da się ją przełączać,
+      // zostawiony stan przeniósłby oceny i notatkę z poprzedniej nocy do tej,
+      // w której ich nie było — i zapisałby je jako obserwację.
       const existing = stored.logs.find((l) => l.id === nightLogId(night.from));
-      if (!existing) return;
 
-      setOutcomes(Object.fromEntries(existing.observations.map((o) => [o.targetId, o.outcome])));
-      setTransparency(existing.transparency);
-      setSeeing(existing.seeing);
-      setNote(existing.note);
+      setOutcomes(
+        existing
+          ? Object.fromEntries(existing.observations.map((o) => [o.targetId, o.outcome]))
+          : {},
+      );
+      setTransparency(existing?.transparency ?? null);
+      setSeeing(existing?.seeing ?? null);
+      setNote(existing?.note ?? '');
+      setSaved(null);
     });
   }, [night]);
 
@@ -181,12 +211,47 @@ export default function JournalScreen() {
           </Card>
         )}
 
-        <Text style={styles.nightLabel}>
-          Noc {formatShortDate(night.from)} · {formatTime(night.from)}–{formatTime(night.to)}
-        </Text>
-        <Text style={styles.nightSub}>
-          {active.label} · Bortle {active.bortle} · Księżyc {moonIllumination}%
-        </Text>
+        <View style={styles.nightPicker}>
+          {/* Wstecz bez ograniczenia w praktyce, ale nie w nieskończoność:
+              po dwóch tygodniach pamięć o tym, co było widać, i tak jest
+              gorszym źródłem niż brak wpisu. */}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Poprzednia noc"
+            hitSlop={touchSlop(30)}
+            disabled={daysBack >= MAX_DAYS_BACK}
+            onPress={() => setDaysBack((n) => Math.min(MAX_DAYS_BACK, n + 1))}
+          >
+            <Ionicons
+              name="chevron-back"
+              size={20}
+              color={daysBack >= MAX_DAYS_BACK ? colors.textMuted : colors.purple}
+            />
+          </Pressable>
+
+          <View style={styles.nightPickerText}>
+            <Text style={styles.nightLabel}>
+              Noc {formatShortDate(night.from)} · {formatTime(night.from)}–{formatTime(night.to)}
+            </Text>
+            <Text style={styles.nightSub}>
+              {active.label} · Bortle {active.bortle} · Księżyc {moonIllumination}%
+            </Text>
+          </View>
+
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Następna noc"
+            hitSlop={touchSlop(30)}
+            disabled={daysBack === 0}
+            onPress={() => setDaysBack((n) => Math.max(0, n - 1))}
+          >
+            <Ionicons
+              name="chevron-forward"
+              size={20}
+              color={daysBack === 0 ? colors.textMuted : colors.purple}
+            />
+          </Pressable>
+        </View>
 
         <SectionLabel style={styles.sectionLabel}>Cele tej nocy</SectionLabel>
         {ordered.length === 0 ? (
@@ -408,6 +473,12 @@ const styles = StyleSheet.create({
   title: { fontFamily: fonts.sansMedium, fontSize: 17, color: colors.textPrimary },
   content: { paddingHorizontal: 16, paddingBottom: 32 },
   gap: { marginBottom: 16 },
+  nightPicker: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  nightPickerText: { flex: 1 },
   nightLabel: { fontFamily: fonts.sansMedium, fontSize: 15, color: colors.textPrimary },
   nightSub: { fontFamily: fonts.sans, fontSize: 12, color: colors.textMuted, marginTop: 3 },
   sectionLabel: { marginTop: 18, marginBottom: 8 },
