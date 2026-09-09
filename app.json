@@ -17,7 +17,11 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0A0A14"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -48,6 +52,18 @@
         }
       ],
       "expo-status-bar"
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "f3ab6158-b76c-4f6a-b195-4d29ec03f99d"
+      }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/f3ab6158-b76c-4f6a-b195-4d29ec03f99d"
+    }
   }
 }
