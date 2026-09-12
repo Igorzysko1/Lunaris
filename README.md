@@ -98,14 +98,23 @@ wystarcza do sprawdzenia wszystkiego** — powiadomienia wymagają własnego bui
 a źródłem prawdy jest konfiguracja, nie wygenerowany kod.
 
 ```bash
-npm i -g eas-cli && eas login    # jednorazowo
+npx eas-cli@latest login         # jednorazowo
 npm run build:dev                # dev client — do pracy i do testu terenowego
 npm run build:apk                # samodzielny APK do zainstalowania
 ```
 
+`eas-cli` celowo nie jest zależnością projektu — `expo-doctor` to zgłasza, a build na EAS przez
+to pada.
+
 Profile stoją w [`eas.json`](eas.json): `development` (dev client, APK), `preview` (APK do
 rozdania) i `production` (AAB pod Google Play, z automatycznym numerem wersji). Podpisywaniem
 zajmuje się EAS — klucz generuje się przy pierwszym buildzie i zostaje na koncie.
+
+**Node na serwerze buildów jest przypięty** (`"node"` w każdym profilu). Domyślny obraz ma npm 10,
+który czyta lock surowiej niż npm 11+: opcjonalny peer `react-native-worklets` w
+`expo-modules-core` (`^0.10`) kłóci się z wersją od reanimated (`0.12.x`), więc npm 10 odrzuca
+lock jako niezsynchronizowany, a nowszy go przyjmuje. Zanim zmienisz tę wersję, sprawdź lokalnie
+za darmo: `npx npm@<wersja npm z tego Node> ci --dry-run --include=dev`.
 
 Identyfikator aplikacji to `com.igormusial.lunaris`. Zmiana jest darmowa **teraz**; po pierwszej
 publikacji w Google Play pakietu nie da się już podmienić.
