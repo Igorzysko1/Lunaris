@@ -17,6 +17,7 @@ import {
   SeeingCard,
 } from '@/components/night-cards';
 import { LightPollutionLink } from '@/components/LightPollutionLink';
+import { BookingButtons } from '@/components/BookingButtons';
 import { SessionCard, SessionsSkeleton } from '@/components/session-cards';
 import { Card, SectionLabel } from '@/components/primitives';
 import { dayBucket, formatLongDate, formatTime } from '@/lib/date';
@@ -25,7 +26,8 @@ import { formatAge } from '@/lib/forecast-cache';
 import { horizonOf } from '@/lib/horizon';
 import { constellationsTonight } from '@/lib/constellations';
 import { currentNightWindow } from '@/lib/night-window';
-import { nightTargetsForProfiles } from '@/lib/sky-targets';
+import { bookingFor, bookingId } from '@/lib/session-booking';
+import { nightTargetsForProfiles, rankedTargets } from '@/lib/sky-targets';
 import { useApod } from '@/hooks/use-apod';
 import { useSessions } from '@/hooks/use-sessions';
 import { useNightData } from '@/hooks/use-night-data';
@@ -33,9 +35,12 @@ import { useForecast } from '@/store/forecast';
 import { useSettings } from '@/store/settings';
 import { HAIRLINE, colors, fonts, radius, touchSlop } from '@/theme';
 
+/** Ile celów wymieniamy w opisie rezerwacji — tyle, ile czyta się w aucie. */
+const TARGETS_IN_BOOKING = 5;
+
 export default function NightScreen() {
   const router = useRouter();
-  const { active, config } = useSettings();
+  const { active, config, placeId } = useSettings();
   const { status, data, savedAt, stale, failure, refresh, refreshing } = useNightData(
     active.coords,
     active.bortle,
@@ -46,6 +51,10 @@ export default function NightScreen() {
   const apod = useApod();
 
   const { lat, lon } = active.coords;
+  // Klucz miejsca w identyfikatorze rezerwacji. Pozycja z GPS nie ma stałego
+  // id, więc wszystkie dzielą jeden — ta sama noc z dwóch punktów GPS to i tak
+  // jeden wyjazd.
+  const bookingSite = active.source === 'gps' ? 'gps' : placeId;
   const nextEvent = useMemo(() => upcomingEvents(new Date(), { lat, lon })[0] ?? null, [lat, lon]);
 
   // Cele zależą od miejsca, jakości nieba i sprzętu — nie od prognozy, więc liczą
@@ -231,9 +240,9 @@ export default function NightScreen() {
                 </Pressable>
 
                 <SectionLabel style={styles.sessionsLabel}>
-                  {sessions.savedAt
+                  {(sessions.savedAt
                     ? `Nadchodzące sesje · z prognozy ${formatAge(sessions.savedAt)}`
-                    : 'Nadchodzące sesje'}
+                    : 'Nadchodzące sesje') + (sessions.calendar ? ' · z kalendarzem' : '')}
                 </SectionLabel>
                 {sessions.status === 'loading' && <SessionsSkeleton />}
                 {sessions.status === 'ready' &&
@@ -242,6 +251,19 @@ export default function NightScreen() {
                       key={session.verdict.night.from.toISOString()}
                       session={session}
                       locationLabel={active.label}
+                      footer={
+                        <BookingButtons
+                          bookingId={bookingId(session.verdict.night, bookingSite)}
+                          booking={bookingFor({
+                            verdict: session.verdict,
+                            site: { id: bookingSite, name: active.label, lat, lon },
+                            rating: session.rating,
+                            targets: rankedTargets(session.targets, TARGETS_IN_BOOKING).map(
+                              (t) => t.name,
+                            ),
+                          })}
+                        />
+                      }
                     />
                   ))}
 

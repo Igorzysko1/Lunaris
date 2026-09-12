@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import { Link } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -19,6 +20,7 @@ import { formatShortDate } from '@/lib/date';
 import { formatAge } from '@/lib/forecast-cache';
 import { NOTIFICATIONS_AVAILABLE } from '@/lib/notification-store';
 import { useForecast } from '@/store/forecast';
+import { useGoogle } from '@/store/google';
 import { LEAD_TIMES, useSettings } from '@/store/settings';
 import { colors, fonts } from '@/theme';
 
@@ -258,6 +260,9 @@ export default function SettingsScreen() {
           </Link>
         </Card>
 
+        <SectionLabel style={styles.groupLabel}>Kalendarz Google</SectionLabel>
+        <GoogleCalendarCard />
+
         <SectionLabel style={styles.groupLabel}>Powiadomienia</SectionLabel>
         <Card variant="raised" style={styles.group}>
           {/* Przełącznik zostaje włączalny: ustawienie jest zapamiętywane i
@@ -328,6 +333,85 @@ export default function SettingsScreen() {
         </Card>
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+/**
+ * Połączenie z Kalendarzem Google.
+ *
+ * Mówi wprost, co połączenie zmienia, bo z zewnątrz tego nie widać: karty
+ * wyglądają tak samo, tylko pobudka przestaje być założeniem.
+ */
+function GoogleCalendarCard() {
+  const google = useGoogle();
+  const [failed, setFailed] = useState(false);
+
+  const connect = async () => {
+    setFailed((await google.connect()) === 'failed');
+  };
+
+  const disconnect = () =>
+    Alert.alert(
+      'Odłączyć Kalendarz Google?',
+      'Werdykt wróci do założonej godziny pobudki, a przyciski rezerwacji znikną. Zapisane już wpisy zostają w kalendarzu.',
+      [
+        { text: 'Zostaw', style: 'cancel' },
+        { text: 'Odłącz', style: 'destructive', onPress: () => void google.disconnect() },
+      ],
+    );
+
+  if (!google.available) {
+    return (
+      <Card variant="raised" style={styles.group}>
+        <Text style={[styles.notice, styles.calendarNotice]}>
+          Logowanie do Google działa tylko we własnym buildzie na Androida — w Expo Go
+          przekierowanie po zgodzie nie ma dokąd wrócić. Werdykt liczy pobudkę z założenia.
+        </Text>
+      </Card>
+    );
+  }
+
+  return (
+    <Card variant="raised" style={styles.group}>
+      <View style={styles.row}>
+        <View style={styles.rowText}>
+          <Text style={styles.rowLabel}>
+            {google.connected === null
+              ? 'Sprawdzam…'
+              : google.connected
+                ? 'Połączono'
+                : 'Nie połączono'}
+          </Text>
+          <Text style={styles.rowHint}>
+            {google.connected
+              ? 'Pobudka liczona z pierwszego porannego wydarzenia, a noce „jedź" mają przycisk rezerwacji.'
+              : 'Po połączeniu werdykt liczy pobudkę z prawdziwego kalendarza zamiast z założenia.'}
+          </Text>
+        </View>
+        {google.connected !== null && (
+          <Pressable
+            accessibilityRole="button"
+            onPress={google.connected ? disconnect : () => void connect()}
+            disabled={google.busy}
+            style={styles.calendarAction}
+          >
+            <Text style={google.connected ? styles.calendarDisconnect : styles.link}>
+              {google.busy ? '…' : google.connected ? 'Odłącz' : 'Połącz'}
+            </Text>
+          </Pressable>
+        )}
+      </View>
+      {failed && (
+        <View style={styles.errorRow}>
+          <Text style={styles.errorText}>Nie udało się połączyć z Google.</Text>
+          <Text style={styles.errorHint}>
+            Sprawdź sieć. Jeśli Google pokazał błąd klienta, klient OAuth w konsoli musi mieć nazwę
+            pakietu com.igormusial.lunaris, odcisk SHA-1 tego buildu i włączony niestandardowy
+            schemat URI.
+          </Text>
+        </View>
+      )}
+    </Card>
   );
 }
 
@@ -666,6 +750,19 @@ const styles = StyleSheet.create({
     fontFamily: fonts.mono,
     fontSize: 13,
     color: colors.purple,
+  },
+  calendarNotice: {
+    padding: 14,
+    marginBottom: 0,
+  },
+  calendarAction: {
+    minHeight: 44,
+    justifyContent: 'center',
+  },
+  calendarDisconnect: {
+    fontFamily: fonts.sans,
+    fontSize: 15,
+    color: colors.coral,
   },
   leadPills: {
     flexDirection: 'row',

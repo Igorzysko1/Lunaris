@@ -19,7 +19,7 @@
  */
 
 import { findPlaceById, type Coords } from '../src/data/places.ts';
-import { nextDayFromCalendar, type CalendarEntry } from '../src/lib/calendar.ts';
+import { dayKey, nextDayWith, type CalendarEntry } from '../src/lib/calendar.ts';
 import { DEFAULT_CONFIG, mergeConfig, type LunarisConfig } from '../src/lib/config.ts';
 import { upcomingEvents } from '../src/lib/events.ts';
 import { deleteBooking, fetchDayEntries, upsertBooking } from '../src/lib/google-calendar.ts';
@@ -106,10 +106,10 @@ try {
 
 // Kalendarz czytamy zawsze: rezerwacja liczona z założonej ósmej mogłaby
 // zająć termin, którego silnik z prawdziwymi godzinami by nie polecił.
-const byDay = new Map<string, CalendarEntry[]>();
+const days = new Map<string, CalendarEntry[]>();
 for (const { night } of bundle.nights) {
   const entries = await fetchDayEntries(token, night.to);
-  if (entries) byDay.set(night.to.toDateString(), entries);
+  if (entries) days.set(dayKey(night.to), entries);
 }
 
 const now = new Date();
@@ -121,10 +121,7 @@ const planned = planNights({
   bortle: sky.bortle,
   walkMinutes: site.walkMinutes,
   events: upcomingEvents(now, coords),
-  nextDay: (night) => {
-    const entries = byDay.get(night.to.toDateString());
-    return entries ? nextDayFromCalendar(night, entries) : assumedNextDay(night, config);
-  },
+  nextDay: nextDayWith(days, (night) => assumedNextDay(night, config)),
 });
 
 const wantedNight = args.get('night');

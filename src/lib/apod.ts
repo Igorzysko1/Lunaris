@@ -15,6 +15,8 @@
  * Importy względne (nie alias @/), żeby moduł dało się uruchomić poza Metro.
  */
 
+import { timeoutSignal } from './timeout.ts';
+
 const API = 'https://api.nasa.gov/planetary/apod';
 
 /**
@@ -111,18 +113,19 @@ export function parseApod(raw: unknown): Apod | null {
  * dla którego `parseApod` nie rzuca.
  */
 export async function fetchApod(signal?: AbortSignal): Promise<Apod | null> {
-  const timeout = AbortSignal.timeout(TIMEOUT_MS);
   // Przerwać może i limit czasu, i odmontowanie ekranu.
-  const combined = signal ? AbortSignal.any([signal, timeout]) : timeout;
+  const timeout = timeoutSignal(TIMEOUT_MS, signal);
 
   try {
     const response = await fetch(`${API}?api_key=${encodeURIComponent(KEY)}&thumbs=true`, {
-      signal: combined,
+      signal: timeout.signal,
     });
     if (!response.ok) return null;
 
     return parseApod(await response.json());
   } catch {
     return null;
+  } finally {
+    timeout.clear();
   }
 }

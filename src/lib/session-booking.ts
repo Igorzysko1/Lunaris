@@ -94,6 +94,24 @@ function describe(verdict: NightVerdict, rating: number, targets: string[]): str
   return lines.join('\n');
 }
 
+/** Początek identyfikatora każdej rezerwacji — po nim kalendarz poznaje własne wpisy. */
+export const BOOKING_ID_PREFIX = 'lunaris';
+
+/**
+ * Identyfikator rezerwacji nocy w danym miejscu.
+ *
+ * Osobno od `bookingFor`, bo potrzebny jest też tam, gdzie rezerwacji już nie da
+ * się zbudować: noc, która po nowej prognozie odpadła, może nadal mieć wpis
+ * w kalendarzu — i właśnie wtedy trzeba umieć go odwołać.
+ */
+export function bookingId(night: { from: Date }, siteId: string): string {
+  // Miejsce w identyfikatorze, żeby dwie miejscówki tej samej nocy nie kasowały
+  // się nawzajem — zdarza się przy porównywaniu wariantów wyjazdu.
+  const place = siteId.toLowerCase().replace(ID_ALPHABET, '');
+
+  return `${BOOKING_ID_PREFIX}${eveningOf(night)}${place}`;
+}
+
 export type BookingInput = {
   verdict: NightVerdict;
   site: { id: string; name: string; lat: number; lon: number };
@@ -114,12 +132,8 @@ export function bookingFor({ verdict, site, rating, targets = [] }: BookingInput
 
   const { plan } = verdict;
 
-  // Miejsce w identyfikatorze, żeby dwie miejscówki tej samej nocy nie kasowały
-  // się nawzajem — zdarza się przy porównywaniu wariantów wyjazdu.
-  const place = site.id.toLowerCase().replace(ID_ALPHABET, '');
-
   return {
-    id: `lunaris${eveningOf(verdict.night)}${place}`,
+    id: bookingId(verdict.night, site.id),
     title: `Obserwacja — ${site.name}`,
     start: plan.departAt,
     end: plan.returnAt,

@@ -18,6 +18,7 @@
  * Importy względne (nie alias @/), żeby moduł dało się uruchomić poza Metro.
  */
 
+import { BOOKING_ID_PREFIX } from './session-booking.ts';
 import type { NextDay } from './session-engine.ts';
 
 /**
@@ -81,6 +82,41 @@ export function nextDayFromCalendar(night: { to: Date }, entries: CalendarEntry[
 }
 
 /**
+ * Wydarzenia pobrane na kolejne poranki, po kluczu dnia.
+ *
+ * Brak klucza znaczy „nie udało się pobrać", a nie „pusty dzień" — pusty dzień
+ * to klucz z pustą listą. Na tym rozróżnieniu stoi `nextDayWith`.
+ */
+export type CalendarDays = ReadonlyMap<string, CalendarEntry[]>;
+
+/**
+ * Klucz doby w czasie lokalnym. `toISOString` dałby dobę w UTC, czyli dla
+ * chwil tuż po północy czasu polskiego — dzień poprzedni.
+ */
+export function dayKey(date: Date): string {
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+/**
+ * `nextDay` dla silnika: prawdziwy kalendarz tam, gdzie go mamy, założenie tam,
+ * gdzie nie.
+ *
+ * Rozstrzyga **każdy poranek osobno** — nieudane pobranie jednego dnia nie
+ * cofa pozostałych do założenia i nie udaje, że ten jeden jest wolny.
+ */
+export function nextDayWith<N extends { to: Date }>(
+  days: CalendarDays | null,
+  fallback: (night: N) => NextDay,
+): (night: N) => NextDay {
+  return (night) => {
+    const entries = days?.get(dayKey(night.to));
+    return entries ? nextDayFromCalendar(night, entries) : fallback(night);
+  };
+}
+
+/**
  * Kształt wydarzenia, jaki zwraca Google Calendar API.
  *
  * Trzymamy go osobno od `CalendarEntry`, bo to dwie różne rzeczy: tamto jest
@@ -88,6 +124,7 @@ export function nextDayFromCalendar(night: { to: Date }, entries: CalendarEntry[
  * na inny dotknie tylko tego typu i funkcji poniżej.
  */
 export type GoogleEvent = {
+  id?: string;
   status?: string;
   transparency?: string;
   start?: { dateTime?: string; date?: string };
@@ -105,6 +142,11 @@ export type GoogleEvent = {
 export function toCalendarEntry(event: GoogleEvent): CalendarEntry | null {
   if (!event || typeof event !== 'object') return null;
   if (event.status === 'cancelled') return null;
+
+  // Własna rezerwacja to noc, którą planujemy, a nie poranek po niej. Wpis na
+  // jutrzejszy wieczór wypada po świcie tego samego dnia, więc policzony jako
+  // wydarzenie ustawiałby pobudkę na godzinę wyjazdu.
+  if (typeof event.id === 'string' && event.id.startsWith(BOOKING_ID_PREFIX)) return null;
 
   // Zaproszenie, które odrzuciłem, nie zajmuje mi poranka.
   const declined = (event.attendees ?? []).some(

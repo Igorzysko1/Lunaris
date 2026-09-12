@@ -12,7 +12,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { bookingFor, type BookingInput } from '../src/lib/session-booking.ts';
+import { bookingFor, bookingId, type BookingInput } from '../src/lib/session-booking.ts';
 import type { NightVerdict } from '../src/lib/session-engine.ts';
 
 const SITE = { id: 'site-bledowska', name: 'Pustynia Błędowska', lat: 50.35, lon: 19.53 };
@@ -132,5 +132,22 @@ describe('czego nie rezerwujemy', () => {
 
   it('nocy bez planu wyjazdu', () => {
     assert.equal(bookingFor(input({ verdict: verdict({ plan: null }) })), null);
+  });
+});
+
+describe('identyfikator bez gotowej rezerwacji', () => {
+  it('jest ten sam co w rezerwacji — odwołanie trafia w ten sam wpis', () => {
+    const booking = bookingFor({ verdict: verdict(), site: SITE, rating: 80 });
+
+    assert.equal(bookingId(verdict().night, SITE.id), booking?.id);
+  });
+
+  it('powstaje także dla nocy, która odpadła', () => {
+    // Prognoza się zepsuła, a wpis sprzed zmiany wciąż wisi w kalendarzu:
+    // rezerwacji już nie zbudujemy, ale odwołać trzeba umieć.
+    const rejected = verdict({ status: 'no-go', plan: null });
+
+    assert.equal(bookingFor({ verdict: rejected, site: SITE, rating: 20 }), null);
+    assert.equal(bookingId(rejected.night, SITE.id), bookingId(verdict().night, SITE.id));
   });
 });

@@ -11,6 +11,7 @@ import {
 import { AppState } from 'react-native';
 
 import { findPlaceById, type Coords } from '@/data/places';
+import { nextDayWith } from '@/lib/calendar';
 import type { LunarisConfig } from '@/lib/config';
 import {
   EMPTY_CYCLE_STATE,
@@ -23,6 +24,7 @@ import {
 } from '@/lib/daily-cycle';
 import { reviewEvents } from '@/lib/event-review';
 import { upcomingEvents } from '@/lib/events';
+import { loadCalendarDays } from '@/lib/google-account';
 import { planNights } from '@/lib/night-plan';
 import { planNotifications } from '@/lib/notification-plan';
 import { syncNotifications } from '@/lib/notification-store';
@@ -33,6 +35,7 @@ import {
   saveNoticePlan,
   type StoredNotice,
 } from '@/lib/notice-store';
+import { assumedNextDay } from '@/lib/session-engine';
 import { leadHours, type LeadTime } from '@/lib/settings-storage';
 import {
   loadCycleState,
@@ -100,6 +103,10 @@ async function runEventReview(input: {
 
   const events = upcomingEvents(now, coords);
 
+  // Ten sam kalendarz co na ekranie: powiadomienie „jedź" dla nocy, którą karta
+  // odrzuca przez poranne spotkanie, byłoby dwiema odpowiedziami na jedno pytanie.
+  const calendar = await loadCalendarDays(bundle.nights.map((slice) => slice.night.to));
+
   const planned = planNights({
     nights: bundle.nights,
     target: coords,
@@ -108,6 +115,7 @@ async function runEventReview(input: {
     bortle,
     walkMinutes,
     events,
+    nextDay: nextDayWith(calendar, (night) => assumedNextDay(night, config)),
   });
 
   const verdicts = planned.map((night) => night.verdict);

@@ -1,9 +1,12 @@
 import { useMemo } from 'react';
 
 import { findPlaceById, type Coords } from '@/data/places';
+import { nextDayWith } from '@/lib/calendar';
 import type { LunarisConfig } from '@/lib/config';
 import { upcomingEvents } from '@/lib/events';
 import { planNights, type PlannedNight } from '@/lib/night-plan';
+import { assumedNextDay } from '@/lib/session-engine';
+import { useCalendarDays } from '@/hooks/use-calendar-days';
 import { useForecast } from '@/store/forecast';
 
 export type Session = PlannedNight;
@@ -17,6 +20,9 @@ export type SessionsStatus = 'loading' | 'ready' | 'error';
  * korzysta ekran Noc, więc sekcja sesji nie kosztuje drugiego żądania. Sam
  * werdykt liczy `planNights`, wspólny z cyklem: to, co widać na ekranie, i to,
  * o czym cykl powiadamia, musi być tym samym rachunkiem.
+ *
+ * Pobudka pochodzi z Kalendarza Google, gdy konto jest połączone i poranek
+ * udało się pobrać; w każdym innym przypadku — z założenia w konfiguracji.
  */
 export function useSessions(
   coords: Coords,
@@ -38,6 +44,9 @@ export function useSessions(
     [lat, lon, bundle],
   );
 
+  const mornings = useMemo(() => bundle?.nights.map((slice) => slice.night.to) ?? [], [bundle]);
+  const calendar = useCalendarDays(mornings);
+
   const sessions = useMemo<Session[]>(() => {
     if (!bundle) return [];
 
@@ -49,13 +58,22 @@ export function useSessions(
       bortle,
       walkMinutes,
       events,
+      nextDay: nextDayWith(calendar, (night) => assumedNextDay(night, config)),
     });
     // Werdykt jest funkcją danych, konfiguracji i efemeryd — nie sieci. Zmiana
     // progu albo apertury przelicza go natychmiast, bez pobierania czegokolwiek.
     // `home` rozbite na współrzędne, bo obiekt dostaje nową tożsamość przy każdym
     // renderze store'u, a liczy się sama pozycja.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bundle, events, lat, lon, bortle, config, home?.lat, home?.lon, walkMinutes]);
+  }, [bundle, events, lat, lon, bortle, config, home?.lat, home?.lon, walkMinutes, calendar]);
 
-  return { status, sessions, savedAt, refresh, refreshing };
+  return {
+    status,
+    sessions,
+    savedAt,
+    refresh,
+    refreshing,
+    /** Czy choć jeden poranek policzono z prawdziwego kalendarza. */
+    calendar: calendar !== null && calendar.size > 0,
+  };
 }

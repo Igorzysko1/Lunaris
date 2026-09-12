@@ -10,16 +10,34 @@
  * Pusta lista znaczy „sprawdziłem, nic nie masz", `null` znaczy „nie wiem" —
  * i wtedy wywołujący wraca do założenia z konfiguracji.
  *
+ * Moduł działa i w CLI, i w aplikacji, więc nie sięga po nic, czego React
+ * Native nie ma: limit czasu idzie przez `timeoutSignal`, a adres składamy
+ * ręcznie.
+ *
  * Importy względne (nie alias @/), żeby moduł dało się uruchomić poza Metro.
  */
 
 import { toCalendarEntries, type CalendarEntry } from './calendar.ts';
 import type { Booking } from './session-booking.ts';
+import { timeoutSignal } from './timeout.ts';
 
 const API = 'https://www.googleapis.com/calendar/v3/calendars/primary/events';
 
 /** Ile czekamy na odpowiedź. Brief ma się skończyć, nawet gdy Google milczy. */
 const TIMEOUT_MS = 10_000;
+
+/** Jedno żądanie z limitem czasu; zegar sprzątany niezależnie od wyniku. */
+async function request(url: string, init: RequestInit, signal?: AbortSignal): Promise<Response> {
+  const timeout = timeoutSignal(TIMEOUT_MS, signal);
+
+  try {
+    return await fetch(url, { ...init, signal: timeout.signal });
+  } finally {
+    timeout.clear();
+  }
+}
+
+const bearer = (accessToken: string) => ({ Authorization: `Bearer ${accessToken}` });
 
 /**
  * Wydarzenia z jednej doby kalendarzowej.
@@ -38,21 +56,18 @@ export async function fetchDayEntries(
   const to = new Date(from);
   to.setDate(to.getDate() + 1);
 
-  const url = new URL(API);
-  url.search = new URLSearchParams({
+  const query = Object.entries({
     timeMin: from.toISOString(),
     timeMax: to.toISOString(),
     singleEvents: 'true',
     orderBy: 'startTime',
     maxResults: '50',
-  }).toString();
+  })
+    .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
+    .join('&');
 
   try {
-    const response = await fetch(url, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-      signal: signal ?? AbortSignal.timeout(TIMEOUT_MS),
-    });
-
+    const response = await request(`${API}?${query}`, { headers: bearer(accessToken) }, signal);
     if (!response.ok) return null;
 
     const body = (await response.json()) as { items?: unknown };
@@ -73,7 +88,40 @@ function payload(booking: Booking) {
     // Wpis ma **zajmować** czas, inaczej nie zasłoniłby terminu nikomu, kto
     // szuka wolnego okna — a po to właśnie powstaje.
     transparency: 'opaque',
+    // Jawnie, bo rezerwacja po odwołaniu trafia w ten sam identyfikator: Google
+    // trzyma usunięty wpis jako odwołany, `POST` dostaje 409 i idzie `PUT`.
+    // Bez statusu o tym, czy wpis wróci, decydowałaby domyślna wartość po
+    // stronie Google.
+    status: 'confirmed',
   };
+}
+
+/**
+ * Czy rezerwacja tej nocy wisi w kalendarzu.
+ *
+ * Odwołany wpis Google nadal zwraca — ze statusem `cancelled` — więc sam kod
+ * 200 nie znaczy „jest". `null` znaczy „nie wiem", jak wszędzie w tym module.
+ */
+export async function fetchBooking(
+  accessToken: string,
+  bookingId: string,
+  signal?: AbortSignal,
+): Promise<{ exists: boolean } | null> {
+  try {
+    const response = await request(
+      `${API}/${encodeURIComponent(bookingId)}`,
+      { headers: bearer(accessToken) },
+      signal,
+    );
+
+    if (response.status === 404 || response.status === 410) return { exists: false };
+    if (!response.ok) return null;
+
+    const event = (await response.json()) as { status?: unknown };
+    return { exists: event.status !== 'cancelled' };
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -93,19 +141,14 @@ export async function upsertBooking(
   booking: Booking,
   signal?: AbortSignal,
 ): Promise<{ htmlLink: string; replaced: boolean } | null> {
-  const headers = {
-    Authorization: `Bearer ${accessToken}`,
-    'Content-Type': 'application/json',
-  };
-  const timeout = () => signal ?? AbortSignal.timeout(TIMEOUT_MS);
+  const headers = { ...bearer(accessToken), 'Content-Type': 'application/json' };
 
   try {
-    const inserted = await fetch(API, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ id: booking.id, ...payload(booking) }),
-      signal: timeout(),
-    });
+    const inserted = await request(
+      API,
+      { method: 'POST', headers, body: JSON.stringify({ id: booking.id, ...payload(booking) }) },
+      signal,
+    );
 
     if (inserted.ok) {
       const created = (await inserted.json()) as { htmlLink?: unknown };
@@ -117,12 +160,11 @@ export async function upsertBooking(
 
     if (inserted.status !== 409) return null;
 
-    const updated = await fetch(`${API}/${encodeURIComponent(booking.id)}`, {
-      method: 'PUT',
-      headers,
-      body: JSON.stringify(payload(booking)),
-      signal: timeout(),
-    });
+    const updated = await request(
+      `${API}/${encodeURIComponent(booking.id)}`,
+      { method: 'PUT', headers, body: JSON.stringify(payload(booking)) },
+      signal,
+    );
 
     if (!updated.ok) return null;
 
@@ -151,11 +193,11 @@ export async function deleteBooking(
   signal?: AbortSignal,
 ): Promise<{ existed: boolean } | null> {
   try {
-    const response = await fetch(`${API}/${encodeURIComponent(bookingId)}`, {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${accessToken}` },
-      signal: signal ?? AbortSignal.timeout(TIMEOUT_MS),
-    });
+    const response = await request(
+      `${API}/${encodeURIComponent(bookingId)}`,
+      { method: 'DELETE', headers: bearer(accessToken) },
+      signal,
+    );
 
     if (response.ok) return { existed: true };
     if (response.status === 404 || response.status === 410) return { existed: false };

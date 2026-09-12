@@ -12,6 +12,8 @@ import {
   planAppFetch,
 } from '@/lib/daily-cycle';
 import { loadCycleState, loadForecast, saveCycleState, saveForecast } from '@/lib/forecast-cache';
+import { useCalendarDays } from '@/hooks/use-calendar-days';
+import { nextDayWith } from '@/lib/calendar';
 import { assumedNextDay } from '@/lib/session-engine';
 import { reviewNights } from '@/lib/site-review';
 import { skyQualityAt } from '@/lib/sky-map';
@@ -197,6 +199,14 @@ export function useSiteReview(config: LunarisConfig) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [siteKey, hour, attempt]);
 
+  // Poranki są te same dla każdej miejscówki — kalendarz nie zależy od tego,
+  // dokąd się jedzie — więc wystarczą noce z pierwszej wczytanej prognozy.
+  const mornings = useMemo(
+    () => ([...forecasts.values()][0] ?? []).map((slice) => slice.night.to),
+    [forecasts],
+  );
+  const calendar = useCalendarDays(mornings);
+
   /**
    * Werdykty są **czystą funkcją** wczytanych prognoz i konfiguracji, więc
    * liczymy je przy renderze zamiast trzymać w stanie i ustawiać w efekcie.
@@ -215,13 +225,13 @@ export function useSiteReview(config: LunarisConfig) {
           illumination: Math.round(SunCalc.getMoonIllumination(night.from).fraction * 100),
           upAt: (at) => SunCalc.getMoonPosition(at, coords.lat, coords.lon).altitude > 0,
         }),
-        nextDay: (night) => assumedNextDay(night, config),
+        nextDay: nextDayWith(calendar, (night) => assumedNextDay(night, config)),
         // Bortle policzone dla współrzędnych miejsca bije szacunek wpisany
         // do katalogu; szacunek zostaje dla punktów spoza wgranej mapy.
         bortleFor: (site) => skyQualityAt(site.lat, site.lon, site.bortle).bortle,
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [forecasts, config, home?.lat, home?.lon],
+    [forecasts, config, home?.lat, home?.lon, calendar],
   );
 
   return { status, reviews, savedAt, refresh, refreshing: status === 'loading' };

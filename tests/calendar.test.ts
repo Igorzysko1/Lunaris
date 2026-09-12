@@ -15,7 +15,9 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import {
+  dayKey,
   nextDayFromCalendar,
+  nextDayWith,
   toCalendarEntries,
   toCalendarEntry,
   type CalendarEntry,
@@ -146,6 +148,13 @@ describe('odczyt odpowiedzi Google', () => {
     assert.equal(entry?.blocking, true);
   });
 
+  it('własna rezerwacja nie jest porannym wydarzeniem', () => {
+    // Wpis na jutrzejszy wieczór wypada po świcie tego samego dnia — policzony,
+    // ustawiałby pobudkę na godzinę wyjazdu.
+    assert.equal(toCalendarEntry(event({ id: 'lunaris20260116sitebledoska' })), null);
+    assert.notEqual(toCalendarEntry(event({ id: 'abc123' })), null);
+  });
+
   it('przezroczystość oznacza „wolny"', () => {
     assert.equal(toCalendarEntry(event({ transparency: 'transparent' }))?.blocking, false);
   });
@@ -172,5 +181,39 @@ describe('odczyt odpowiedzi Google', () => {
     for (const value of [null, undefined, {}, 'x', 7]) {
       assert.deepEqual(toCalendarEntries(value), [], String(value));
     }
+  });
+});
+
+describe('kalendarz w werdykcie', () => {
+  const ASSUMED = { firstEventAt: new Date(2026, 0, 16, 7, 0), dayOff: false };
+  const fallback = () => ASSUMED;
+
+  it('klucz dnia jest lokalny, nie UTC', () => {
+    // 0:30 czasu polskiego to w UTC jeszcze poprzedni dzień.
+    assert.equal(dayKey(new Date(2026, 0, 16, 0, 30)), '2026-01-16');
+  });
+
+  it('poranek z pobranym kalendarzem liczy się z wydarzeń', () => {
+    const days = new Map([[dayKey(NIGHT.to), [timed(new Date(2026, 0, 16, 10, 0))]]]);
+
+    assert.deepEqual(nextDayWith(days, fallback)(NIGHT).firstEventAt, new Date(2026, 0, 16, 10, 0));
+  });
+
+  it('pusty dzień to wolny poranek, a nie brak danych', () => {
+    const days = new Map([[dayKey(NIGHT.to), []]]);
+
+    assert.equal(nextDayWith(days, fallback)(NIGHT).dayOff, true);
+  });
+
+  it('dzień, którego nie udało się pobrać, wraca do założenia', () => {
+    // Najgroźniejsza pomyłka tej ścieżki: brak odpowiedzi potraktowany jak pusty
+    // kalendarz dałby zielone światło nocy, która powinna odpaść.
+    const days = new Map([[dayKey(new Date(2026, 0, 17)), []]]);
+
+    assert.deepEqual(nextDayWith(days, fallback)(NIGHT), ASSUMED);
+  });
+
+  it('bez konta wszystko liczy się z założenia', () => {
+    assert.deepEqual(nextDayWith(null, fallback)(NIGHT), ASSUMED);
   });
 });

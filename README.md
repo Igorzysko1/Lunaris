@@ -171,10 +171,23 @@ i etykiet dostępności. Psują się cicho, więc są sprawdzane maszynowo.
 
 Atrybucja jest też w aplikacji, w Ustawieniach.
 
-Kalendarz wymaga jednorazowej autoryzacji OAuth: klienta typu „aplikacja komputerowa" tworzy się
-w Google Cloud Console, a poświadczenia trafiają do `~/.lunaris/google-client.json` (uprawnienia
-`600`, poza repozytorium). `npm run google:auth` wymienia je na token odświeżania. Bez `--calendar`
-nic z tego nie jest potrzebne — obowiązuje wtedy założenie z konfiguracji.
+Kalendarz wymaga jednorazowej autoryzacji OAuth — osobno dla CLI i dla telefonu, bo to dwa różne
+klienty w Google Cloud Console:
+
+- **CLI** — klient typu „aplikacja komputerowa". Poświadczenia trafiają do
+  `~/.lunaris/google-client.json` (uprawnienia `600`, poza repozytorium), a `npm run google:auth`
+  wymienia je na token odświeżania. Bez `--calendar` nic z tego nie jest potrzebne.
+- **Aplikacja** — klient typu „Android" z nazwą pakietu `com.igormusial.lunaris`, odciskiem SHA-1
+  certyfikatu, którym EAS podpisuje buildy, i włączonym niestandardowym schematem URI. Taki klient
+  nie ma sekretu, więc jego identyfikator stoi jawnie w
+  [`google-account.ts`](src/lib/google-account.ts), a token odświeżania leży w `expo-secure-store`.
+  Połączenie włącza się w Ustawieniach i działa tylko we własnym buildzie: w Expo Go przekierowanie
+  po zgodzie nie ma dokąd wrócić.
+
+Po połączeniu aplikacja liczy pobudkę z kalendarza — na ekranie Noc, w przeglądzie miejscówek
+i w cyklu powiadomień, bo to ma być jeden rachunek — a karty nocy „jedź" dostają przyciski
+rezerwacji i odwołania. Nic nie zapisuje się samo. Bez połączenia obowiązuje założenie
+z konfiguracji.
 
 Klucza wymaga tylko APOD i domyślnie idzie na `DEMO_KEY`, który działa bez rejestracji — przy
 pobraniu raz na dobę limit wystarcza z zapasem. Własny klucz z [api.nasa.gov](https://api.nasa.gov)
@@ -193,6 +206,10 @@ Projekt prywatny, jeden użytkownik, bez wydania. Rzeczy świadomie niezrobione:
   zostaje samo wywołanie systemowe.
 - **Zadanie w tle** nie jest jeszcze podpięte: plan powstaje przy odświeżeniu cyklu, czyli po
   otwarciu aplikacji.
+- **Token Google wygasa po tygodniu**, dopóki projekt w Google Cloud Console jest w trybie
+  testowym — tak Google traktuje zakres kalendarza w nieopublikowanych aplikacjach. Aplikacja
+  rozpoznaje to po `invalid_grant` i pokazuje konto jako odłączone; CLI każe ponowić
+  `npm run google:auth`.
 - **Progi nie są skalibrowane.** Domyślne wartości są ostrożne i czekają na dane z dziennika.
 - **Jasność powierzchniowa liczona jest ze średniej po całej powierzchni**, więc nie odróżnia M31
   — rozlanej, ale z jasnym jądrem — od dowolnej galaktyki w Pannie. Naprawa wymaga pola, którego

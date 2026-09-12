@@ -11,6 +11,7 @@ import {
 } from '@expo-google-fonts/ibm-plex-mono';
 
 import { ForecastProvider } from '@/store/forecast';
+import { GoogleProvider } from '@/store/google';
 import { SettingsProvider, useSettings } from '@/store/settings';
 import { colors } from '@/theme';
 
@@ -30,7 +31,11 @@ export default function RootLayout() {
   return (
     <SettingsProvider>
       <StatusBar style="light" />
-      <AppStack />
+      {/* Nad cyklem i ekranami: stan konta czytają karty sesji, przegląd
+          i Ustawienia, a odłączenie wykryte gdziekolwiek ma dotrzeć wszędzie. */}
+      <GoogleProvider>
+        <AppStack />
+      </GoogleProvider>
     </SettingsProvider>
   );
 }

@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -10,10 +11,13 @@ import { HAIRLINE, colors, fonts, radius } from '@/theme';
 export function SessionCard({
   session,
   locationLabel,
+  footer,
   now = new Date(),
 }: {
   session: Session;
   locationLabel: string;
+  /** Akcje pod kartą — rezerwacja w kalendarzu. Karta nie wie, skąd się biorą. */
+  footer?: ReactNode;
   now?: Date;
 }) {
   const { verdict, minTemperature, feltTemperature, targets, uncertain } = session;
@@ -113,6 +117,8 @@ export function SessionCard({
           )}
         </View>
       )}
+
+      {footer}
     </Card>
   );
 }
