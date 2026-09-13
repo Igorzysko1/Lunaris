@@ -33,7 +33,8 @@ import {
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
-import { dayKey, type CalendarDays, type CalendarEntry } from './calendar';
+import { dayKey, fillFromStore, type CalendarDays, type CalendarEntry } from './calendar';
+import { clearStoredDays, loadStoredDays, saveFreshDays } from './calendar-store';
 import { fetchDayEntries } from './google-calendar';
 
 /** Klient OAuth typu Android z Google Cloud Console. Jawny — patrz wyżej. */
@@ -118,6 +119,9 @@ async function forget(): Promise<void> {
   } catch {
     // Brak wpisu do usunięcia to ten sam stan, do którego dążymy.
   }
+
+  // Zapisane godziny wydarzeń należą do konta, które właśnie odłączamy.
+  await clearStoredDays();
 
   for (const listener of listeners) listener(false);
 }
@@ -237,32 +241,49 @@ export async function googleAccessToken(): Promise<AccessResult> {
 }
 
 async function fetchDays(mornings: Date[], id: string): Promise<CalendarDays | null> {
-  const auth = await googleAccessToken();
-  if (auth.status !== 'ok') return null;
-
   const unique = new Map(mornings.map((morning) => [dayKey(morning), morning]));
-  const value = new Map<string, CalendarEntry[]>();
+  const auth = await googleAccessToken();
 
-  await Promise.all(
-    [...unique].map(async ([key, morning]) => {
-      const entries = await fetchDayEntries(auth.token, morning);
-      if (entries) value.set(key, entries);
-    }),
-  );
+  // Odłączone konto nie ma kalendarza — także zapisanego, bo `forget` go skasował.
+  if (auth.status === 'disconnected') return null;
 
-  // Zapamiętujemy tylko komplet. Dzień, który się nie pobrał, ma dostać drugą
-  // szansę przy następnym pytaniu, a nie dziesięć minut założenia.
-  if (value.size === unique.size) cachedDays = { id, at: Date.now(), value };
+  const fresh = new Map<string, CalendarEntry[]>();
 
-  return value;
+  if (auth.status === 'ok') {
+    await Promise.all(
+      [...unique].map(async ([key, morning]) => {
+        const entries = await fetchDayEntries(auth.token, morning);
+        if (entries) fresh.set(key, entries);
+      }),
+    );
+
+    // Sprawdzenie po pobraniu, a nie przed: odłączenie w trakcie żądań
+    // skasowało już zapis i nie może go przywrócić spóźniona odpowiedź.
+    if (await isGoogleConnected()) await saveFreshDays(fresh);
+  }
+
+  // W pamięci trzymamy tylko komplet świeżych dni. Dzień, który się nie
+  // pobrał, ma dostać drugą szansę przy następnym pytaniu, a nie dziesięć minut
+  // zapisu z dysku.
+  if (fresh.size === unique.size) {
+    cachedDays = { id, at: Date.now(), value: fresh };
+    return fresh;
+  }
+
+  // Luki — brak sieci albo pojedynczy dzień, który się nie pobrał — wypełnia
+  // ostatnie udane pobranie, jeśli jest dość świeże.
+  const filled = fillFromStore(fresh, await loadStoredDays(), [...unique.keys()], new Date());
+
+  return auth.status === 'ok' || filled.size > 0 ? filled : null;
 }
 
 /**
  * Wydarzenia z podanych poranków, gotowe dla `nextDayWith`.
  *
- * `null`, gdy konta nie ma albo token się nie odświeżył — silnik liczy wtedy
- * całość z założenia. Dzień, którego nie udało się pobrać, po prostu nie trafia
- * do mapy i tylko on wraca do założenia.
+ * `null`, gdy konta nie ma, albo gdy token się nie odświeżył, a na dysku nie ma
+ * dość świeżego zapisu — silnik liczy wtedy całość z założenia. Dzień, którego
+ * nie udało się pobrać ani odczytać z zapisu, nie trafia do mapy i tylko on
+ * wraca do założenia.
  */
 export function loadCalendarDays(mornings: Date[]): Promise<CalendarDays | null> {
   if (!GOOGLE_AVAILABLE) return Promise.resolve(null);

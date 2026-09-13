@@ -16,11 +16,16 @@ import { describe, it } from 'node:test';
 
 import {
   dayKey,
+  fillFromStore,
   nextDayFromCalendar,
   nextDayWith,
+  parseStore,
+  serializeStore,
   toCalendarEntries,
   toCalendarEntry,
+  updateStore,
   type CalendarEntry,
+  type StoredCalendarDay,
 } from '../src/lib/calendar.ts';
 
 /** Noc kończąca się o 4:12 w piątek 16 stycznia 2026. */
@@ -215,5 +220,110 @@ describe('kalendarz w werdykcie', () => {
 
   it('bez konta wszystko liczy się z założenia', () => {
     assert.deepEqual(nextDayWith(null, fallback)(NIGHT), ASSUMED);
+  });
+});
+
+describe('źródło godziny poranka', () => {
+  it('kalendarz oznacza swoją odpowiedź', () => {
+    assert.equal(nextDayFromCalendar(NIGHT, []).source, 'calendar');
+  });
+});
+
+describe('zapis kalendarza na czas bez sieci', () => {
+  const NOW = new Date(2026, 0, 15, 20, 0);
+  const KEY = dayKey(NIGHT.to);
+  const hoursAgo = (h: number) => new Date(NOW.getTime() - h * 3_600_000);
+  const stored = (savedAt: Date, entries: CalendarEntry[]): Map<string, StoredCalendarDay> =>
+    new Map([[KEY, { savedAt, entries }]]);
+
+  it('świeże pobranie wygrywa z zapisem', () => {
+    const fresh = new Map([[KEY, [timed(new Date(2026, 0, 16, 10, 0))]]]);
+    const filled = fillFromStore(
+      fresh,
+      stored(hoursAgo(1), [timed(new Date(2026, 0, 16, 7, 0))]),
+      [KEY],
+      NOW,
+    );
+
+    assert.deepEqual(filled.get(KEY)?.[0].startsAt, new Date(2026, 0, 16, 10, 0));
+  });
+
+  it('zapis wypełnia dzień, którego nie udało się pobrać', () => {
+    const filled = fillFromStore(
+      new Map(),
+      stored(hoursAgo(5), [timed(new Date(2026, 0, 16, 7, 0))]),
+      [KEY],
+      NOW,
+    );
+
+    assert.deepEqual(filled.get(KEY)?.[0].startsAt, new Date(2026, 0, 16, 7, 0));
+  });
+
+  it('zapis starszy niż doba nie wchodzi', () => {
+    // Stary zapis nie zna spotkań dopisanych później — lepiej założenie niż
+    // poranek, który wygląda na wolniejszy, niż jest.
+    const filled = fillFromStore(new Map(), stored(hoursAgo(25), []), [KEY], NOW);
+
+    assert.equal(filled.has(KEY), false);
+  });
+
+  it('zapis z przyszłości nie wchodzi', () => {
+    const filled = fillFromStore(new Map(), stored(hoursAgo(-2), []), [KEY], NOW);
+
+    assert.equal(filled.has(KEY), false);
+  });
+
+  it('nowe pobranie nadpisuje dzień, a przeterminowane wypadają', () => {
+    const OLD = '2026-01-01';
+    const before = new Map<string, StoredCalendarDay>([
+      [OLD, { savedAt: hoursAgo(48), entries: [] }],
+      [KEY, { savedAt: hoursAgo(3), entries: [timed(new Date(2026, 0, 16, 7, 0))] }],
+    ]);
+
+    const after = updateStore(before, new Map([[KEY, []]]), NOW);
+
+    assert.equal(after.has(OLD), false);
+    assert.deepEqual(after.get(KEY), { savedAt: NOW, entries: [] });
+  });
+
+  it('zapis przeżywa zamianę na tekst razem z datami', () => {
+    const store = new Map<string, StoredCalendarDay>([
+      [
+        KEY,
+        {
+          savedAt: NOW,
+          entries: [
+            timed(new Date(2026, 0, 16, 9, 15)),
+            { startsAt: null, allDay: true, blocking: true },
+          ],
+        },
+      ],
+    ]);
+
+    assert.deepEqual(parseStore(serializeStore(store)), store);
+  });
+
+  it('uszkodzony zapis to pusty zapis, a nie wyjątek', () => {
+    for (const raw of [null, '', '{', '[]', '{"version":99,"days":{}}']) {
+      assert.equal(parseStore(raw).size, 0, String(raw));
+    }
+  });
+
+  it('dzień z uszkodzonym wpisem wypada w całości', () => {
+    // Połowa listy to poranek pustszy, niż był naprawdę.
+    const raw = JSON.stringify({
+      version: 1,
+      days: {
+        [KEY]: {
+          savedAt: NOW.toISOString(),
+          entries: [
+            { startsAt: '2026-01-16T09:00:00.000Z', allDay: false, blocking: true },
+            { startsAt: 'wczoraj', allDay: false, blocking: true },
+          ],
+        },
+      },
+    });
+
+    assert.equal(parseStore(raw).has(KEY), false);
   });
 });

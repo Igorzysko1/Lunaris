@@ -29,7 +29,14 @@ export type Rejection =
   | { kind: 'no-forecast' }
   | { kind: 'conditions'; blocker: Blocker }
   | { kind: 'window-too-short'; longestMinutes: number }
-  | { kind: 'not-enough-sleep'; sleepHours: number };
+  | {
+      kind: 'not-enough-sleep';
+      sleepHours: number;
+      /** Godzina, od której liczony jest sen — pierwsze wydarzenie następnego dnia. */
+      firstEventAt: Date | null;
+      /** Czy ta godzina pochodzi z kalendarza, czy z założenia w konfiguracji. */
+      fromCalendar: boolean;
+    };
 
 export type Warning =
   | { kind: 'dew'; minSpreadC: number }
@@ -111,6 +118,13 @@ export type NextDay = {
   /** Pierwsze wydarzenie następnego dnia; `null`, gdy kalendarz jest pusty. */
   firstEventAt: Date | null;
   dayOff: boolean;
+  /**
+   * Skąd pochodzi godzina: z prawdziwego kalendarza czy z założenia
+   * w konfiguracji. Silnik liczy tak samo w obu przypadkach — różnica jest dla
+   * użytkownika, który przy odrzuceniu ma wiedzieć, czy przełożyć spotkanie,
+   * czy poprawić ustawienia. Brak pola znaczy założenie.
+   */
+  source?: 'calendar' | 'assumed';
 };
 
 export type NightInput = {
@@ -332,7 +346,7 @@ export function assumedNextDay(night: { to: Date }, config: LunarisConfig): Next
   const firstEventAt = new Date(morning);
   firstEventAt.setHours(config.calendar.assumedFirstEventHour, 0, 0, 0);
 
-  return { firstEventAt: dayOff ? null : firstEventAt, dayOff };
+  return { firstEventAt: dayOff ? null : firstEventAt, dayOff, source: 'assumed' };
 }
 
 /**
@@ -496,7 +510,12 @@ export function evaluateNight(input: NightInput): NightVerdict {
         plan: null,
         warnings,
         status: 'no-go',
-        rejection: { kind: 'not-enough-sleep', sleepHours: plan.sleepHours ?? 0 },
+        rejection: {
+          kind: 'not-enough-sleep',
+          sleepHours: plan.sleepHours ?? 0,
+          firstEventAt: input.nextDay.firstEventAt,
+          fromCalendar: input.nextDay.source === 'calendar',
+        },
       };
     }
 

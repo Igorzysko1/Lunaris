@@ -117,9 +117,14 @@ export type BriefInput = {
 /** Daty w powodzie odrzucenia i w ostrzeżeniach też muszą wyjść jako ISO. */
 function plainRejection(rejection: Rejection | null): Record<string, unknown> | null {
   if (!rejection) return null;
-  // Żaden powód odrzucenia nie niesie już daty — wszystkie są liczbami albo
-  // etykietami. Gdyby doszedł taki z `Date`, trzeba go tu zamienić na ISO.
-  return { ...rejection };
+  // Odrzucenie przez sen niesie godzinę pierwszego wydarzenia, więc daty
+  // zamieniamy tak samo jak w ostrzeżeniach — każdą, a nie po nazwie pola.
+  return Object.fromEntries(
+    Object.entries(rejection).map(([key, value]) => [
+      key,
+      value instanceof Date ? iso(value) : value,
+    ]),
+  );
 }
 
 /**

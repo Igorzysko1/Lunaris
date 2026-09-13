@@ -78,7 +78,7 @@ export function nextDayFromCalendar(night: { to: Date }, entries: CalendarEntry[
   // „Dzień wolny" znaczy tu dokładnie tyle: nic nie wyznacza godziny pobudki.
   // Nie zgadujemy już weekendów — sobota z wizytą o dziewiątej ogranicza noc
   // tak samo jak wtorek, a pusta środa nie ogranicza jej wcale.
-  return { firstEventAt, dayOff: firstEventAt === null };
+  return { firstEventAt, dayOff: firstEventAt === null, source: 'calendar' };
 }
 
 /**
@@ -114,6 +114,139 @@ export function nextDayWith<N extends { to: Date }>(
     const entries = days?.get(dayKey(night.to));
     return entries ? nextDayFromCalendar(night, entries) : fallback(night);
   };
+}
+
+/** Poranek zapisany na dysku — ostatnie udane pobranie tego dnia. */
+export type StoredCalendarDay = { savedAt: Date; entries: CalendarEntry[] };
+
+const STORE_VERSION = 1;
+const HOUR_MS = 3_600_000;
+
+/**
+ * Jak długo zapis kalendarza zastępuje brak sieci.
+ *
+ * Krócej niż prognoza, i celowo: stary zapis nie zna spotkań dopisanych po
+ * nim, a przemilczane spotkanie daje sesję dłuższą, niż powinna być — jedyny
+ * groźny kierunek pomyłki w tym module. Doba wystarcza na wyjazd bez zasięgu,
+ * a nie pozwala planować z kalendarza sprzed tygodnia.
+ */
+export const CALENDAR_CACHE_MAX_AGE_HOURS = 24;
+
+function isFresh(day: StoredCalendarDay, now: Date, maxAgeHours: number): boolean {
+  const age = (now.getTime() - day.savedAt.getTime()) / HOUR_MS;
+  // Zapis z przyszłości znaczy przestawiony zegar — też mu nie ufamy.
+  return age >= 0 && age <= maxAgeHours;
+}
+
+/**
+ * Świeżo pobrane dni uzupełnione zapisem tam, gdzie pobranie się nie udało.
+ *
+ * Świeże zawsze wygrywają. Zapis wchodzi tylko w luki i tylko dość młody.
+ */
+export function fillFromStore(
+  fresh: ReadonlyMap<string, CalendarEntry[]>,
+  stored: ReadonlyMap<string, StoredCalendarDay>,
+  keys: readonly string[],
+  now: Date,
+  maxAgeHours = CALENDAR_CACHE_MAX_AGE_HOURS,
+): Map<string, CalendarEntry[]> {
+  const result = new Map(fresh);
+
+  for (const key of keys) {
+    const day = stored.get(key);
+    if (!result.has(key) && day && isFresh(day, now, maxAgeHours)) {
+      result.set(key, day.entries);
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Zapis po udanym pobraniu: nowe dni nadpisują stare, a przeterminowane
+ * wypadają, żeby zapis nie rósł z każdym tygodniem.
+ */
+export function updateStore(
+  stored: ReadonlyMap<string, StoredCalendarDay>,
+  fresh: ReadonlyMap<string, CalendarEntry[]>,
+  now: Date,
+  maxAgeHours = CALENDAR_CACHE_MAX_AGE_HOURS,
+): Map<string, StoredCalendarDay> {
+  const result = new Map<string, StoredCalendarDay>();
+
+  for (const [key, day] of stored) {
+    if (isFresh(day, now, maxAgeHours)) result.set(key, day);
+  }
+  for (const [key, entries] of fresh) result.set(key, { savedAt: now, entries });
+
+  return result;
+}
+
+/** Zapis do tekstu. Daty jako ISO — `JSON.parse` sam ich z powrotem nie ożywi. */
+export function serializeStore(store: ReadonlyMap<string, StoredCalendarDay>): string {
+  const days = Object.fromEntries(
+    [...store].map(([key, day]) => [
+      key,
+      {
+        savedAt: day.savedAt.toISOString(),
+        entries: day.entries.map((entry) => ({
+          ...entry,
+          startsAt: entry.startsAt?.toISOString() ?? null,
+        })),
+      },
+    ]),
+  );
+
+  return JSON.stringify({ version: STORE_VERSION, days });
+}
+
+/**
+ * Odczyt zapisu. Nigdy nie rzuca: uszkodzony zapis to pusty zapis, a nie
+ * awaria — i tak jak przy odpowiedzi Google, wpis nie do odczytania wypada,
+ * zamiast udawać wolny poranek pod inną postacią.
+ */
+export function parseStore(raw: string | null): Map<string, StoredCalendarDay> {
+  const result = new Map<string, StoredCalendarDay>();
+  if (!raw) return result;
+
+  let parsed: { version?: unknown; days?: unknown };
+  try {
+    parsed = JSON.parse(raw) as typeof parsed;
+  } catch {
+    return result;
+  }
+
+  if (parsed?.version !== STORE_VERSION || !parsed.days || typeof parsed.days !== 'object') {
+    return result;
+  }
+
+  for (const [key, value] of Object.entries(parsed.days as Record<string, unknown>)) {
+    const day = value as { savedAt?: unknown; entries?: unknown };
+    const savedAt = new Date(String(day?.savedAt));
+    // Dzień z uszkodzoną listą wypada w całości: jego część byłaby pustszym
+    // porankiem, niż był naprawdę.
+    if (Number.isNaN(savedAt.getTime()) || !Array.isArray(day.entries)) continue;
+
+    const entries: CalendarEntry[] = [];
+    let broken = false;
+    for (const item of day.entries) {
+      const entry = item as { startsAt?: unknown; allDay?: unknown; blocking?: unknown };
+      const startsAt = typeof entry?.startsAt === 'string' ? new Date(entry.startsAt) : null;
+      if (
+        typeof entry?.allDay !== 'boolean' ||
+        typeof entry.blocking !== 'boolean' ||
+        (startsAt !== null && Number.isNaN(startsAt.getTime()))
+      ) {
+        broken = true;
+        break;
+      }
+      entries.push({ startsAt, allDay: entry.allDay, blocking: entry.blocking });
+    }
+
+    if (!broken) result.set(key, { savedAt, entries });
+  }
+
+  return result;
 }
 
 /**

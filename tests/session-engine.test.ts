@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { DEFAULT_CONFIG, type LunarisConfig } from '../src/lib/config.ts';
-import { evaluateNight, type NightInput } from '../src/lib/session-engine.ts';
+import { assumedNextDay, evaluateNight, type NightInput } from '../src/lib/session-engine.ts';
 import type { NightHour } from '../src/lib/weather.ts';
 
 const KATOWICE = { lat: 50.259, lon: 19.021 };
@@ -503,5 +503,35 @@ describe('evaluateNight — kalendarz i sen', () => {
     assert.ok(Math.abs(verdict.plan!.travelMinutes - 60) < 3);
     assert.ok(verdict.plan!.departAt < NIGHT.from);
     assert.ok(verdict.plan!.returnAt > NIGHT.to);
+  });
+});
+
+describe('odrzucenie przez sen wskazuje poranek', () => {
+  it('niesie godzinę wydarzenia i to, że pochodzi z kalendarza', () => {
+    const at = new Date(2026, 0, 16, 2, 0);
+    const verdict = evaluateNight(
+      sleepBound({ nextDay: { firstEventAt: at, dayOff: false, source: 'calendar' } }),
+    );
+
+    const rejection = verdict.rejection;
+    assert.ok(rejection?.kind === 'not-enough-sleep', 'noc powinna odpaść przez sen');
+    assert.deepEqual(rejection.firstEventAt, at);
+    assert.equal(rejection.fromCalendar, true);
+  });
+
+  it('godzina bez źródła to założenie, nie kalendarz', () => {
+    // Stare wywołania nie znają pola `source` — nie mogą przez to zacząć
+    // twierdzić, że godzina pochodzi z kalendarza.
+    const verdict = evaluateNight(
+      sleepBound({ nextDay: { firstEventAt: new Date(2026, 0, 16, 2, 0), dayOff: false } }),
+    );
+
+    const rejection = verdict.rejection;
+    assert.ok(rejection?.kind === 'not-enough-sleep', 'noc powinna odpaść przez sen');
+    assert.equal(rejection.fromCalendar, false);
+  });
+
+  it('założenie z konfiguracji oznacza się jako założenie', () => {
+    assert.equal(assumedNextDay(LONG_NIGHT, DEFAULT_CONFIG).source, 'assumed');
   });
 });

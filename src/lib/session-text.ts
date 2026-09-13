@@ -62,8 +62,17 @@ export function describeRejection(rejection: Rejection): string {
     // Świadome przejście do kolejnego case: każdy blocker wyżej kończy się return.
     case 'window-too-short':
       return `Najdłuższe pogodne okno to ${formatDuration(rejection.longestMinutes)} — za krótko.`;
-    case 'not-enough-sleep':
-      return `Zostałoby ${rejection.sleepHours.toFixed(1)} h snu przed pobudką.`;
+    case 'not-enough-sleep': {
+      const sleep = `Zostałoby ${rejection.sleepHours.toFixed(1)} h snu`;
+      // Godzina, od której liczony jest sen, to jedyne, co da się zmienić:
+      // przełożyć spotkanie albo poprawić założenie w ustawieniach. Bez niej
+      // powód brzmi jak werdykt pogody, a nie poranka.
+      if (!rejection.firstEventAt) return `${sleep} przed pobudką.`;
+
+      return rejection.fromCalendar
+        ? `${sleep} — pierwsze wydarzenie w kalendarzu o ${formatTime(rejection.firstEventAt)}.`
+        : `${sleep} — zakładany początek dnia o ${formatTime(rejection.firstEventAt)}.`;
+    }
   }
 }
 
