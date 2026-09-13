@@ -17,11 +17,23 @@
  * Importy względne (nie alias @/), żeby moduł dało się uruchomić poza Metro.
  */
 
-import { toCalendarEntries, type CalendarEntry } from './calendar.ts';
+import {
+  effectiveCalendarIds,
+  toCalendarEntries,
+  toCalendarInfos,
+  type CalendarEntry,
+  type CalendarInfo,
+} from './calendar.ts';
 import type { Booking } from './session-booking.ts';
 import { timeoutSignal } from './timeout.ts';
 
-const API = 'https://www.googleapis.com/calendar/v3/calendars/primary/events';
+const CALENDAR_API = 'https://www.googleapis.com/calendar/v3';
+
+/** Rezerwacje trafiają zawsze do głównego kalendarza. */
+const API = `${CALENDAR_API}/calendars/primary/events`;
+
+const eventsUrl = (calendarId: string) =>
+  `${CALENDAR_API}/calendars/${encodeURIComponent(calendarId)}/events`;
 
 /** Ile czekamy na odpowiedź. Brief ma się skończyć, nawet gdy Google milczy. */
 const TIMEOUT_MS = 10_000;
@@ -77,6 +89,7 @@ export async function fetchDayEntries(
   accessToken: string,
   day: Date,
   signal?: AbortSignal,
+  calendarId: string = 'primary',
 ): Promise<CalendarEntry[] | null> {
   const from = new Date(day);
   from.setHours(0, 0, 0, 0);
@@ -94,7 +107,11 @@ export async function fetchDayEntries(
     .join('&');
 
   try {
-    const response = await request(`${API}?${query}`, { headers: bearer(accessToken) }, signal);
+    const response = await request(
+      `${eventsUrl(calendarId)}?${query}`,
+      { headers: bearer(accessToken) },
+      signal,
+    );
     if (!response.ok) return null;
 
     const body = (await response.json()) as { items?: unknown };
@@ -253,4 +270,74 @@ export async function deleteBooking(
   } catch {
     return null;
   }
+}
+
+export type CalendarListResult =
+  | { status: 'ok'; calendars: CalendarInfo[] }
+  | { status: 'insufficient-scope' }
+  | { status: 'failed' };
+
+/**
+ * Lista kalendarzy konta.
+ *
+ * Wymaga zakresu `calendar.calendarlist.readonly`. Token wydany przed jego
+ * dodaniem dostaje 403 z brakiem uprawnień — to osobny wynik, bo naprawia go
+ * ponowne połączenie konta, a nie ponowienie żądania. 403 z innego powodu
+ * (limit zapytań) jest zwykłą porażką.
+ */
+export async function fetchCalendarList(
+  accessToken: string,
+  signal?: AbortSignal,
+): Promise<CalendarListResult> {
+  try {
+    const response = await request(
+      `${CALENDAR_API}/users/me/calendarList?maxResults=250`,
+      { headers: bearer(accessToken) },
+      signal,
+    );
+
+    if (response.status === 403) {
+      const body = await response.text().catch(() => '');
+      return /insufficient/i.test(body) ? { status: 'insufficient-scope' } : { status: 'failed' };
+    }
+    if (!response.ok) return { status: 'failed' };
+
+    const body = (await response.json()) as { items?: unknown };
+    return { status: 'ok', calendars: toCalendarInfos(body.items) };
+  } catch {
+    return { status: 'failed' };
+  }
+}
+
+/**
+ * Wydarzenia poranka ze wszystkich wybranych kalendarzy.
+ *
+ * Albo komplet, albo `null`. Poranek z jednego kalendarza z trzech wygląda na
+ * wolniejszy, niż jest — to ta sama pomyłka co brak danych udający pusty
+ * dzień, tylko częściowa.
+ */
+export async function fetchMorningEntries(
+  accessToken: string,
+  day: Date,
+  calendarIds: readonly string[],
+  signal?: AbortSignal,
+): Promise<CalendarEntry[] | null> {
+  const lists = await Promise.all(
+    calendarIds.map((calendarId) => fetchDayEntries(accessToken, day, signal, calendarId)),
+  );
+
+  if (lists.some((list) => list === null)) return null;
+  return (lists as CalendarEntry[][]).flat();
+}
+
+/**
+ * Kalendarze do czytania — wspólne dla aplikacji i CLI: wybór z konfiguracji
+ * sprawdzony z listą konta, a bez listy zapisany wybór albo główny.
+ */
+export async function resolveCalendarIds(
+  accessToken: string,
+  configured: readonly string[] | null,
+): Promise<string[]> {
+  const list = await fetchCalendarList(accessToken);
+  return effectiveCalendarIds(configured, list.status === 'ok' ? list.calendars : null);
 }

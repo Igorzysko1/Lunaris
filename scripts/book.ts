@@ -22,7 +22,12 @@ import { findPlaceById, type Coords } from '../src/data/places.ts';
 import { dayKey, nextDayWith, type CalendarEntry } from '../src/lib/calendar.ts';
 import { DEFAULT_CONFIG, mergeConfig, type LunarisConfig } from '../src/lib/config.ts';
 import { upcomingEvents } from '../src/lib/events.ts';
-import { deleteBooking, fetchDayEntries, upsertBooking } from '../src/lib/google-calendar.ts';
+import {
+  deleteBooking,
+  fetchMorningEntries,
+  resolveCalendarIds,
+  upsertBooking,
+} from '../src/lib/google-calendar.ts';
 import { accessToken, readClient, readRefreshToken } from '../src/lib/google-oauth.ts';
 import { planNights } from '../src/lib/night-plan.ts';
 import { assumedNextDay } from '../src/lib/session-engine.ts';
@@ -106,9 +111,12 @@ try {
 
 // Kalendarz czytamy zawsze: rezerwacja liczona z założonej ósmej mogłaby
 // zająć termin, którego silnik z prawdziwymi godzinami by nie polecił.
+// Pobudkę wyznaczają wszystkie wybrane kalendarze; sam wpis trafia do głównego.
+const calendarIds = await resolveCalendarIds(token, config.calendar.calendarIds);
+
 const days = new Map<string, CalendarEntry[]>();
 for (const { night } of bundle.nights) {
-  const entries = await fetchDayEntries(token, night.to);
+  const entries = await fetchMorningEntries(token, night.to, calendarIds);
   if (entries) days.set(dayKey(night.to), entries);
 }
 

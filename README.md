@@ -189,6 +189,14 @@ i w cyklu powiadomień, bo to ma być jeden rachunek — a karty nocy „jedź" 
 rezerwacji i odwołania. Nic nie zapisuje się samo. Bez połączenia obowiązuje założenie
 z konfiguracji.
 
+**Pobudkę wyznacza kilka kalendarzy, nie tylko główny.** Domyślnie liczą się główny i własne
+kalendarze widoczne w Google Calendar; subskrypcje w rodzaju świąt i urodzin — nie. Wybór zmienia
+się w Ustawieniach, zapisuje w `calendar.calendarIds` i obowiązuje też w CLI (`brief`, `book`).
+Rezerwacje zawsze trafiają do głównego. Lista kalendarzy wymaga zakresu
+`calendar.calendarlist.readonly` — połączenie sprzed jego dodania trzeba odnowić: w aplikacji
+odłączyć i połączyć konto, w CLI powtórzyć `npm run google:auth`. Do tego czasu liczy się tylko
+główny kalendarz.
+
 Klucza wymaga tylko APOD i domyślnie idzie na `DEMO_KEY`, który działa bez rejestracji — przy
 pobraniu raz na dobę limit wystarcza z zapasem. Własny klucz z [api.nasa.gov](https://api.nasa.gov)
 podaje się w `EXPO_PUBLIC_NASA_KEY`. Zdjęcia bywają cudzą własnością, dlatego karta pokazuje podpis

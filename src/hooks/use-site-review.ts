@@ -205,7 +205,7 @@ export function useSiteReview(config: LunarisConfig) {
     () => ([...forecasts.values()][0] ?? []).map((slice) => slice.night.to),
     [forecasts],
   );
-  const calendar = useCalendarDays(mornings);
+  const calendar = useCalendarDays(mornings, config.calendar.calendarIds);
 
   /**
    * Werdykty są **czystą funkcją** wczytanych prognoz i konfiguracji, więc

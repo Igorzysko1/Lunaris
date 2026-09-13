@@ -306,3 +306,95 @@ export function toCalendarEntries(events: unknown): CalendarEntry[] {
     .map((event) => toCalendarEntry(event as GoogleEvent))
     .filter((entry): entry is CalendarEntry => entry !== null);
 }
+
+/** Alias głównego kalendarza konta w API Google. */
+export const PRIMARY_CALENDAR = 'primary';
+
+/**
+ * Kalendarz z listy konta — tyle, ile potrzeba do wyboru w Ustawieniach.
+ *
+ * Nazwa kalendarza to nie treść wydarzeń: „Praca" czy „Sport" użytkownik nadał
+ * sam i bez niej nie da się niczego wybrać.
+ */
+export type CalendarInfo = {
+  id: string;
+  name: string;
+  primary: boolean;
+  /** Widoczny w Google Calendar — Google trzyma to per użytkownik. */
+  selected: boolean;
+  /** `owner` i `writer` to własne kalendarze; `reader` to subskrypcje i cudze. */
+  accessRole: string;
+  color: string | null;
+};
+
+/**
+ * Lista kalendarzy z odpowiedzi Google. Nigdy nie rzuca; brakujące pole nie
+ * daje uprawnień, których Google nie potwierdził.
+ */
+export function toCalendarInfos(items: unknown): CalendarInfo[] {
+  if (!Array.isArray(items)) return [];
+
+  return items.flatMap((item): CalendarInfo[] => {
+    if (!item || typeof item !== 'object') return [];
+    const raw = item as Record<string, unknown>;
+    const id = raw.id;
+    if (typeof id !== 'string' || id.length === 0) return [];
+
+    const name =
+      [raw.summaryOverride, raw.summary].find(
+        (value): value is string => typeof value === 'string' && value.length > 0,
+      ) ?? id;
+
+    return [
+      {
+        id,
+        name,
+        primary: raw.primary === true,
+        selected: raw.selected === true,
+        accessRole: typeof raw.accessRole === 'string' ? raw.accessRole : 'reader',
+        color: typeof raw.backgroundColor === 'string' ? raw.backgroundColor : null,
+      },
+    ];
+  });
+}
+
+/**
+ * Które kalendarze liczą się, gdy użytkownik niczego nie wybrał.
+ *
+ * Główny zawsze. Poza nim te widoczne w Google Calendar i należące do
+ * użytkownika — `owner` albo `writer`. Subskrypcje (święta, urodziny, kalendarze
+ * cudzych zespołów) mają rolę `reader` i odpadają same: urodziny znajomego nie
+ * są porannym obowiązkiem, a wydarzenie, na które nikt mnie nie zaprosił, nie
+ * wyznacza mojej pobudki.
+ */
+export function defaultCalendarIds(calendars: readonly CalendarInfo[]): string[] {
+  const ids = calendars
+    .filter(
+      (c) => c.primary || (c.selected && (c.accessRole === 'owner' || c.accessRole === 'writer')),
+    )
+    .map((c) => c.id);
+
+  return ids.length > 0 ? ids : [PRIMARY_CALENDAR];
+}
+
+/**
+ * Kalendarze do czytania: wybór z konfiguracji, jeśli coś z niego wciąż
+ * istnieje, w przeciwnym razie domyślne.
+ *
+ * Kalendarz usunięty w Google znika z wyboru po cichu. Bez listy konta (stary
+ * token, brak sieci) nie ma jak sprawdzić, co istnieje — zostaje zapisany wybór
+ * albo główny.
+ */
+export function effectiveCalendarIds(
+  configured: readonly string[] | null,
+  calendars: readonly CalendarInfo[] | null,
+): string[] {
+  if (!calendars) {
+    return configured && configured.length > 0 ? [...configured] : [PRIMARY_CALENDAR];
+  }
+
+  const known = new Set(calendars.map((c) => c.id));
+  const chosen = (configured ?? []).filter((id) => known.has(id) || id === PRIMARY_CALENDAR);
+
+  return chosen.length > 0 ? chosen : defaultCalendarIds(calendars);
+}

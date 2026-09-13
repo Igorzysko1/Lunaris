@@ -134,6 +134,12 @@ export type CalendarThresholds = {
   assumedFirstEventHour: number;
   /** Czy sobota i niedziela liczą się jako dni wolne. */
   weekendDaysOff: boolean;
+  /**
+   * Kalendarze Google, których poranki ograniczają noc. `null` — domyślne:
+   * główny i własne kalendarze widoczne w Google Calendar, bez subskrypcji
+   * w rodzaju świąt i urodzin. Rezerwacje zawsze trafiają do głównego.
+   */
+  calendarIds: string[] | null;
 };
 
 /**
@@ -198,6 +204,7 @@ export const DEFAULT_CONFIG: LunarisConfig = {
     homeOnlyBeforeHour: 10,
     assumedFirstEventHour: 8,
     weekendDaysOff: true,
+    calendarIds: null,
   },
   refresh: {
     hourOfDay: DEFAULT_REFRESH_HOUR,
@@ -334,6 +341,17 @@ function clampNumber(value: number, range: Range, fallback: number): number {
  * nie może wypadać przed godziną odrzucenia — inaczej reguła kalendarzowa
  * przestałaby cokolwiek znaczyć.
  */
+/**
+ * Wybór kalendarzy: lista napisów albo nic. Pusta lista znaczy to samo co brak
+ * wyboru — „żaden kalendarz" byłby wolnym porankiem z definicji.
+ */
+function calendarIdsOf(value: unknown): string[] | null {
+  if (!Array.isArray(value)) return null;
+
+  const ids = value.filter((id): id is string => typeof id === 'string' && id.length > 0);
+  return ids.length > 0 ? ids : null;
+}
+
 export function clampConfig(config: LunarisConfig): LunarisConfig {
   const d = DEFAULT_CONFIG;
   const l = CONFIG_LIMITS;
@@ -364,6 +382,7 @@ export function clampConfig(config: LunarisConfig): LunarisConfig {
       d.calendar.assumedFirstEventHour,
     ),
     weekendDaysOff: config.calendar.weekendDaysOff !== false,
+    calendarIds: calendarIdsOf(config.calendar.calendarIds),
   };
 
   return {

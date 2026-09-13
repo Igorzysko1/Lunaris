@@ -35,11 +35,15 @@ import { CLIENT_PATH, TOKEN_PATH, TOKEN_URL, readClient } from '../src/lib/googl
 const AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 
 /**
- * Odczyt i zapis wydarzeń. Węższy `calendar.readonly` wystarczyłby dzisiaj, ale
- * rezerwacja sesji w kalendarzu jest kolejnym zadaniem, a rozszerzenie zakresu
- * wymaga ponownej zgody — czyli powtórzenia całej tej procedury.
+ * Odczyt i zapis wydarzeń (rezerwacja sesji) oraz sama lista kalendarzy, bez
+ * prawa do jej zmiany — potrzebna, żeby poranki liczyć ze wszystkich własnych
+ * kalendarzy, a nie tylko z głównego. Rozszerzenie zakresu wymaga ponownej
+ * zgody, czyli powtórzenia tej procedury.
  */
-const SCOPE = 'https://www.googleapis.com/auth/calendar.events';
+const SCOPE = [
+  'https://www.googleapis.com/auth/calendar.events',
+  'https://www.googleapis.com/auth/calendar.calendarlist.readonly',
+].join(' ');
 
 function fail(message: string): never {
   process.stderr.write(`${message}\n`);

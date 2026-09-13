@@ -105,7 +105,10 @@ async function runEventReview(input: {
 
   // Ten sam kalendarz co na ekranie: powiadomienie „jedź" dla nocy, którą karta
   // odrzuca przez poranne spotkanie, byłoby dwiema odpowiedziami na jedno pytanie.
-  const calendar = await loadCalendarDays(bundle.nights.map((slice) => slice.night.to));
+  const calendar = await loadCalendarDays(
+    bundle.nights.map((slice) => slice.night.to),
+    config.calendar.calendarIds,
+  );
 
   const planned = planNights({
     nights: bundle.nights,

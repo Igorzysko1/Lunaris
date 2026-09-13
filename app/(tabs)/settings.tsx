@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'expo-router';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -20,6 +20,8 @@ import { formatShortDate } from '@/lib/date';
 import { formatAge } from '@/lib/forecast-cache';
 import { NOTIFICATIONS_AVAILABLE } from '@/lib/notification-store';
 import { useForecast } from '@/store/forecast';
+import { effectiveCalendarIds, type CalendarInfo } from '@/lib/calendar';
+import { googleCalendars, type CalendarsResult } from '@/lib/google-account';
 import { useGoogle } from '@/store/google';
 import { LEAD_TIMES, useSettings } from '@/store/settings';
 import { colors, fonts } from '@/theme';
@@ -401,6 +403,7 @@ function GoogleCalendarCard() {
           </Pressable>
         )}
       </View>
+      {google.connected && <CalendarChoiceList />}
       {failed && (
         <View style={styles.errorRow}>
           <Text style={styles.errorText}>Nie udało się połączyć z Google.</Text>
@@ -412,6 +415,97 @@ function GoogleCalendarCard() {
         </View>
       )}
     </Card>
+  );
+}
+
+/**
+ * Które kalendarze wyznaczają pobudkę.
+ *
+ * Lista przychodzi z konta, a wybór ląduje w konfiguracji — tej samej, z której
+ * czyta CLI. Ostatniego zaznaczonego nie da się odznaczyć: „żaden kalendarz"
+ * to wolny poranek z definicji, czyli dokładnie ta pomyłka, przed którą cała
+ * integracja ma chronić.
+ */
+function CalendarChoiceList() {
+  const { config, updateConfig } = useSettings();
+  const [result, setResult] = useState<CalendarsResult | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    void googleCalendars().then((value) => {
+      if (active) setResult(value);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  if (!result) {
+    return <Text style={[styles.rowHint, styles.calendarNotice]}>Wczytuję listę kalendarzy…</Text>;
+  }
+
+  if (result.status === 'insufficient-scope') {
+    return (
+      <Text style={[styles.notice, styles.calendarNotice]}>
+        To połączenie powstało przed wyborem kalendarzy. Odłącz i połącz konto ponownie, żeby
+        poranki liczyły się ze wszystkich Twoich kalendarzy — do tego czasu liczy się tylko główny.
+      </Text>
+    );
+  }
+
+  if (result.status !== 'ok') {
+    return (
+      <Text style={[styles.rowHint, styles.calendarNotice]}>
+        Nie udało się pobrać listy kalendarzy. Poranki liczą się z{' '}
+        {config.calendar.calendarIds ? 'ostatnio wybranych' : 'głównego kalendarza'}.
+      </Text>
+    );
+  }
+
+  const chosen = new Set(effectiveCalendarIds(config.calendar.calendarIds, result.calendars));
+
+  const toggle = (calendar: CalendarInfo) => {
+    const next = new Set(chosen);
+    if (next.has(calendar.id)) {
+      if (next.size === 1) return;
+      next.delete(calendar.id);
+    } else {
+      next.add(calendar.id);
+    }
+    updateConfig('calendar', { calendarIds: [...next] });
+  };
+
+  return (
+    <>
+      <Divider />
+      <Text style={styles.sourcesLabel}>Kalendarze wyznaczające pobudkę</Text>
+      {result.calendars.map((calendar) => (
+        <View key={calendar.id} style={styles.row}>
+          <View style={styles.rowText}>
+            <Text style={styles.rowLabel} numberOfLines={1}>
+              {calendar.name}
+            </Text>
+            <Text style={styles.rowHint}>
+              {calendar.primary
+                ? 'główny · tu trafiają rezerwacje'
+                : calendar.accessRole === 'reader'
+                  ? 'subskrypcja'
+                  : 'własny'}
+            </Text>
+          </View>
+          <Toggle
+            value={chosen.has(calendar.id)}
+            onPress={() => toggle(calendar)}
+            label={`Kalendarz ${calendar.name}`}
+          />
+        </View>
+      ))}
+      {chosen.size === 1 && (
+        <Text style={[styles.rowHint, styles.calendarNotice]}>
+          Co najmniej jeden kalendarz musi zostać zaznaczony.
+        </Text>
+      )}
+    </>
   );
 }
 

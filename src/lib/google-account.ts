@@ -33,9 +33,15 @@ import {
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
-import { dayKey, fillFromStore, type CalendarDays, type CalendarEntry } from './calendar';
+import {
+  dayKey,
+  effectiveCalendarIds,
+  fillFromStore,
+  type CalendarDays,
+  type CalendarEntry,
+} from './calendar';
 import { clearStoredDays, loadStoredDays, saveFreshDays } from './calendar-store';
-import { fetchDayEntries } from './google-calendar';
+import { fetchCalendarList, fetchMorningEntries, type CalendarListResult } from './google-calendar';
 
 /** Klient OAuth typu Android z Google Cloud Console. Jawny — patrz wyżej. */
 const CLIENT_ID = '173163195418-1f2epvlthho674uhvdrfq3tmupuei6pg.apps.googleusercontent.com';
@@ -48,8 +54,16 @@ const CLIENT_ID = '173163195418-1f2epvlthho674uhvdrfq3tmupuei6pg.apps.googleuser
  */
 const REDIRECT_URI = 'com.igormusial.lunaris:/oauthredirect';
 
-/** Ten sam zakres co w CLI: odczyt i zapis wydarzeń, bez ustawień kalendarza. */
-const SCOPE = 'https://www.googleapis.com/auth/calendar.events';
+/**
+ * Te same zakresy co w CLI: odczyt i zapis wydarzeń oraz sama lista
+ * kalendarzy — bez ich ustawień i bez prawa do zmiany listy. Token wydany
+ * przed dodaniem drugiego zakresu dalej działa dla wydarzeń; o liście mówi mu
+ * 403, a Ustawienia proszą wtedy o ponowne połączenie.
+ */
+const SCOPES = [
+  'https://www.googleapis.com/auth/calendar.events',
+  'https://www.googleapis.com/auth/calendar.calendarlist.readonly',
+];
 
 const DISCOVERY: DiscoveryDocument = {
   authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
@@ -82,6 +96,7 @@ export const GOOGLE_AVAILABLE =
 let access: { token: string; expiresAt: number } | null = null;
 let cachedDays: { id: string; at: number; value: CalendarDays } | null = null;
 let pendingDays: { id: string; promise: Promise<CalendarDays | null> } | null = null;
+let cachedList: { at: number; result: CalendarListResult } | null = null;
 
 const listeners = new Set<(connected: boolean) => void>();
 
@@ -113,6 +128,7 @@ async function forget(): Promise<void> {
   access = null;
   cachedDays = null;
   pendingDays = null;
+  cachedList = null;
 
   try {
     await SecureStore.deleteItemAsync(REFRESH_KEY);
@@ -141,7 +157,7 @@ export async function connectGoogle(): Promise<ConnectResult> {
     const request = new AuthRequest({
       clientId: CLIENT_ID,
       redirectUri: REDIRECT_URI,
-      scopes: [SCOPE],
+      scopes: SCOPES,
       usePKCE: true,
       // Bez `prompt: consent` Google przy ponownym połączeniu tego samego konta
       // nie wydaje nowego tokenu odświeżania: logowanie „się udaje", a aplikacja
@@ -167,6 +183,7 @@ export async function connectGoogle(): Promise<ConnectResult> {
     await SecureStore.setItemAsync(REFRESH_KEY, tokens.refreshToken);
     access = { token: tokens.accessToken, expiresAt: expiryOf(tokens) };
     cachedDays = null;
+    cachedList = null;
 
     for (const listener of listeners) listener(true);
     return 'connected';
@@ -240,8 +257,42 @@ export async function googleAccessToken(): Promise<AccessResult> {
   }
 }
 
-async function fetchDays(mornings: Date[], id: string): Promise<CalendarDays | null> {
+export type CalendarsResult = CalendarListResult | { status: 'disconnected' };
+
+/**
+ * Lista kalendarzy konta — do wyboru w Ustawieniach i do ustalenia domyślnych.
+ *
+ * Trzymana w pamięci tak jak dni: ekrany pytają o nią prawie naraz. Porażki
+ * nie zapamiętujemy — po ponownym połączeniu albo powrocie sieci lista ma
+ * przyjść od razu.
+ */
+export async function googleCalendars(): Promise<CalendarsResult> {
+  if (!GOOGLE_AVAILABLE) return { status: 'disconnected' };
+  if (cachedList && Date.now() - cachedList.at < DAYS_TTL_MS) return cachedList.result;
+
+  const auth = await googleAccessToken();
+  if (auth.status !== 'ok') return { status: auth.status };
+
+  const result = await fetchCalendarList(auth.token);
+  if (result.status === 'ok') cachedList = { at: Date.now(), result };
+
+  return result;
+}
+
+/**
+ * Klucz zapisu na dysku dla wyboru z konfiguracji. Liczony z wyboru, a nie
+ * z listy konta: bez sieci listy nie ma, a zapis musi dać się odnaleźć.
+ */
+const storeScope = (configured: readonly string[] | null) =>
+  configured && configured.length > 0 ? [...configured].sort().join(',') : 'default';
+
+async function fetchDays(
+  mornings: Date[],
+  configured: readonly string[] | null,
+  id: string,
+): Promise<CalendarDays | null> {
   const unique = new Map(mornings.map((morning) => [dayKey(morning), morning]));
+  const scope = storeScope(configured);
   const auth = await googleAccessToken();
 
   // Odłączone konto nie ma kalendarza — także zapisanego, bo `forget` go skasował.
@@ -250,16 +301,22 @@ async function fetchDays(mornings: Date[], id: string): Promise<CalendarDays | n
   const fresh = new Map<string, CalendarEntry[]>();
 
   if (auth.status === 'ok') {
+    const list = await googleCalendars();
+    const calendarIds = effectiveCalendarIds(
+      configured,
+      list.status === 'ok' ? list.calendars : null,
+    );
+
     await Promise.all(
       [...unique].map(async ([key, morning]) => {
-        const entries = await fetchDayEntries(auth.token, morning);
+        const entries = await fetchMorningEntries(auth.token, morning, calendarIds);
         if (entries) fresh.set(key, entries);
       }),
     );
 
     // Sprawdzenie po pobraniu, a nie przed: odłączenie w trakcie żądań
     // skasowało już zapis i nie może go przywrócić spóźniona odpowiedź.
-    if (await isGoogleConnected()) await saveFreshDays(fresh);
+    if (await isGoogleConnected()) await saveFreshDays(scope, fresh);
   }
 
   // W pamięci trzymamy tylko komplet świeżych dni. Dzień, który się nie
@@ -272,7 +329,8 @@ async function fetchDays(mornings: Date[], id: string): Promise<CalendarDays | n
 
   // Luki — brak sieci albo pojedynczy dzień, który się nie pobrał — wypełnia
   // ostatnie udane pobranie, jeśli jest dość świeże.
-  const filled = fillFromStore(fresh, await loadStoredDays(), [...unique.keys()], new Date());
+  const stored = await loadStoredDays(scope);
+  const filled = fillFromStore(fresh, stored, [...unique.keys()], new Date());
 
   return auth.status === 'ok' || filled.size > 0 ? filled : null;
 }
@@ -285,10 +343,14 @@ async function fetchDays(mornings: Date[], id: string): Promise<CalendarDays | n
  * nie udało się pobrać ani odczytać z zapisu, nie trafia do mapy i tylko on
  * wraca do założenia.
  */
-export function loadCalendarDays(mornings: Date[]): Promise<CalendarDays | null> {
+export function loadCalendarDays(
+  mornings: Date[],
+  calendarIds: readonly string[] | null = null,
+): Promise<CalendarDays | null> {
   if (!GOOGLE_AVAILABLE) return Promise.resolve(null);
 
-  const id = [...new Set(mornings.map(dayKey))].sort().join(',');
+  const days = [...new Set(mornings.map(dayKey))].sort().join(',');
+  const id = `${days}|${storeScope(calendarIds)}`;
 
   if (cachedDays?.id === id && Date.now() - cachedDays.at < DAYS_TTL_MS) {
     return Promise.resolve(cachedDays.value);
@@ -296,7 +358,7 @@ export function loadCalendarDays(mornings: Date[]): Promise<CalendarDays | null>
   // Ekrany pytają równocześnie — drugie pytanie dostaje to samo żądanie.
   if (pendingDays?.id === id) return pendingDays.promise;
 
-  const promise = fetchDays(mornings, id).finally(() => {
+  const promise = fetchDays(mornings, calendarIds, id).finally(() => {
     if (pendingDays?.promise === promise) pendingDays = null;
   });
   pendingDays = { id, promise };

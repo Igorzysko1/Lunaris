@@ -45,7 +45,7 @@ export function useSessions(
   );
 
   const mornings = useMemo(() => bundle?.nights.map((slice) => slice.night.to) ?? [], [bundle]);
-  const calendar = useCalendarDays(mornings);
+  const calendar = useCalendarDays(mornings, config.calendar.calendarIds);
 
   const sessions = useMemo<Session[]>(() => {
     if (!bundle) return [];

@@ -30,7 +30,7 @@ import {
 } from '../src/lib/narrative.ts';
 import { DEFAULT_CONFIG, mergeConfig, type LunarisConfig } from '../src/lib/config.ts';
 import { nextDayFromCalendar, type CalendarEntry } from '../src/lib/calendar.ts';
-import { fetchDayEntries } from '../src/lib/google-calendar.ts';
+import { fetchMorningEntries, resolveCalendarIds } from '../src/lib/google-calendar.ts';
 import { accessToken, readClient, readRefreshToken } from '../src/lib/google-oauth.ts';
 import { assumedNextDay } from '../src/lib/session-engine.ts';
 import type { NoticeLog } from '../src/lib/event-review.ts';
@@ -217,6 +217,10 @@ async function loadCalendar(nights: { night: { to: Date } }[]) {
   const token = await accessToken(client, refresh);
   if (!token) fail('Nie udało się odświeżyć tokenu Google. Spróbuj ponownie: npm run google:auth');
 
+  // Te same kalendarze co w aplikacji: wybór z konfiguracji albo domyślne
+  // kalendarze konta.
+  const calendarIds = await resolveCalendarIds(token, config.calendar.calendarIds);
+
   const byDay = new Map<string, CalendarEntry[]>();
   let missing = 0;
 
@@ -224,7 +228,7 @@ async function loadCalendar(nights: { night: { to: Date } }[]) {
     const key = night.to.toDateString();
     if (byDay.has(key)) continue;
 
-    const entries = await fetchDayEntries(token, night.to);
+    const entries = await fetchMorningEntries(token, night.to, calendarIds);
     if (entries === null) missing += 1;
     else byDay.set(key, entries);
   }
