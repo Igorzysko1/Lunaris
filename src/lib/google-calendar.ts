@@ -26,12 +26,39 @@ const API = 'https://www.googleapis.com/calendar/v3/calendars/primary/events';
 /** Ile czekamy na odpowiedź. Brief ma się skończyć, nawet gdy Google milczy. */
 const TIMEOUT_MS = 10_000;
 
-/** Jedno żądanie z limitem czasu; zegar sprzątany niezależnie od wyniku. */
+/**
+ * Kody, które w tym module znaczą stan, a nie awarię: brak wpisu, nagrobek po
+ * usunięciu i konflikt identyfikatora przy ponownej rezerwacji.
+ */
+const EXPECTED_STATUSES = new Set([404, 409, 410]);
+
+/**
+ * Jedno żądanie z limitem czasu; zegar sprzątany niezależnie od wyniku.
+ *
+ * Każda funkcja niżej zamienia porażkę w `null`, więc z zewnątrz odrzucony
+ * token, brak uprawnień i zły format wpisu wyglądają identycznie. Prawdziwą
+ * odpowiedź Google wypisujemy tutaj — w aplikacji ląduje w terminalu Metro,
+ * w CLI na stderr.
+ */
 async function request(url: string, init: RequestInit, signal?: AbortSignal): Promise<Response> {
   const timeout = timeoutSignal(TIMEOUT_MS, signal);
+  const method = init.method ?? 'GET';
 
   try {
-    return await fetch(url, { ...init, signal: timeout.signal });
+    const response = await fetch(url, { ...init, signal: timeout.signal });
+
+    if (!response.ok && !EXPECTED_STATUSES.has(response.status)) {
+      const body = await response
+        .clone()
+        .text()
+        .catch(() => '');
+      console.warn(`Google Calendar ${method} ${response.status}: ${body.slice(0, 500)}`);
+    }
+
+    return response;
+  } catch (error) {
+    console.warn(`Google Calendar ${method} nie doszło do skutku: ${String(error)}`);
+    throw error;
   } finally {
     timeout.clear();
   }
@@ -136,6 +163,22 @@ export async function fetchBooking(
  * Zwraca `null` przy niepowodzeniu — wywołujący ma powiedzieć, że nie zapisał,
  * a nie udawać, że zapisał.
  */
+/** To, co Google oddaje po zapisie — tyle, ile potrzeba do oceny wyniku. */
+type SavedEvent = { status?: unknown; htmlLink?: unknown; start?: { dateTime?: unknown } };
+
+const linkOf = (event: SavedEvent) => (typeof event.htmlLink === 'string' ? event.htmlLink : '');
+
+/**
+ * Wynik zapisu w logu. Kod 200 mówi tylko, że Google przyjął żądanie — czy wpis
+ * jest widoczny i na jaki dzień trafił, widać dopiero w oddanym wydarzeniu.
+ */
+function reportSaved(method: string, event: SavedEvent) {
+  console.info(
+    `Google Calendar ${method}: status=${String(event.status)} ` +
+      `start=${String(event.start?.dateTime)} ${linkOf(event)}`,
+  );
+}
+
 export async function upsertBooking(
   accessToken: string,
   booking: Booking,
@@ -151,11 +194,9 @@ export async function upsertBooking(
     );
 
     if (inserted.ok) {
-      const created = (await inserted.json()) as { htmlLink?: unknown };
-      return {
-        htmlLink: typeof created.htmlLink === 'string' ? created.htmlLink : '',
-        replaced: false,
-      };
+      const created = (await inserted.json()) as SavedEvent;
+      reportSaved('POST', created);
+      return { htmlLink: linkOf(created), replaced: false };
     }
 
     if (inserted.status !== 409) return null;
@@ -168,8 +209,14 @@ export async function upsertBooking(
 
     if (!updated.ok) return null;
 
-    const event = (await updated.json()) as { htmlLink?: unknown };
-    return { htmlLink: typeof event.htmlLink === 'string' ? event.htmlLink : '', replaced: true };
+    const event = (await updated.json()) as SavedEvent;
+    reportSaved('PUT', event);
+
+    // Przyjęte nadpisanie, po którym wpis dalej jest odwołany, to nie
+    // rezerwacja — zgłoszenie sukcesu byłoby tu kłamstwem.
+    if (event.status === 'cancelled') return null;
+
+    return { htmlLink: linkOf(event), replaced: true };
   } catch {
     return null;
   }

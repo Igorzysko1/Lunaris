@@ -224,6 +224,14 @@ export async function googleAccessToken(): Promise<AccessResult> {
       await forget();
       return { status: 'disconnected' };
     }
+    // Do logu Metro: bez tej linii „nie wyszło" z odrzuconego klienta wygląda
+    // dokładnie tak samo jak brak sieci.
+    console.warn(
+      'Google: odświeżenie tokenu nie powiodło się —',
+      error instanceof TokenError
+        ? `${error.params.error} ${error.description ?? ''}`
+        : String(error),
+    );
     return { status: 'failed' };
   }
 }
