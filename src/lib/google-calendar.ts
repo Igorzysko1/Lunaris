@@ -24,6 +24,12 @@ import {
   type CalendarEntry,
   type CalendarInfo,
 } from './calendar.ts';
+import {
+  describeWithNote,
+  toCalendarEvents,
+  uniqueEvents,
+  type CalendarEvent,
+} from './calendar-view.ts';
 import type { Booking } from './session-booking.ts';
 import { timeoutSignal } from './timeout.ts';
 
@@ -133,7 +139,7 @@ function payload(booking: Booking) {
     // szuka wolnego okna — a po to właśnie powstaje.
     transparency: 'opaque',
     // Jawnie, bo rezerwacja po odwołaniu trafia w ten sam identyfikator: Google
-    // trzyma usunięty wpis jako odwołany, `POST` dostaje 409 i idzie `PUT`.
+    // trzyma usunięty wpis jako odwołany, `POST` dostaje 409 i idzie `PATCH`.
     // Bez statusu o tym, czy wpis wróci, decydowałaby domyślna wartość po
     // stronie Google.
     status: 'confirmed',
@@ -172,8 +178,11 @@ export async function fetchBooking(
  * Zapisuje rezerwację, nadpisując wcześniejszą wersję tej samej nocy.
  *
  * Dwa kroki, bo Google rozdziela te operacje: wstawienie z własnym
- * identyfikatorem to `POST`, a nadpisanie istniejącego — `PUT`. Sam `PUT`
+ * identyfikatorem to `POST`, a zmiana istniejącego — `PATCH`. Sam `PATCH`
  * zwróciłby 404 przy pierwszej rezerwacji, a sam `POST` — 409 przy drugiej.
+ * `PATCH`, a nie `PUT`, bo zmienia tylko pola rezerwacji: notatka dopisana
+ * w zakładce kalendarza leży w `extendedProperties` i ma przetrwać
+ * aktualizację wpisu do nowej prognozy.
  * Konflikt jest tu stanem **oczekiwanym**: znaczy tyle, że tę noc już raz
  * rezerwowaliśmy, a prognoza od tego czasu się zmieniła.
  *
@@ -220,14 +229,14 @@ export async function upsertBooking(
 
     const updated = await request(
       `${API}/${encodeURIComponent(booking.id)}`,
-      { method: 'PUT', headers, body: JSON.stringify(payload(booking)) },
+      { method: 'PATCH', headers, body: JSON.stringify(payload(booking)) },
       signal,
     );
 
     if (!updated.ok) return null;
 
     const event = (await updated.json()) as SavedEvent;
-    reportSaved('PUT', event);
+    reportSaved('PATCH', event);
 
     // Przyjęte nadpisanie, po którym wpis dalej jest odwołany, to nie
     // rezerwacja — zgłoszenie sukcesu byłoby tu kłamstwem.
@@ -340,4 +349,89 @@ export async function resolveCalendarIds(
 ): Promise<string[]> {
   const list = await fetchCalendarList(accessToken);
   return effectiveCalendarIds(configured, list.status === 'ok' ? list.calendars : null);
+}
+
+/**
+ * Wydarzenia z zakresu dat do zakładki kalendarza — z tytułami.
+ *
+ * Tytuły trafiają wyłącznie na ekran: ten wynik nie przechodzi przez zapis na
+ * dysku ani przez silnik. Albo komplet ze wszystkich kalendarzy, albo `null` —
+ * z tego samego powodu co poranki: brakujący kalendarz wyglądałby na wolne dni.
+ *
+ * Bez stronicowania: 250 wpisów na kalendarz w sześciu tygodniach siatki to
+ * więcej, niż ktokolwiek przejrzy na telefonie.
+ */
+export async function fetchRangeEvents(
+  accessToken: string,
+  from: Date,
+  to: Date,
+  calendarIds: readonly string[],
+  signal?: AbortSignal,
+): Promise<CalendarEvent[] | null> {
+  const query = Object.entries({
+    timeMin: from.toISOString(),
+    timeMax: to.toISOString(),
+    singleEvents: 'true',
+    orderBy: 'startTime',
+    maxResults: '250',
+  })
+    .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
+    .join('&');
+
+  const lists = await Promise.all(
+    calendarIds.map(async (calendarId) => {
+      try {
+        const response = await request(
+          `${eventsUrl(calendarId)}?${query}`,
+          { headers: bearer(accessToken) },
+          signal,
+        );
+        if (!response.ok) return null;
+
+        const body = (await response.json()) as { items?: unknown };
+        return toCalendarEvents(body.items, calendarId);
+      } catch {
+        return null;
+      }
+    }),
+  );
+
+  if (lists.some((list) => list === null)) return null;
+  return uniqueEvents((lists as CalendarEvent[][]).flat());
+}
+
+/**
+ * Ręczna zmiana zapisanej obserwacji: godziny i notatka.
+ *
+ * `PATCH`, więc tytuł, miejsce i reszta wpisu zostają. Notatka idzie w dwa
+ * miejsca: do opisu, w wydzielonej sekcji — żeby było ją widać w samym Google
+ * Calendar — i do `extendedProperties`, skąd aplikacja czyta ją bez
+ * wyłuskiwania z tekstu.
+ */
+export async function patchObservation(
+  accessToken: string,
+  event: Pick<CalendarEvent, 'id' | 'description'>,
+  change: { start: Date; end: Date; note: string },
+  signal?: AbortSignal,
+): Promise<boolean> {
+  try {
+    const response = await request(
+      `${API}/${encodeURIComponent(event.id)}`,
+      {
+        method: 'PATCH',
+        headers: { ...bearer(accessToken), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          start: { dateTime: change.start.toISOString() },
+          end: { dateTime: change.end.toISOString() },
+          description: describeWithNote(event.description, change.note),
+          extendedProperties: { private: { lunarisNote: change.note.trim() } },
+        }),
+      },
+      signal,
+    );
+
+    return response.ok;
+  } catch {
+    return false;
+  }
 }

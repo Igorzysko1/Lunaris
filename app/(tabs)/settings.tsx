@@ -497,6 +497,9 @@ function CalendarChoiceList() {
             value={chosen.has(calendar.id)}
             onPress={() => toggle(calendar)}
             label={`Kalendarz ${calendar.name}`}
+            // Przełącznik rusza przed decyzją rodzica, więc zmiana, której nie
+            // wolno wykonać, musi być zablokowana, a nie odrzucona po fakcie.
+            disabled={chosen.size === 1 && chosen.has(calendar.id)}
           />
         </View>
       ))}

@@ -29,6 +29,7 @@ import { currentNightWindow } from '@/lib/night-window';
 import { bookingFor, bookingId } from '@/lib/session-booking';
 import { nightTargetsForProfiles, rankedTargets } from '@/lib/sky-targets';
 import { useApod } from '@/hooks/use-apod';
+import { useBookingSite } from '@/hooks/use-booking-site';
 import { useSessions } from '@/hooks/use-sessions';
 import { useNightData } from '@/hooks/use-night-data';
 import { useForecast } from '@/store/forecast';
@@ -40,7 +41,8 @@ const TARGETS_IN_BOOKING = 5;
 
 export default function NightScreen() {
   const router = useRouter();
-  const { active, config, placeId } = useSettings();
+  const { active, config } = useSettings();
+  const bookingSite = useBookingSite();
   const { status, data, savedAt, stale, failure, refresh, refreshing } = useNightData(
     active.coords,
     active.bortle,
@@ -51,10 +53,7 @@ export default function NightScreen() {
   const apod = useApod();
 
   const { lat, lon } = active.coords;
-  // Klucz miejsca w identyfikatorze rezerwacji. Pozycja z GPS nie ma stałego
-  // id, więc wszystkie dzielą jeden — ta sama noc z dwóch punktów GPS to i tak
-  // jeden wyjazd.
-  const bookingSite = active.source === 'gps' ? 'gps' : placeId;
+
   const nextEvent = useMemo(() => upcomingEvents(new Date(), { lat, lon })[0] ?? null, [lat, lon]);
 
   // Cele zależą od miejsca, jakości nieba i sprzętu — nie od prognozy, więc liczą
@@ -253,10 +252,10 @@ export default function NightScreen() {
                       locationLabel={active.label}
                       footer={
                         <BookingButtons
-                          bookingId={bookingId(session.verdict.night, bookingSite)}
+                          bookingId={bookingId(session.verdict.night, bookingSite.id)}
                           booking={bookingFor({
                             verdict: session.verdict,
-                            site: { id: bookingSite, name: active.label, lat, lon },
+                            site: bookingSite,
                             rating: session.rating,
                             targets: rankedTargets(session.targets, TARGETS_IN_BOOKING).map(
                               (t) => t.name,

@@ -41,7 +41,13 @@ import {
   type CalendarEntry,
 } from './calendar';
 import { clearStoredDays, loadStoredDays, saveFreshDays } from './calendar-store';
-import { fetchCalendarList, fetchMorningEntries, type CalendarListResult } from './google-calendar';
+import type { CalendarEvent } from './calendar-view';
+import {
+  fetchCalendarList,
+  fetchMorningEntries,
+  fetchRangeEvents,
+  type CalendarListResult,
+} from './google-calendar';
 
 /** Klient OAuth typu Android z Google Cloud Console. Jawny — patrz wyżej. */
 const CLIENT_ID = '173163195418-1f2epvlthho674uhvdrfq3tmupuei6pg.apps.googleusercontent.com';
@@ -364,4 +370,27 @@ export function loadCalendarDays(
   pendingDays = { id, promise };
 
   return promise;
+}
+
+/**
+ * Wydarzenia zakresu dat do zakładki kalendarza. `null`, gdy konta nie ma
+ * albo pobranie się nie udało.
+ *
+ * Główny kalendarz czytamy zawsze, nawet gdy nie wyznacza pobudki: tam
+ * mieszkają rezerwacje, a zakładka bez nich nie miałaby czego edytować.
+ */
+export async function loadRangeEvents(
+  from: Date,
+  to: Date,
+  calendarIds: readonly string[] | null,
+): Promise<CalendarEvent[] | null> {
+  const auth = await googleAccessToken();
+  if (auth.status !== 'ok') return null;
+
+  const list = await googleCalendars();
+  const calendars = list.status === 'ok' ? list.calendars : null;
+  const primary = calendars?.find((c) => c.primary)?.id ?? 'primary';
+  const ids = [...new Set([...effectiveCalendarIds(calendarIds, calendars), primary])];
+
+  return fetchRangeEvents(auth.token, from, to, ids);
 }

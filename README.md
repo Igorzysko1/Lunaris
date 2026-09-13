@@ -122,7 +122,7 @@ publikacji w Google Play pakietu nie da się już podmienić.
 ## Układ katalogów
 
 ```
-app/            ekrany (expo-router); (tabs)/ to Noc, Eventy, Ustawienia
+app/            ekrany (expo-router); (tabs)/ to Noc, Kalendarz, Eventy, Ustawienia
 src/lib/        warstwa domenowa — cały rachunek, zero widoku
 src/data/       katalogi i dane generowane (miejsca, obiekty, mapa nieba)
 src/components/ elementy widoku
