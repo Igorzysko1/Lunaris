@@ -19,9 +19,11 @@ import {
   exportJournal,
   parseJournal,
   upsertLog,
+  withTimeline,
   type Journal,
   type NightLog,
 } from './journal';
+import type { SessionTimeline } from './session-timeline';
 
 const JOURNAL_KEY = 'lunaris.journal';
 
@@ -56,6 +58,27 @@ export async function saveNightLog(log: NightLog): Promise<Journal | null> {
   if (!readable) return null;
 
   const updated = upsertLog(journal, log);
+
+  try {
+    await AsyncStorage.setItem(JOURNAL_KEY, JSON.stringify(updated));
+    return updated;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Zapisuje przebieg nocy, dokładając go do wpisu z celami i notatką. Ta sama
+ * odmowa co przy zapisie nocy: nieczytelnego dziennika nie nadpisujemy.
+ */
+export async function saveTimeline(
+  night: Parameters<typeof withTimeline>[1],
+  timeline: SessionTimeline,
+): Promise<Journal | null> {
+  const { journal, readable } = await loadJournal();
+  if (!readable) return null;
+
+  const updated = withTimeline(journal, night, timeline, new Date().toISOString());
 
   try {
     await AsyncStorage.setItem(JOURNAL_KEY, JSON.stringify(updated));

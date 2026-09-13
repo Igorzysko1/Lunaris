@@ -18,6 +18,7 @@ import {
 } from '@/components/night-cards';
 import { LightPollutionLink } from '@/components/LightPollutionLink';
 import { BookingButtons } from '@/components/BookingButtons';
+import { SessionTimeline } from '@/components/SessionTimeline';
 import { SessionCard, SessionsSkeleton } from '@/components/session-cards';
 import { Card, SectionLabel } from '@/components/primitives';
 import { dayBucket, formatLongDate, formatTime } from '@/lib/date';
@@ -27,6 +28,7 @@ import { horizonOf } from '@/lib/horizon';
 import { constellationsTonight } from '@/lib/constellations';
 import { currentNightWindow } from '@/lib/night-window';
 import { bookingFor, bookingId } from '@/lib/session-booking';
+import { liveNightIndex } from '@/lib/session-timeline';
 import { nightTargetsForProfiles, rankedTargets } from '@/lib/sky-targets';
 import { useApod } from '@/hooks/use-apod';
 import { useBookingSite } from '@/hooks/use-booking-site';
@@ -48,6 +50,12 @@ export default function NightScreen() {
     active.bortle,
   );
   const sessions = useSessions(active.coords, active.bortle, config, active.walkMinutes);
+  // Przebieg na żywo tylko przy nocy, która trwa albo zaraz się zacznie —
+  // pozostałe karty nie mają czego mierzyć.
+  const liveIndex = liveNightIndex(
+    sessions.sessions.map((session) => session.verdict.night),
+    new Date(),
+  );
   const { cycle } = useForecast();
   // Ozdoba, nie dana wejściowa: `null` znaczy „nie ma karty", a nie „błąd".
   const apod = useApod();
@@ -245,23 +253,33 @@ export default function NightScreen() {
                 </SectionLabel>
                 {sessions.status === 'loading' && <SessionsSkeleton />}
                 {sessions.status === 'ready' &&
-                  sessions.sessions.map((session) => (
+                  sessions.sessions.map((session, index) => (
                     <SessionCard
                       key={session.verdict.night.from.toISOString()}
                       session={session}
                       locationLabel={active.label}
                       footer={
-                        <BookingButtons
-                          bookingId={bookingId(session.verdict.night, bookingSite.id)}
-                          booking={bookingFor({
-                            verdict: session.verdict,
-                            site: bookingSite,
-                            rating: session.rating,
-                            targets: rankedTargets(session.targets, TARGETS_IN_BOOKING).map(
-                              (t) => t.name,
-                            ),
-                          })}
-                        />
+                        <>
+                          {index === liveIndex && (
+                            <SessionTimeline
+                              night={session.verdict.night}
+                              plan={session.verdict.plan}
+                              window={session.verdict.window}
+                              bookingId={bookingId(session.verdict.night, bookingSite.id)}
+                            />
+                          )}
+                          <BookingButtons
+                            bookingId={bookingId(session.verdict.night, bookingSite.id)}
+                            booking={bookingFor({
+                              verdict: session.verdict,
+                              site: bookingSite,
+                              rating: session.rating,
+                              targets: rankedTargets(session.targets, TARGETS_IN_BOOKING).map(
+                                (t) => t.name,
+                              ),
+                            })}
+                          />
+                        </>
                       }
                     />
                   ))}

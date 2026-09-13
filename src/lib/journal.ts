@@ -16,6 +16,8 @@
  * Importy względne (nie alias @/), żeby moduł dało się uruchomić poza Metro.
  */
 
+import { parseTimeline, type SessionTimeline } from './session-timeline.ts';
+
 /**
  * Wynik podejścia do celu.
  *
@@ -62,6 +64,11 @@ export type NightLog = {
   seeing: number | null;
   note: string;
   savedAt: string;
+  /**
+   * Rzeczywisty przebieg nocy — wyjazd, dojazd, zwijanie i powrót obok planu
+   * z chwili wyjazdu. Brak pola znaczy „nie mierzono", a nie „nie było".
+   */
+  timeline?: SessionTimeline;
 };
 
 export type Journal = {
@@ -96,10 +103,42 @@ export function nightLogId(nightFrom: Date): string {
  * nocą, a nie drugą. Kolejność chronologiczna, najnowsze na końcu.
  */
 export function upsertLog(journal: Journal, log: NightLog): Journal {
-  const logs = journal.logs.filter((l) => l.id !== log.id).concat(log);
+  // Przebieg nocy zapisuje karta nocy, a cele — ekran dziennika. Żaden z tych
+  // zapisów nie może skasować drugiego tylko dlatego, że go nie niesie.
+  const previous = journal.logs.find((l) => l.id === log.id);
+  const merged =
+    log.timeline || !previous?.timeline ? log : { ...log, timeline: previous.timeline };
+
+  const logs = journal.logs.filter((l) => l.id !== log.id).concat(merged);
   logs.sort((a, b) => a.nightFrom.localeCompare(b.nightFrom));
 
   return { version: JOURNAL_VERSION, logs };
+}
+
+/**
+ * Dokłada przebieg nocy do wpisu, który już jest — z celami, notatką
+ * i ocenami — albo zakłada nowy, gdy tej nocy jeszcze nic nie zapisano.
+ */
+export function withTimeline(
+  journal: Journal,
+  night: { id: string; nightFrom: string; siteId: string | null; siteName: string },
+  timeline: SessionTimeline,
+  savedAt: string,
+): Journal {
+  const existing = journal.logs.find((l) => l.id === night.id);
+  const log: NightLog = existing
+    ? { ...existing, timeline }
+    : {
+        ...night,
+        observations: [],
+        transparency: null,
+        seeing: null,
+        note: '',
+        savedAt,
+        timeline,
+      };
+
+  return upsertLog(journal, log);
 }
 
 /** Co dziennik wie o jednym obiekcie. */
@@ -290,6 +329,9 @@ export function parseJournal(raw: string | null): Journal | null {
         transparency: typeof l.transparency === 'number' ? l.transparency : null,
         seeing: typeof l.seeing === 'number' ? l.seeing : null,
         note: typeof l.note === 'string' ? l.note : '',
+        // Przebieg sprawdzany pole po polu: godziny zasilają kalibrację, więc
+        // uszkodzony zapis nie może trafić do rachunku jako prawdziwy.
+        ...(l.timeline !== undefined ? { timeline: parseTimeline(l.timeline) } : {}),
       }));
 
     return { version: JOURNAL_VERSION, logs };

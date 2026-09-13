@@ -32,7 +32,9 @@ pierwszym wyjeździe w teren, bo dotąd aplikacja zakładała, że wiesz, gdzie 
 
 **Dziennik obserwacji jest sprzężeniem zwrotnym.** Zasięg sprzętu i progi to przybliżenia. Jedyne
 dane, które mogą je nastroić, to odpowiedź na pytanie „widziałeś?" — stąd
-[dziennik](src/lib/journal.ts) i [raport miesięczny](src/lib/monthly-report.ts).
+[dziennik](src/lib/journal.ts) i [raport miesięczny](src/lib/monthly-report.ts). Obok celów dziennik trzyma
+rzeczywisty [przebieg nocy](src/lib/session-timeline.ts) — wyjazd, dojazd, zwijanie i powrót — żeby
+założenia o dojeździe i zwijaniu sprzętu dało się porównać z tym, co się naprawdę działo.
 
 ## Uruchomienie
 

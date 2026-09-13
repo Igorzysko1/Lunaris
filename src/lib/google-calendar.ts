@@ -450,3 +450,42 @@ export async function resolveBookingCalendar(
   const list = await fetchCalendarList(accessToken);
   return bookingCalendarIdOf(configured, list.status === 'ok' ? list.calendars : null);
 }
+
+/**
+ * Przesunięcie godzin wpisu przy przebiegu sesji na żywo — samo `start`
+ * i `end`, bez ruszania notatki i opisu.
+ *
+ * `missing`, gdy wpisu nie ma albo jest odwołany: noc bez rezerwacji to nie
+ * porażka, tylko brak czego poprawiać.
+ */
+export async function patchEventTimes(
+  accessToken: string,
+  calendarId: string,
+  eventId: string,
+  start: Date,
+  end: Date,
+  signal?: AbortSignal,
+): Promise<'ok' | 'missing' | 'failed'> {
+  try {
+    const response = await request(
+      `${eventsUrl(calendarId)}/${encodeURIComponent(eventId)}`,
+      {
+        method: 'PATCH',
+        headers: { ...bearer(accessToken), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          start: { dateTime: start.toISOString() },
+          end: { dateTime: end.toISOString() },
+        }),
+      },
+      signal,
+    );
+
+    if (response.status === 404 || response.status === 410) return 'missing';
+    if (!response.ok) return 'failed';
+
+    const event = (await response.json()) as { status?: unknown };
+    return event.status === 'cancelled' ? 'missing' : 'ok';
+  } catch {
+    return 'failed';
+  }
+}

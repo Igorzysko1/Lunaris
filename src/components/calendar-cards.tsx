@@ -212,23 +212,34 @@ export function OtherEventRow({ event }: { event: CalendarEvent }) {
   );
 }
 
-function TimeStepper({
+/**
+ * Godzina z przyciskami „wcześniej" i „później". Wspólna dla edycji obserwacji
+ * w kalendarzu i poprawek przebiegu nocy — różni je tylko krok.
+ */
+export function TimeStepper({
   label,
   value,
   onShift,
+  stepMinutes = STEP_MINUTES,
+  canShift = () => true,
 }: {
   label: string;
   value: Date;
   onShift: (steps: number) => void;
+  stepMinutes?: number;
+  /** Czy przesunięcie o tyle kroków ma sens — inaczej przycisk jest wyłączony. */
+  canShift?: (steps: number) => boolean;
 }) {
   return (
     <View style={styles.stepper}>
       <Text style={styles.stepperLabel}>{label}</Text>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`${label}: ${STEP_MINUTES} minut wcześniej`}
+        accessibilityLabel={`${label}: ${stepMinutes} minut wcześniej`}
+        accessibilityState={{ disabled: !canShift(-1) }}
         onPress={() => onShift(-1)}
-        style={styles.stepButton}
+        disabled={!canShift(-1)}
+        style={[styles.stepButton, !canShift(-1) && styles.dimmed]}
       >
         <Ionicons name="remove" size={18} color={colors.purple} />
       </Pressable>
@@ -239,9 +250,11 @@ function TimeStepper({
       </View>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`${label}: ${STEP_MINUTES} minut później`}
+        accessibilityLabel={`${label}: ${stepMinutes} minut później`}
+        accessibilityState={{ disabled: !canShift(1) }}
         onPress={() => onShift(1)}
-        style={styles.stepButton}
+        disabled={!canShift(1)}
+        style={[styles.stepButton, !canShift(1) && styles.dimmed]}
       >
         <Ionicons name="add" size={18} color={colors.purple} />
       </Pressable>
