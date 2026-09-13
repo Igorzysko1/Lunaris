@@ -25,6 +25,7 @@ import { upcomingEvents } from '../src/lib/events.ts';
 import {
   deleteBooking,
   fetchMorningEntries,
+  resolveBookingCalendar,
   resolveCalendarIds,
   upsertBooking,
 } from '../src/lib/google-calendar.ts';
@@ -111,8 +112,10 @@ try {
 
 // Kalendarz czytamy zawsze: rezerwacja liczona z założonej ósmej mogłaby
 // zająć termin, którego silnik z prawdziwymi godzinami by nie polecił.
-// Pobudkę wyznaczają wszystkie wybrane kalendarze; sam wpis trafia do głównego.
+// Pobudkę wyznaczają wszystkie wybrane kalendarze; sam wpis trafia do kalendarza
+// rezerwacji — tego samego, który wybiera się w Ustawieniach aplikacji.
 const calendarIds = await resolveCalendarIds(token, config.calendar.calendarIds);
+const bookingCalendarId = await resolveBookingCalendar(token, config.calendar.bookingCalendarId);
 
 const days = new Map<string, CalendarEntry[]>();
 for (const { night } of bundle.nights) {
@@ -179,7 +182,7 @@ if (!args.has('cancel')) {
 }
 
 if (args.has('cancel')) {
-  const removed = await deleteBooking(token, booking.id);
+  const removed = await deleteBooking(token, booking.id, bookingCalendarId);
   if (!removed) fail('Nie udało się odwołać rezerwacji.');
 
   process.stdout.write(
@@ -195,7 +198,7 @@ if (!args.has('confirm')) {
   process.exit(0);
 }
 
-const result = await upsertBooking(token, booking);
+const result = await upsertBooking(token, booking, bookingCalendarId);
 if (!result) fail('Nie udało się zapisać wpisu w kalendarzu.');
 
 process.stdout.write(

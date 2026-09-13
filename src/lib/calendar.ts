@@ -398,3 +398,30 @@ export function effectiveCalendarIds(
 
   return chosen.length > 0 ? chosen : defaultCalendarIds(calendars);
 }
+
+const writable = (calendar: CalendarInfo) =>
+  calendar.accessRole === 'owner' || calendar.accessRole === 'writer';
+
+/** Kalendarze, do których da się zapisać rezerwację — subskrypcje odpadają. */
+export function writableCalendars(calendars: readonly CalendarInfo[]): CalendarInfo[] {
+  return calendars.filter(writable);
+}
+
+/**
+ * Kalendarz, do którego trafia rezerwacja.
+ *
+ * Wybór z konfiguracji, jeśli wciąż istnieje i da się do niego pisać. Kalendarz
+ * usunięty albo taki, do którego odebrano prawo zapisu, wraca do głównego —
+ * rezerwacja ma gdzieś powstać, a nie przepaść z błędem. Bez listy konta (stary
+ * token, brak sieci) ufamy zapisanemu wyborowi.
+ */
+export function bookingCalendarIdOf(
+  configured: string | null,
+  calendars: readonly CalendarInfo[] | null,
+): string {
+  const primary = calendars?.find((c) => c.primary)?.id ?? PRIMARY_CALENDAR;
+  if (!configured || !calendars) return configured ?? primary;
+
+  const chosen = calendars.find((c) => c.id === configured);
+  return chosen && writable(chosen) ? configured : primary;
+}

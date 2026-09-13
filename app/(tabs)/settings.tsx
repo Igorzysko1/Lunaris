@@ -20,7 +20,12 @@ import { formatShortDate } from '@/lib/date';
 import { formatAge } from '@/lib/forecast-cache';
 import { NOTIFICATIONS_AVAILABLE } from '@/lib/notification-store';
 import { useForecast } from '@/store/forecast';
-import { effectiveCalendarIds, type CalendarInfo } from '@/lib/calendar';
+import {
+  bookingCalendarIdOf,
+  effectiveCalendarIds,
+  writableCalendars,
+  type CalendarInfo,
+} from '@/lib/calendar';
 import { googleCalendars, type CalendarsResult } from '@/lib/google-account';
 import { useGoogle } from '@/store/google';
 import { LEAD_TIMES, useSettings } from '@/store/settings';
@@ -463,6 +468,14 @@ function CalendarChoiceList() {
   }
 
   const chosen = new Set(effectiveCalendarIds(config.calendar.calendarIds, result.calendars));
+  const bookingTarget = bookingCalendarIdOf(config.calendar.bookingCalendarId, result.calendars);
+
+  const chooseBookingCalendar = (calendar: CalendarInfo) => {
+    if (calendar.id === bookingTarget) return;
+    // Główny zapisujemy jako brak wyboru: gdyby konto zmieniło adres, `null`
+    // dalej wskaże główny, a zapisany identyfikator — już nie.
+    updateConfig('calendar', { bookingCalendarId: calendar.primary ? null : calendar.id });
+  };
 
   const toggle = (calendar: CalendarInfo) => {
     const next = new Set(chosen);
@@ -486,11 +499,16 @@ function CalendarChoiceList() {
               {calendar.name}
             </Text>
             <Text style={styles.rowHint}>
-              {calendar.primary
-                ? 'główny · tu trafiają rezerwacje'
-                : calendar.accessRole === 'reader'
-                  ? 'subskrypcja'
-                  : 'własny'}
+              {[
+                calendar.primary
+                  ? 'główny'
+                  : calendar.accessRole === 'reader'
+                    ? 'subskrypcja'
+                    : 'własny',
+                calendar.id === bookingTarget ? 'tu trafiają rezerwacje' : null,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
             </Text>
           </View>
           <Toggle
@@ -508,6 +526,26 @@ function CalendarChoiceList() {
           Co najmniej jeden kalendarz musi zostać zaznaczony.
         </Text>
       )}
+
+      <Divider />
+      <Text style={styles.sourcesLabel}>Kalendarz dla rezerwacji</Text>
+      {writableCalendars(result.calendars).map((calendar) => {
+        const selected = calendar.id === bookingTarget;
+        return (
+          <Pressable
+            key={`booking-${calendar.id}`}
+            accessibilityRole="radio"
+            accessibilityState={{ checked: selected }}
+            onPress={() => chooseBookingCalendar(calendar)}
+            style={styles.row}
+          >
+            <Text style={[styles.rowLabel, styles.calendarChoiceName]} numberOfLines={1}>
+              {calendar.name}
+            </Text>
+            {selected && <Ionicons name="checkmark" size={18} color={colors.purple} />}
+          </Pressable>
+        );
+      })}
     </>
   );
 }
@@ -847,6 +885,9 @@ const styles = StyleSheet.create({
     fontFamily: fonts.mono,
     fontSize: 13,
     color: colors.purple,
+  },
+  calendarChoiceName: {
+    flex: 1,
   },
   calendarNotice: {
     padding: 14,

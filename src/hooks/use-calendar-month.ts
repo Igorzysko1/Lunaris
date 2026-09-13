@@ -14,11 +14,15 @@ export type MonthStatus = 'disconnected' | 'loading' | 'ready' | 'error';
  * Przy odświeżaniu poprzednie wydarzenia tego samego miesiąca zostają na
  * ekranie: siatka nie ma migać pustką przy każdym powrocie na zakładkę.
  */
-export function useCalendarMonth(cursor: Date, calendarIds: readonly string[] | null) {
+export function useCalendarMonth(
+  cursor: Date,
+  calendarIds: readonly string[] | null,
+  bookingCalendarId: string | null,
+) {
   const { connected } = useGoogle();
   const year = cursor.getFullYear();
   const month = cursor.getMonth();
-  const range = `${year}-${month}|${calendarIds?.join(',') ?? ''}`;
+  const range = `${year}-${month}|${calendarIds?.join(',') ?? ''}|${bookingCalendarId ?? ''}`;
 
   const [revision, setRevision] = useState(0);
   const [loaded, setLoaded] = useState<{
@@ -53,7 +57,7 @@ export function useCalendarMonth(cursor: Date, calendarIds: readonly string[] | 
       const from = cells[0].date;
       const to = new Date(last.getFullYear(), last.getMonth(), last.getDate() + 1);
 
-      const events = await loadRangeEvents(from, to, calendarIds);
+      const events = await loadRangeEvents(from, to, calendarIds, bookingCalendarId);
       if (active) setLoaded({ range, revision, events });
     })();
 

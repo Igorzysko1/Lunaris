@@ -11,9 +11,11 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import {
+  bookingCalendarIdOf,
   defaultCalendarIds,
   effectiveCalendarIds,
   toCalendarInfos,
+  writableCalendars,
   type CalendarInfo,
 } from '../src/lib/calendar.ts';
 import { DEFAULT_CONFIG, clampConfig, mergeConfig } from '../src/lib/config.ts';
@@ -155,5 +157,59 @@ describe('wybór kalendarzy w konfiguracji', () => {
     });
 
     assert.deepEqual(config.calendar.calendarIds, ['praca']);
+  });
+});
+
+describe('kalendarz rezerwacji', () => {
+  const HOLIDAY = 'pl.polish#holiday@group.v.calendar.google.com';
+
+  it('bez wyboru rezerwacje trafiają do głównego', () => {
+    assert.equal(bookingCalendarIdOf(null, ACCOUNT), 'me@gmail.com');
+    assert.equal(bookingCalendarIdOf(null, null), 'primary');
+  });
+
+  it('wybrany własny albo współdzielony z prawem zapisu', () => {
+    assert.equal(bookingCalendarIdOf('praca', ACCOUNT), 'praca');
+    assert.equal(bookingCalendarIdOf('wspolny', ACCOUNT), 'wspolny');
+  });
+
+  it('subskrypcja i usunięty kalendarz wracają do głównego', () => {
+    // Do subskrypcji nie da się pisać, a usuniętego nie ma — rezerwacja ma
+    // powstać w głównym, a nie przepaść z błędem.
+    assert.equal(bookingCalendarIdOf(HOLIDAY, ACCOUNT), 'me@gmail.com');
+    assert.equal(bookingCalendarIdOf('usuniety', ACCOUNT), 'me@gmail.com');
+  });
+
+  it('bez listy konta ufamy zapisanemu wyborowi', () => {
+    assert.equal(bookingCalendarIdOf('praca', null), 'praca');
+  });
+
+  it('do wyboru są tylko kalendarze z prawem zapisu', () => {
+    assert.deepEqual(
+      writableCalendars(ACCOUNT).map((c) => c.id),
+      ['me@gmail.com', 'praca', 'ukryty', 'wspolny'],
+    );
+  });
+
+  it('wybór przechodzi przez zapis i przeżywa zmianę innego ustawienia', () => {
+    assert.equal(DEFAULT_CONFIG.calendar.bookingCalendarId, null);
+    assert.equal(
+      mergeConfig({ calendar: { bookingCalendarId: 'praca' } }).calendar.bookingCalendarId,
+      'praca',
+    );
+
+    for (const value of ['', 7, null, ['praca']]) {
+      assert.equal(
+        mergeConfig({ calendar: { bookingCalendarId: value } }).calendar.bookingCalendarId,
+        null,
+        JSON.stringify(value),
+      );
+    }
+
+    const config = clampConfig({
+      ...DEFAULT_CONFIG,
+      calendar: { ...DEFAULT_CONFIG.calendar, bookingCalendarId: 'praca' },
+    });
+    assert.equal(config.calendar.bookingCalendarId, 'praca');
   });
 });

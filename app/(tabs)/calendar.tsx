@@ -7,7 +7,7 @@ import { ObservationCard, OtherEventRow, ProposalCard } from '@/components/calen
 import { Card, SectionLabel } from '@/components/primitives';
 import { eventsOnDay, monthCells, unbookedNights, type MonthCell } from '@/lib/calendar-view';
 import { WEEKDAYS_SHORT, formatLongDate, formatMonth, formatTime, isSameDay } from '@/lib/date';
-import { googleAccessToken } from '@/lib/google-account';
+import { bookingCalendar, googleAccessToken } from '@/lib/google-account';
 import { deleteBooking, patchObservation, upsertBooking } from '@/lib/google-calendar';
 import { bookingFor, bookingId } from '@/lib/session-booking';
 import { describeRejection } from '@/lib/session-text';
@@ -40,7 +40,11 @@ export default function CalendarScreen() {
   const [cursor, setCursor] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
   const [selected, setSelected] = useState<Date>(today);
 
-  const month = useCalendarMonth(cursor, config.calendar.calendarIds);
+  const month = useCalendarMonth(
+    cursor,
+    config.calendar.calendarIds,
+    config.calendar.bookingCalendarId,
+  );
 
   const cells = useMemo(() => monthCells(cursor.getFullYear(), cursor.getMonth()), [cursor]);
   const weeks = useMemo(
@@ -209,7 +213,12 @@ export default function CalendarScreen() {
                 booking={proposal.booking}
                 onConfirm={() =>
                   withToken(
-                    async (token) => (await upsertBooking(token, proposal.booking!)) !== null,
+                    async (token) =>
+                      (await upsertBooking(
+                        token,
+                        proposal.booking!,
+                        await bookingCalendar(config.calendar.bookingCalendarId),
+                      )) !== null,
                   )
                 }
               />
@@ -225,7 +234,10 @@ export default function CalendarScreen() {
               event={event}
               onSave={(change) => withToken((token) => patchObservation(token, event, change))}
               onDelete={() =>
-                withToken(async (token) => (await deleteBooking(token, event.id)) !== null)
+                withToken(
+                  async (token) =>
+                    (await deleteBooking(token, event.id, event.calendarId)) !== null,
+                )
               }
             />
           ) : (

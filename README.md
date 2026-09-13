@@ -192,7 +192,7 @@ z konfiguracji.
 **Pobudkę wyznacza kilka kalendarzy, nie tylko główny.** Domyślnie liczą się główny i własne
 kalendarze widoczne w Google Calendar; subskrypcje w rodzaju świąt i urodzin — nie. Wybór zmienia
 się w Ustawieniach, zapisuje w `calendar.calendarIds` i obowiązuje też w CLI (`brief`, `book`).
-Rezerwacje zawsze trafiają do głównego. Lista kalendarzy wymaga zakresu
+Rezerwacje trafiają do kalendarza wybranego w Ustawieniach (domyślnie głównego), także z `npm run book`. Lista kalendarzy wymaga zakresu
 `calendar.calendarlist.readonly` — połączenie sprzed jego dodania trzeba odnowić: w aplikacji
 odłączyć i połączyć konto, w CLI powtórzyć `npm run google:auth`. Do tego czasu liczy się tylko
 główny kalendarz.

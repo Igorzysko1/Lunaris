@@ -34,6 +34,8 @@ import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
 import {
+  PRIMARY_CALENDAR,
+  bookingCalendarIdOf,
   dayKey,
   effectiveCalendarIds,
   fillFromStore,
@@ -373,24 +375,37 @@ export function loadCalendarDays(
 }
 
 /**
+ * Kalendarz, do którego trafiają rezerwacje — wybór z Ustawień sprawdzony
+ * z listą konta, trzymaną w pamięci, więc karta nocy nie pyta o nią za każdym
+ * razem.
+ */
+export async function bookingCalendar(configured: string | null): Promise<string> {
+  if (!configured) return PRIMARY_CALENDAR;
+
+  const list = await googleCalendars();
+  return bookingCalendarIdOf(configured, list.status === 'ok' ? list.calendars : null);
+}
+
+/**
  * Wydarzenia zakresu dat do zakładki kalendarza. `null`, gdy konta nie ma
  * albo pobranie się nie udało.
  *
- * Główny kalendarz czytamy zawsze, nawet gdy nie wyznacza pobudki: tam
- * mieszkają rezerwacje, a zakładka bez nich nie miałaby czego edytować.
+ * Kalendarz rezerwacji czytamy zawsze, nawet gdy nie wyznacza pobudki: tam
+ * mieszkają obserwacje, a zakładka bez nich nie miałaby czego edytować.
  */
 export async function loadRangeEvents(
   from: Date,
   to: Date,
   calendarIds: readonly string[] | null,
+  bookingCalendarId: string | null,
 ): Promise<CalendarEvent[] | null> {
   const auth = await googleAccessToken();
   if (auth.status !== 'ok') return null;
 
   const list = await googleCalendars();
   const calendars = list.status === 'ok' ? list.calendars : null;
-  const primary = calendars?.find((c) => c.primary)?.id ?? 'primary';
-  const ids = [...new Set([...effectiveCalendarIds(calendarIds, calendars), primary])];
+  const target = bookingCalendarIdOf(bookingCalendarId, calendars);
+  const ids = [...new Set([...effectiveCalendarIds(calendarIds, calendars), target])];
 
   return fetchRangeEvents(auth.token, from, to, ids);
 }

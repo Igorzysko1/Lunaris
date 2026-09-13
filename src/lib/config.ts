@@ -137,9 +137,15 @@ export type CalendarThresholds = {
   /**
    * Kalendarze Google, których poranki ograniczają noc. `null` — domyślne:
    * główny i własne kalendarze widoczne w Google Calendar, bez subskrypcji
-   * w rodzaju świąt i urodzin. Rezerwacje zawsze trafiają do głównego.
+   * w rodzaju świąt i urodzin.
    */
   calendarIds: string[] | null;
+  /**
+   * Kalendarz, do którego trafiają rezerwacje sesji. `null` — główny.
+   * Niezależny od `calendarIds`: kalendarz rezerwacji nie musi wyznaczać
+   * pobudki, a własne rezerwacje i tak nie liczą się jako poranne wydarzenia.
+   */
+  bookingCalendarId: string | null;
 };
 
 /**
@@ -205,6 +211,7 @@ export const DEFAULT_CONFIG: LunarisConfig = {
     assumedFirstEventHour: 8,
     weekendDaysOff: true,
     calendarIds: null,
+    bookingCalendarId: null,
   },
   refresh: {
     hourOfDay: DEFAULT_REFRESH_HOUR,
@@ -383,6 +390,11 @@ export function clampConfig(config: LunarisConfig): LunarisConfig {
     ),
     weekendDaysOff: config.calendar.weekendDaysOff !== false,
     calendarIds: calendarIdsOf(config.calendar.calendarIds),
+    bookingCalendarId:
+      typeof config.calendar.bookingCalendarId === 'string' &&
+      config.calendar.bookingCalendarId.length > 0
+        ? config.calendar.bookingCalendarId
+        : null,
   };
 
   return {

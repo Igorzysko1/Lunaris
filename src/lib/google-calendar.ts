@@ -18,6 +18,8 @@
  */
 
 import {
+  PRIMARY_CALENDAR,
+  bookingCalendarIdOf,
   effectiveCalendarIds,
   toCalendarEntries,
   toCalendarInfos,
@@ -34,9 +36,6 @@ import type { Booking } from './session-booking.ts';
 import { timeoutSignal } from './timeout.ts';
 
 const CALENDAR_API = 'https://www.googleapis.com/calendar/v3';
-
-/** Rezerwacje trafiają zawsze do głównego kalendarza. */
-const API = `${CALENDAR_API}/calendars/primary/events`;
 
 const eventsUrl = (calendarId: string) =>
   `${CALENDAR_API}/calendars/${encodeURIComponent(calendarId)}/events`;
@@ -155,11 +154,12 @@ function payload(booking: Booking) {
 export async function fetchBooking(
   accessToken: string,
   bookingId: string,
+  calendarId: string = PRIMARY_CALENDAR,
   signal?: AbortSignal,
 ): Promise<{ exists: boolean } | null> {
   try {
     const response = await request(
-      `${API}/${encodeURIComponent(bookingId)}`,
+      `${eventsUrl(calendarId)}/${encodeURIComponent(bookingId)}`,
       { headers: bearer(accessToken) },
       signal,
     );
@@ -208,13 +208,14 @@ function reportSaved(method: string, event: SavedEvent) {
 export async function upsertBooking(
   accessToken: string,
   booking: Booking,
+  calendarId: string = PRIMARY_CALENDAR,
   signal?: AbortSignal,
 ): Promise<{ htmlLink: string; replaced: boolean } | null> {
   const headers = { ...bearer(accessToken), 'Content-Type': 'application/json' };
 
   try {
     const inserted = await request(
-      API,
+      eventsUrl(calendarId),
       { method: 'POST', headers, body: JSON.stringify({ id: booking.id, ...payload(booking) }) },
       signal,
     );
@@ -228,7 +229,7 @@ export async function upsertBooking(
     if (inserted.status !== 409) return null;
 
     const updated = await request(
-      `${API}/${encodeURIComponent(booking.id)}`,
+      `${eventsUrl(calendarId)}/${encodeURIComponent(booking.id)}`,
       { method: 'PATCH', headers, body: JSON.stringify(payload(booking)) },
       signal,
     );
@@ -263,11 +264,12 @@ export async function upsertBooking(
 export async function deleteBooking(
   accessToken: string,
   bookingId: string,
+  calendarId: string = PRIMARY_CALENDAR,
   signal?: AbortSignal,
 ): Promise<{ existed: boolean } | null> {
   try {
     const response = await request(
-      `${API}/${encodeURIComponent(bookingId)}`,
+      `${eventsUrl(calendarId)}/${encodeURIComponent(bookingId)}`,
       { method: 'DELETE', headers: bearer(accessToken) },
       signal,
     );
@@ -410,13 +412,15 @@ export async function fetchRangeEvents(
  */
 export async function patchObservation(
   accessToken: string,
-  event: Pick<CalendarEvent, 'id' | 'description'>,
+  event: Pick<CalendarEvent, 'id' | 'calendarId' | 'description'>,
   change: { start: Date; end: Date; note: string },
   signal?: AbortSignal,
 ): Promise<boolean> {
   try {
     const response = await request(
-      `${API}/${encodeURIComponent(event.id)}`,
+      // Kalendarz, z którego wpis przeczytano — rezerwacja mogła powstać, zanim
+      // zmienił się kalendarz docelowy.
+      `${eventsUrl(event.calendarId)}/${encodeURIComponent(event.id)}`,
       {
         method: 'PATCH',
         headers: { ...bearer(accessToken), 'Content-Type': 'application/json' },
@@ -434,4 +438,15 @@ export async function patchObservation(
   } catch {
     return false;
   }
+}
+
+/** Kalendarz rezerwacji dla CLI — ten sam wybór i ta sama reguła co w aplikacji. */
+export async function resolveBookingCalendar(
+  accessToken: string,
+  configured: string | null,
+): Promise<string> {
+  if (!configured) return PRIMARY_CALENDAR;
+
+  const list = await fetchCalendarList(accessToken);
+  return bookingCalendarIdOf(configured, list.status === 'ok' ? list.calendars : null);
 }

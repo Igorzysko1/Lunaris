@@ -2,10 +2,11 @@ import { useEffect, useState, type ComponentProps } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import { googleAccessToken } from '@/lib/google-account';
+import { bookingCalendar, googleAccessToken } from '@/lib/google-account';
 import { deleteBooking, fetchBooking, upsertBooking } from '@/lib/google-calendar';
 import type { Booking } from '@/lib/session-booking';
 import { useGoogle } from '@/store/google';
+import { useSettings } from '@/store/settings';
 import { colors, fonts, radius } from '@/theme';
 
 /** Stan wpisu w kalendarzu; `unknown`, gdy nie udało się tego sprawdzić. */
@@ -21,6 +22,10 @@ type Presence = 'booked' | 'absent' | 'unknown';
  * `booking` jest `null`, gdy noc nie ma już werdyktu „jedź". Wpis sprzed zmiany
  * prognozy może jednak dalej wisieć — i to jest moment, w którym przycisk
  * odwołania jest najbardziej potrzebny, więc karta pokazuje go i wtedy.
+ *
+ * Wpis trafia do kalendarza wybranego w Ustawieniach i tam jest szukany. Po
+ * zmianie wyboru rezerwacja z poprzedniego kalendarza przestaje być tu widoczna
+ * — Ustawienia mówią o tym wprost.
  */
 export function BookingButtons({
   bookingId,
@@ -30,12 +35,18 @@ export function BookingButtons({
   booking: Booking | null;
 }) {
   const google = useGoogle();
+  const { config } = useSettings();
   const connected = google.connected === true;
+  const target = config.calendar.bookingCalendarId;
 
-  // Oba stany z identyfikatorem, którego dotyczą: karta tej samej pozycji
-  // listy dostaje po odświeżeniu inną noc i nie może odziedziczyć „zapisano".
-  const [presence, setPresence] = useState<{ id: string; value: Presence } | null>(null);
-  const [message, setMessage] = useState<{ id: string; text: string; error: boolean } | null>(null);
+  // Stany niosą klucz nocy i kalendarza, którego dotyczą: karta tej samej
+  // pozycji listy dostaje po odświeżeniu inną noc, a po zmianie kalendarza
+  // docelowego — inny wpis. Żadna z tych zmian nie może odziedziczyć „zapisano".
+  const key = `${bookingId}|${target ?? ''}`;
+  const [presence, setPresence] = useState<{ key: string; value: Presence } | null>(null);
+  const [message, setMessage] = useState<{ key: string; text: string; error: boolean } | null>(
+    null,
+  );
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -44,11 +55,14 @@ export function BookingButtons({
     let active = true;
     void (async () => {
       const auth = await googleAccessToken();
-      const found = auth.status === 'ok' ? await fetchBooking(auth.token, bookingId) : null;
+      const found =
+        auth.status === 'ok'
+          ? await fetchBooking(auth.token, bookingId, await bookingCalendar(target))
+          : null;
       if (!active) return;
 
       setPresence({
-        id: bookingId,
+        key,
         value: found === null ? 'unknown' : found.exists ? 'booked' : 'absent',
       });
     })();
@@ -56,7 +70,9 @@ export function BookingButtons({
     return () => {
       active = false;
     };
-  }, [connected, bookingId]);
+    // `key` składa się z `bookingId` i `target`, więc wystarczy zamiast nich.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connected, key]);
 
   if (!google.available || google.connected === null) return null;
 
@@ -77,23 +93,24 @@ export function BookingButtons({
   }
 
   /** `null` — jeszcze sprawdzamy. */
-  const current = presence?.id === bookingId ? presence.value : null;
-  const note = message?.id === bookingId ? message : null;
+  const current = presence?.key === key ? presence.value : null;
+  const note = message?.key === key ? message : null;
 
   // Noc odpadła i nic po niej nie zostało: nie ma czego pokazywać.
   if (!booking && current !== 'booked') return null;
 
-  const run = async (action: (token: string) => Promise<string | null>) => {
+  const run = async (action: (token: string, calendarId: string) => Promise<string | null>) => {
     setBusy(true);
     try {
       const auth = await googleAccessToken();
-      const done = auth.status === 'ok' ? await action(auth.token) : null;
+      const done =
+        auth.status === 'ok' ? await action(auth.token, await bookingCalendar(target)) : null;
 
       setMessage(
         done
-          ? { id: bookingId, text: done, error: false }
+          ? { key, text: done, error: false }
           : {
-              id: bookingId,
+              key,
               text:
                 auth.status === 'disconnected'
                   ? 'Konto Google jest odłączone — połącz je ponownie w Ustawieniach.'
@@ -107,11 +124,11 @@ export function BookingButtons({
   };
 
   const book = (confirmed: Booking) =>
-    run(async (token) => {
-      const result = await upsertBooking(token, confirmed);
+    run(async (token, calendarId) => {
+      const result = await upsertBooking(token, confirmed, calendarId);
       if (!result) return null;
 
-      setPresence({ id: bookingId, value: 'booked' });
+      setPresence({ key, value: 'booked' });
       return result.replaced
         ? 'Wpis zaktualizowany do bieżącej prognozy.'
         : 'Zapisano w kalendarzu.';
@@ -124,11 +141,11 @@ export function BookingButtons({
         text: 'Odwołaj',
         style: 'destructive',
         onPress: () =>
-          void run(async (token) => {
-            const result = await deleteBooking(token, bookingId);
+          void run(async (token, calendarId) => {
+            const result = await deleteBooking(token, bookingId, calendarId);
             if (!result) return null;
 
-            setPresence({ id: bookingId, value: 'absent' });
+            setPresence({ key, value: 'absent' });
             return 'Sesja odwołana — wpis usunięty z kalendarza.';
           }),
       },
