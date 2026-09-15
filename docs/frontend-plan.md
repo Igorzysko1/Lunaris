@@ -183,25 +183,24 @@ Historia" z tury 4c; zapisany wpis czyta się jako Wpis nocy (14b).
 
 ### Etap 6 — Gdzie
 
-| Element                                                                      | Źródło                                                                             | Status                                                                          |
-| ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| Ranking: warte rozważenia / zdominowane / odpada / bez prognozy              | `site-review.reviewNights` → `go`, `dominated`, `noGo`, `missing`; `useSiteReview` | jest                                                                            |
-| Zdanie wyniku („niebo 72/100, minus 6 za 30 min drogi")                      | `site-review.explainScore`                                                         | jest                                                                            |
-| „Tylko stąd: M33, NGC 7000"                                                  | `SiteOutlook.uniqueTargets`                                                        | jest                                                                            |
-| „noc: dziś ▾"                                                                | `reviewNights` dla kolejnych nocy                                                  | jest                                                                            |
-| Katalog z Bortle i dojazdem                                                  | `config.sites`, `sky-map.skyQualityAt`, `astro.distanceKm`                         | jest                                                                            |
-| „Jestem tutaj": fix GPS z dokładnością, nowe miejsce / korekta współrzędnych | `use-device-location.capturePosition`, akcje miejscówek ze `app/sites.tsx`         | jest                                                                            |
-| Szczegół: horyzont, przeszkody, „usuń"                                       | `config` `HorizonOverride`, `horizon.isValidMask`, settings store                  | jest                                                                            |
-| Szczegół: notatki z wyjazdów                                                 | `ObservingSite`                                                                    | **DO ZROBIENIA**: sprawdzić, czy miejsce ma pole notatek; jeśli nie — dodać     |
-| „Obserwuj stąd tej nocy"                                                     | `ActiveLocation` w settings store, `use-booking-site`                              | jest                                                                            |
-| „Nawiguj ↗"                                                                  | —                                                                                  | **UI**: `Linking` z `geo:` / URL map                                            |
-| „Usuń miejsce"                                                               | akcje miejscówek z `app/sites.tsx`                                                 | jest                                                                            |
-| „Pobierz prognozę dla tych dwóch"                                            | `weather.fetchUpcomingNightsForPoints`                                             | **DO ZROBIENIA**: akcja w `ForecastProvider` pobierająca tylko brakujące punkty |
-| Mapa zanieczyszczenia światłem ↗                                             | `light-pollution.lightPollutionMapUrl`                                             | jest                                                                            |
+| Element                                                                      | Źródło                                                                                | Status                                                                                                                        |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Ranking: warte rozważenia / zdominowane / odpada / bez prognozy              | `site-review.reviewNights`, `useRanking` (`use-where`)                                | podpięte — miejsce wybrane w Nocy wchodzi jako zwykły wiersz (decyzja 15 września), z prognozą cyklu Nocy, oznaczone „w Nocy" |
+| Duża liczba w wierszu                                                        | `SiteOutlook.score`                                                                   | podpięte — wynik po karze 0–100 (decyzja 15 września), obok `explainScore`                                                    |
+| „Tylko stąd: M33, NGC 7000"                                                  | `SiteOutlook.uniqueTargets` → `where-text.uniqueText`                                 | podpięte                                                                                                                      |
+| „noc: dziś ▾"                                                                | `reviewNights` dla kolejnych nocy                                                     | podpięte — dotknięcie przełącza na kolejną noc                                                                                |
+| Katalog z Bortle i dojazdem                                                  | `config.sites`, `sky-map.skyQualityAt`, `astro.distanceKm`, `where-text.driveMinutes` | podpięte                                                                                                                      |
+| „Jestem tutaj": fix GPS z dokładnością, nowe miejsce / korekta współrzędnych | `capturePosition`, `addSiteAt`, `moveSite` (`useSiteCatalog`)                         | podpięte — nowe miejsce od razu wybrane w Nocy; do korekty trzy najbliższe fixowi                                             |
+| Szczegół: horyzont, przeszkody, „usuń"                                       | `addHorizonOverride`, `removeHorizonOverride`, `where-text.parseObstacle`             | podpięte — azymuty 0–360 (także przez północ), wysokość 0–90                                                                  |
+| Szczegół: notatki z wyjazdów                                                 | `ObservingSite.notes`, `updateSiteNotes`                                              | było — pole istniało; zapis po zakończeniu edycji                                                                             |
+| „Obserwuj stąd tej nocy"                                                     | `selectPlace`                                                                         | podpięte — przechodzi do Nocy                                                                                                 |
+| „Nawiguj ↗"                                                                  | `where-text.navigationUrl` + `Linking`                                                | podpięte — adres Google Maps                                                                                                  |
+| „Usuń miejsce"                                                               | `removeSite`                                                                          | podpięte — pyta; przy miejscu liczonym w Nocy uprzedza, że Noc wróci do domyślnej miejscowości                                |
+| „Pobierz prognozę dla tych dwóch"                                            | `useSiteReview.fetchMissing` (`fetchUpcomingNightsForPoints`)                         | podpięte — tylko brakujące punkty, 30 min blokady po 429; w hooku przeglądu, nie w `ForecastProvider`                         |
+| Mapa zanieczyszczenia światłem ↗                                             | `lightPollutionMapUrl`                                                                | podpięte                                                                                                                      |
 
-Do rozstrzygnięcia z projektu przed etapem: czy wybrana miejscowość z Nocy (np. Zawoja) wchodzi do
-rankingu jako zwykły wiersz, oraz czy wiersz rankingu pokazuje wynik po karze (66) czy ocenę 1–5.
-Po etapie usuwamy `app/sites.tsx` i `app/review.tsx`.
+Usunięte: `app/sites.tsx`, `app/review.tsx`, `src/mock/where.ts`. Zdania i walidacja w
+`src/lib/where-text.ts` (test: `tests/where-text.test.ts`).
 
 ### Etap 7 — Kalendarz, Eventy, powiadomienia
 
@@ -273,8 +272,8 @@ komponenty z `src/components`. `grep -rn "todo(" app src` ma zwrócić pusto.
 | 6   | Udostępnianie eksportu (`expo-sharing`) — moduł natywny, wymaga nowego buildu                        | 3    |
 | 7   | ~~Godzina odhaczenia celu~~ — zrobione: `TargetObservation.seenAt`, dziennik v3                      | 4    |
 | 8   | ~~Cele dopisane ręcznie do planu nocy~~ — zrobione: `night-picks`, w opisie rezerwacji z listy Nieba | 4–5  |
-| 9   | Notatki przy miejscówce (do sprawdzenia)                                                             | 6    |
-| 10  | Pobranie prognozy tylko dla brakujących miejsc                                                       | 6    |
+| 9   | ~~Notatki przy miejscówce~~ — już były: `ObservingSite.notes`                                        | 6    |
+| 10  | ~~Pobranie prognozy tylko dla brakujących miejsc~~ — zrobione: `useSiteReview.fetchMissing`          | 6    |
 | 11  | Rezerwacja nocy zjawiska bez planu — decyzja                                                         | 7    |
 | 12  | Wyciszanie pojedynczego zjawiska                                                                     | 7    |
 | 13  | Kategorie powiadomień                                                                                | 7    |
@@ -296,4 +295,4 @@ komponenty z `src/components`. `grep -rn "todo(" app src` ma zwrócić pusto.
 - Czy tryb sesji (nocleg w terenie) zasługuje na własny segment Planu.
 - Powrót do zakładki Noc kasuje drill-down, ale zachowuje wybrany segment i noc.
 - Czy przy zamykaniu nocy proponować wyjście z trybu czerwonego.
-- Ranking w Gdzie: wynik po karze czy ocena 1–5; miejscowość z Nocy w rankingu czy nie.
+- ~~Ranking w Gdzie~~ — rozstrzygnięte 15 września: wynik po karze 0–100, miejscowość z Nocy jako zwykły wiersz.

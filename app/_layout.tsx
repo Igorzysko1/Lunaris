@@ -106,8 +106,6 @@ function AppStack() {
         <Stack.Screen name="legacy/calendar" />
         <Stack.Screen name="legacy/events" />
         <Stack.Screen name="legacy/settings" />
-        <Stack.Screen name="sites" />
-        <Stack.Screen name="review" />
       </Stack>
     </ForecastProvider>
   );

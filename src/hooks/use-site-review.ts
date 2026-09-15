@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as SunCalc from 'suncalc';
 
+import type { ObservingSite } from '@/data/observing-sites';
 import { findPlaceById, type Coords } from '@/data/places';
 import type { LunarisConfig } from '@/lib/config';
 import {
@@ -10,6 +11,7 @@ import {
   markFailure,
   markSuccess,
   planAppFetch,
+  rateLimitCooldown,
 } from '@/lib/daily-cycle';
 import { loadCycleState, loadForecast, saveCycleState, saveForecast } from '@/lib/forecast-cache';
 import { useCalendarDays } from '@/hooks/use-calendar-days';
@@ -42,7 +44,14 @@ export type ReviewStatus = 'loading' | 'ready' | 'error';
 /** Stała pustka — nowa `Map` przy każdym renderze psułaby zależności `useMemo`. */
 const EMPTY_FORECASTS: Map<string, NightSlice[]> = new Map();
 
-export function useSiteReview(config: LunarisConfig) {
+export function useSiteReview(
+  config: LunarisConfig,
+  /**
+   * Miejsce spoza katalogu, które ma stanąć w rankingu — wybrane w Nocy. Jego
+   * prognozę dostarcza cykl prognozy Nocy, więc przegląd jej nie pobiera.
+   */
+  extra: { site: ObservingSite; nights: NightSlice[] | null } | null = null,
+) {
   /**
    * Wynik ostatniego pobrania razem z kluczem żądania, którego dotyczy.
    *
@@ -54,6 +63,9 @@ export function useSiteReview(config: LunarisConfig) {
   const [outcome, setOutcome] = useState<{ key: string; status: 'ready' | 'error' } | null>(null);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [attempt, setAttempt] = useState(0);
+  const [fetching, setFetching] = useState(false);
+  const [fetchFailed, setFetchFailed] = useState(false);
+  const [cooldownUntil, setCooldownUntil] = useState<Date | null>(null);
 
   /** Ręczne odświeżenie pomija terminarz — użytkownik wie więcej niż zegar. */
   const forced = useRef(false);
@@ -199,11 +211,66 @@ export function useSiteReview(config: LunarisConfig) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [siteKey, hour, attempt]);
 
+  const extraNights = extra?.nights ?? null;
+  const reviewed = useMemo(() => {
+    if (!extra || !extraNights) return forecasts;
+    return new Map([...forecasts, [extra.site.id, extraNights.slice(0, REVIEW_NIGHTS)]]);
+  }, [forecasts, extra, extraNights]);
+
+  /**
+   * Pobiera prognozę tylko dla miejsc, których brakuje w przeglądzie (13c) —
+   * jedno żądanie na brakujące punkty, bez ponownego pobierania reszty. Po
+   * odpowiedzi 429 czeka pół godziny, tak samo jak ręczne odświeżenie Nocy.
+   */
+  const fetchMissing = useCallback(
+    async (missing: ObservingSite[]) => {
+      if (missing.length === 0) return;
+
+      const stored = (await loadCycleState(SOURCE)) ?? EMPTY_CYCLE_STATE;
+      const now = new Date();
+      const cooldown = rateLimitCooldown(stored, now);
+      setCooldownUntil(cooldown);
+      if (cooldown) return;
+
+      setFetching(true);
+      setFetchFailed(false);
+      const attempted = markAttempt(stored, now, decideRefresh(now, stored, hour).term);
+      void saveCycleState(SOURCE, attempted);
+
+      try {
+        const perPoint = await fetchUpcomingNightsForPoints(
+          missing.map((site) => ({ lat: site.lat, lon: site.lon })),
+          REVIEW_NIGHTS,
+        );
+
+        setForecasts((current) => {
+          const next = new Map(current);
+          missing.forEach((site, i) => next.set(site.id, perPoint[i]));
+          return next;
+        });
+        missing.forEach((site, i) => {
+          void saveForecast('site', { lat: site.lat, lon: site.lon }, perPoint[i]);
+        });
+        void saveCycleState(SOURCE, markSuccess(attempted, new Date()));
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : 'Nieznany błąd pobierania';
+        const rateLimited = error instanceof ForecastError && error.kind === 'rate-limit';
+        const failed = markFailure(attempted, reason, rateLimited);
+        void saveCycleState(SOURCE, failed);
+        setCooldownUntil(rateLimitCooldown(failed, new Date()));
+        setFetchFailed(!rateLimited);
+      } finally {
+        setFetching(false);
+      }
+    },
+    [hour, setForecasts],
+  );
+
   // Poranki są te same dla każdej miejscówki — kalendarz nie zależy od tego,
   // dokąd się jedzie — więc wystarczą noce z pierwszej wczytanej prognozy.
   const mornings = useMemo(
-    () => ([...forecasts.values()][0] ?? []).map((slice) => slice.night.to),
-    [forecasts],
+    () => ([...reviewed.values()][0] ?? []).map((slice) => slice.night.to),
+    [reviewed],
   );
   const calendar = useCalendarDays(mornings, config.calendar.calendarIds);
 
@@ -217,8 +284,8 @@ export function useSiteReview(config: LunarisConfig) {
   const reviews = useMemo(
     () =>
       reviewNights({
-        sites,
-        forecasts,
+        sites: extra ? [...sites, extra.site] : sites,
+        forecasts: reviewed,
         home,
         config,
         moon: (night, coords) => ({
@@ -231,8 +298,18 @@ export function useSiteReview(config: LunarisConfig) {
         bortleFor: (site) => skyQualityAt(site.lat, site.lon, site.bortle).bortle,
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [forecasts, config, home?.lat, home?.lon, calendar],
+    [reviewed, extra, config, home?.lat, home?.lon, calendar],
   );
 
-  return { status, reviews, savedAt, refresh, refreshing: status === 'loading' };
+  return {
+    status,
+    reviews,
+    savedAt,
+    refresh,
+    refreshing: status === 'loading',
+    fetchMissing,
+    fetching,
+    fetchFailed,
+    cooldownUntil,
+  };
 }

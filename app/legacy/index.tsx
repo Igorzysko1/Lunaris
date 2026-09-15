@@ -30,8 +30,6 @@ export default function LegacyScreens() {
         subtitle="sprzęt, profil, Google, powiadomienia"
         onPress={() => router.push('/legacy/settings')}
       />
-      <MenuRow title="Gdzie dziś jechać" onPress={() => router.push('/review')} />
-      <MenuRow title="Miejscówki" onPress={() => router.push('/sites')} />
       <Note>Nowe ekrany są makietą: dane są stałe, a przyciski bez logiki mówią to wprost.</Note>
     </Screen>
   );

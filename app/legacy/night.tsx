@@ -200,7 +200,7 @@ export default function NightScreen() {
               <>
                 <Pressable
                   accessibilityRole="button"
-                  onPress={() => router.push('/review')}
+                  onPress={() => router.navigate('/where')}
                   style={[styles.reviewLink, styles.gap]}
                 >
                   <Ionicons name="map-outline" size={18} color={colors.purple} />
