@@ -204,6 +204,13 @@ pobraniu raz na dobę limit wystarcza z zapasem. Własny klucz z [api.nasa.gov](
 podaje się w `EXPO_PUBLIC_NASA_KEY`. Zdjęcia bywają cudzą własnością, dlatego karta pokazuje podpis
 autora, gdy API go zwraca.
 
+**Prognoza idzie przez serwer Lunaris na Frogu** (`https://frog01-30951.wykr.es`), gdy w `.env`
+(plik poza gitem) są `EXPO_PUBLIC_FROG_URL` i `EXPO_PUBLIC_FROG_KEY`. Serwer jest pośrednikiem
+Open-Meteo z pamięcią podręczną odświeżaną o 6:00 i 17:00 — oddaje tę samą odpowiedź, a werdykt
+dalej liczy telefon z własnymi ustawieniami. Przy każdym błędzie serwera aplikacja pyta Open-Meteo
+wprost, a bez sieci działa zapis w telefonie. CLI zawsze idzie prosto do Open-Meteo. Build na EAS
+nie widzi lokalnego `.env`: bez tych zmiennych ustawionych w EAS aplikacja po prostu pomija serwer.
+
 ## Stan i ograniczenia
 
 Projekt prywatny, jeden użytkownik, bez wydania. Rzeczy świadomie niezrobione:

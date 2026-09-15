@@ -9,7 +9,61 @@
 import type { Coords } from '../data/places.ts';
 import { nightWindow, type NightWindow } from './night-window.ts';
 
+import { timeoutSignal } from './timeout.ts';
+
 const API = 'https://api.open-meteo.com/v1/forecast';
+
+/**
+ * Serwer Lunaris na Frogu — pośrednik Open-Meteo z pamięcią podręczną,
+ * odświeżaną o 6:00 i 17:00. Przyjmuje dokładnie to zapytanie, które poszłoby
+ * do Open-Meteo, i oddaje tę samą odpowiedź; werdykt dalej liczy telefon.
+ *
+ * Pusty adres — CLI, testy, build bez konfiguracji — znaczy: prosto do
+ * Open-Meteo. Klucz trafia do paczki JS, więc chroni tylko przed przypadkowym
+ * użyciem serwera, a nie przed kimś, kto rozpakuje aplikację.
+ */
+const FROG_URL = process.env.EXPO_PUBLIC_FROG_URL ?? '';
+const FROG_KEY = process.env.EXPO_PUBLIC_FROG_KEY ?? '';
+
+/** Krócej niż do Open-Meteo: wolny Frog nie może opóźniać zapasowej drogi. */
+const FROG_TIMEOUT_MS = 8_000;
+
+/**
+ * Adresy do spróbowania po kolei: Frog, jeśli jest skonfigurowany, potem
+ * Open-Meteo. Ścieżka i parametry zapytania są te same po obu stronach.
+ */
+export function forecastSources(url: URL, frogBase: string): string[] {
+  const direct = url.toString();
+  if (!frogBase) return [direct];
+
+  return [`${frogBase.replace(/\/+$/, '')}/v1/forecast${url.search}`, direct];
+}
+
+/**
+ * Próba przez Frog. `undefined` znaczy „nie wyszło, idź prosto do Open-Meteo".
+ *
+ * Każda porażka serwera kończy się tak samo — brak sieci na serwerze, limit,
+ * zły klucz, wolna odpowiedź — bo telefon ma własny dostęp do sieci. Awaria
+ * Froga nie może zabrać prognozy. Wyjątkiem jest przerwanie przez wywołującego:
+ * to idzie dalej, jak dotąd.
+ */
+async function viaFrog(url: URL, signal?: AbortSignal): Promise<unknown | undefined> {
+  const [frog] = forecastSources(url, FROG_URL);
+  const timeout = timeoutSignal(FROG_TIMEOUT_MS, signal);
+
+  try {
+    const res = await fetch(frog, {
+      headers: { 'x-lunaris-key': FROG_KEY },
+      signal: timeout.signal,
+    });
+    return res.ok ? await res.json() : undefined;
+  } catch (error) {
+    if (signal?.aborted) throw error;
+    return undefined;
+  } finally {
+    timeout.clear();
+  }
+}
 
 /**
  * Błąd pobierania prognozy, z rozróżnieniem powodu.
@@ -47,6 +101,11 @@ export class ForecastError extends Error {
  * jest z jego punktu widzenia sukcesem, więc status trzeba sprawdzić osobno.
  */
 async function getJson(url: URL, signal?: AbortSignal): Promise<unknown> {
+  if (FROG_URL) {
+    const fromFrog = await viaFrog(url, signal);
+    if (fromFrog !== undefined) return fromFrog;
+  }
+
   let res: Response;
 
   try {
