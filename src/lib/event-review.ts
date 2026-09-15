@@ -39,6 +39,39 @@ export const PREVIEW_LEAD_DAYS = 7;
  */
 const NOTABLE_AHEAD: EventType[] = ['eclipse', 'meteor_shower'];
 
+/** Kategorie powiadomień z ekranu Powiadomienia — wyłączona nie odzywa się wcale. */
+export type NotifyCategory = 'eclipses' | 'meteors' | 'planets' | 'moon';
+
+export const NOTIFY_CATEGORIES: readonly NotifyCategory[] = [
+  'eclipses',
+  'meteors',
+  'planets',
+  'moon',
+];
+
+/**
+ * Domyślnie bez faz Księżyca: nów i pełnia wracają co dwa tygodnie, a o nocy,
+ * która się nadaje, i tak mówi powiadomienie o dobrej nocy.
+ */
+export const DEFAULT_NOTIFY_CATEGORIES: readonly NotifyCategory[] = [
+  'eclipses',
+  'meteors',
+  'planets',
+];
+
+export function categoryOf(event: Pick<AstroEvent, 'type'>): NotifyCategory {
+  switch (event.type) {
+    case 'eclipse':
+      return 'eclipses';
+    case 'meteor_shower':
+      return 'meteors';
+    case 'moon_phase':
+      return 'moon';
+    default:
+      return 'planets';
+  }
+}
+
 /** Stan zjawiska w danym przebiegu przeglądu. */
 export type EventState =
   /** Poza zasięgiem prognozy — wiadomo, że wypadnie, nie wiadomo, czy pojedziemy. */
@@ -61,6 +94,12 @@ export type NoticeLogEntry = {
   announced: 'preview' | 'go' | null;
   /** Moment zjawiska — po nim sprzątamy wpisy, których nie ma po co pamiętać. */
   at: Date;
+  /**
+   * Zgłoszenie oddane do zaplanowania, dopóki się nie odezwie. Plan powiadomień
+   * liczy się od zera, więc bez tej pamięci następny przegląd nie wiedziałby,
+   * że zapowiedź sprzed tygodnia wciąż czeka — i odwołałby ją w systemie.
+   */
+  pending?: { reason: NoticeReason; notifyAt: Date; title: string; body: string };
 };
 
 export type NoticeLog = Record<string, NoticeLogEntry>;
@@ -97,13 +136,61 @@ export type EventReviewInput = {
   /** Pora odświeżania — o niej odzywają się zapowiedzi. */
   refreshHour: number;
   previous: NoticeLog;
+  /** Kategorie, o których wolno powiadamiać; domyślnie wszystkie. */
+  categories?: readonly NotifyCategory[];
+  /** Zjawiska wyciszone ręcznie, po identyfikatorze. */
+  muted?: readonly string[];
 };
 
-export type EventReview = { notices: EventNotice[]; log: NoticeLog };
+export type EventReview = {
+  /** Zgłoszenia nowe w tym przebiegu. */
+  notices: EventNotice[];
+  /** Zgłoszenia z poprzednich przebiegów, które jeszcze się nie odezwały. */
+  pending: EventNotice[];
+  log: NoticeLog;
+};
 
 /** Noc, w której wypada zjawisko — albo `null`, gdy jest poza zasięgiem prognozy. */
 function verdictFor(event: AstroEvent, verdicts: NightVerdict[]): NightVerdict | null {
   return verdicts.find((v) => event.at >= v.night.from && event.at <= v.night.to) ?? null;
+}
+
+/** Dlaczego zjawisko się nie odezwie; `null`, gdy odezwie się (albo już się odezwało). */
+export type Silence = 'invisible' | 'muted' | 'category-off' | 'no-go' | 'not-notable';
+
+export type EventOutlook = {
+  state: EventState;
+  verdict: NightVerdict | null;
+  silence: Silence | null;
+};
+
+/**
+ * Zjawisko oczami przeglądu, razem z powodem milczenia — dla Kalendarza
+ * i ekranu powiadomień. Te same reguły co w `reviewEvents`, żeby ekran nie
+ * zgadywał po swojemu, dlaczego coś się nie odezwie.
+ */
+export function eventOutlook(
+  event: AstroEvent,
+  verdicts: NightVerdict[],
+  options: { categories?: readonly NotifyCategory[]; muted?: readonly string[] } = {},
+): EventOutlook {
+  const { categories = NOTIFY_CATEGORIES, muted = [] } = options;
+  const verdict = verdictFor(event, verdicts);
+  const state: EventState = !verdict ? 'preview' : verdict.status === 'go' ? 'go' : 'no-go';
+
+  const silence: Silence | null = !event.visible
+    ? 'invisible'
+    : muted.includes(event.id)
+      ? 'muted'
+      : !categories.includes(categoryOf(event))
+        ? 'category-off'
+        : state === 'no-go'
+          ? 'no-go'
+          : state === 'preview' && !NOTABLE_AHEAD.includes(event.type)
+            ? 'not-notable'
+            : null;
+
+  return { state, verdict, silence };
 }
 
 /** Moment powiadomienia; zjawisko bliższe niż wyprzedzenie zgłaszamy od razu. */
@@ -123,7 +210,7 @@ function notifyMoment(at: Date, leadMs: number, now: Date): Date {
  * Arytmetyka kalendarzowa, nie milisekundowa: między zapowiedzią a zjawiskiem
  * może wypaść zmiana czasu.
  */
-function previewMoment(at: Date, refreshHour: number, now: Date): Date {
+export function previewMoment(at: Date, refreshHour: number, now: Date): Date {
   const day = new Date(at);
   day.setDate(day.getDate() - PREVIEW_LEAD_DAYS);
   day.setHours(refreshHour, 0, 0, 0);
@@ -177,9 +264,12 @@ export function reviewEvents({
   leadHours,
   refreshHour,
   previous,
+  categories = NOTIFY_CATEGORIES,
+  muted = [],
 }: EventReviewInput): EventReview {
   const leadMs = leadHours * 3_600_000;
   const notices: EventNotice[] = [];
+  const pending: EventNotice[] = [];
   const log: NoticeLog = {};
 
   for (const event of events) {
@@ -194,26 +284,46 @@ export function reviewEvents({
 
     log[event.id] = { seen: state, announced, at: event.at };
 
+    // Wyciszone i z wyłączonej kategorii milczą, ale pamięć stanu zostaje: po
+    // przywróceniu noc, która w tym czasie przeszła przez progi, dalej się zgłosi.
+    if (muted.includes(event.id) || !categories.includes(categoryOf(event))) continue;
+
     if (state === 'no-go') continue;
 
+    /** Zgłoszenie z poprzedniego przeglądu, które jeszcze się nie odezwało, czeka dalej. */
+    const keepWaiting = (current: NightVerdict | null) => {
+      const waiting = before?.pending;
+      if (!waiting || waiting.notifyAt <= now) return;
+      log[event.id].pending = waiting;
+      pending.push({ event, verdict: current, ...waiting });
+    };
+
     if (state === 'preview') {
-      if (announced !== null) continue;
+      if (announced !== null) {
+        keepWaiting(null);
+        continue;
+      }
       if (!NOTABLE_AHEAD.includes(event.type)) continue;
 
-      notices.push({
+      const notice: EventNotice = {
         event,
         verdict: null,
         reason: 'preview',
         notifyAt: previewMoment(event.at, refreshHour, now),
         title: event.title,
         body: previewBody(event, now),
-      });
+      };
+      notices.push(notice);
       log[event.id].announced = 'preview';
+      log[event.id].pending = pendingOf(notice);
       continue;
     }
 
     // state === 'go'
-    if (announced === 'go') continue;
+    if (announced === 'go') {
+      keepWaiting(verdict);
+      continue;
+    }
 
     const reason: NoticeReason =
       before?.seen === 'no-go' ? 'reopened' : announced === 'preview' ? 'confirmed' : 'new';
@@ -227,9 +337,21 @@ export function reviewEvents({
       body: alertBody(event, verdict as NightVerdict, now),
     });
     log[event.id].announced = 'go';
+    log[event.id].pending = pendingOf(notices[notices.length - 1]);
   }
 
-  notices.sort((a, b) => a.notifyAt.getTime() - b.notifyAt.getTime());
+  const byTime = (a: EventNotice, b: EventNotice) => a.notifyAt.getTime() - b.notifyAt.getTime();
+  notices.sort(byTime);
+  pending.sort(byTime);
 
-  return { notices, log };
+  return { notices, pending, log };
+}
+
+function pendingOf(notice: EventNotice): NonNullable<NoticeLogEntry['pending']> {
+  return {
+    reason: notice.reason,
+    notifyAt: notice.notifyAt,
+    title: notice.title,
+    body: notice.body,
+  };
 }

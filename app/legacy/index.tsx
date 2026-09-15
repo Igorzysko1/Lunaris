@@ -16,16 +16,6 @@ export default function LegacyScreens() {
         onPress={() => router.push('/legacy/night')}
       />
       <MenuRow
-        title="Kalendarz"
-        subtitle="miesiąc, propozycje, rezerwacje"
-        onPress={() => router.push('/legacy/calendar')}
-      />
-      <MenuRow
-        title="Eventy"
-        subtitle="zjawiska 60 dni"
-        onPress={() => router.push('/legacy/events')}
-      />
-      <MenuRow
         title="Ustawienia"
         subtitle="sprzęt, profil, Google, powiadomienia"
         onPress={() => router.push('/legacy/settings')}

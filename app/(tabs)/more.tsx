@@ -86,7 +86,7 @@ const GROUPS: { label: string; rows: Row[] }[] = [
       },
       {
         title: 'Stare ekrany',
-        subtitle: 'Noc, Kalendarz, Eventy i Ustawienia sprzed przebudowy',
+        subtitle: 'Noc i Ustawienia sprzed przebudowy',
         go: () => router.push('/legacy'),
       },
     ],

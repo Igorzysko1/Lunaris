@@ -112,6 +112,37 @@ export function bookingId(night: { from: Date }, siteId: string): string {
   return `${BOOKING_ID_PREFIX}${eveningOf(night)}${place}`;
 }
 
+/**
+ * Wstępna rezerwacja nocy zjawiska spoza prognozy (decyzja 15 września).
+ *
+ * Planu wyjazdu jeszcze nie ma, więc blok obejmuje całą noc. Identyfikator jest
+ * ten sam co rezerwacji z planu: gdy noc wejdzie w prognozę i przejdzie progi,
+ * „Zaktualizuj wpis" nadpisze ten wpis godzinami wyjazdu zamiast stawiać drugi.
+ */
+export function previewBookingFor({
+  night,
+  site,
+  event,
+}: {
+  night: { from: Date; to: Date };
+  site: BookingInput['site'];
+  event: { title: string; at: Date };
+}): Booking {
+  return {
+    id: bookingId(night, site.id),
+    title: `Obserwacja (wstępnie) — ${site.name}`,
+    start: night.from,
+    end: night.to,
+    description: [
+      `Zapowiedź: ${event.title}, ${time(event.at)}.`,
+      'Poza zasięgiem prognozy — zajęta cała noc. Gdy noc wejdzie w prognozę i przejdzie progi, rezerwacja z planu podmieni godziny na wyjazd.',
+      '',
+      'Zaplanowane przez Lunaris.',
+    ].join('\n'),
+    location: `${site.lat.toFixed(5)}, ${site.lon.toFixed(5)}`,
+  };
+}
+
 export type BookingInput = {
   verdict: NightVerdict;
   site: { id: string; name: string; lat: number; lon: number };

@@ -13,6 +13,7 @@ import {
   type LeadTime,
   type PersistedSettings,
 } from '@/lib/settings-storage';
+import { DEFAULT_NOTIFY_CATEGORIES, type NotifyCategory } from '@/lib/event-review';
 import { useDeviceLocation, type LocationStatus } from '@/hooks/use-device-location';
 
 export { LEAD_TIMES, type LeadTime };
@@ -51,6 +52,7 @@ type Settings = {
   autoLocation: boolean;
   notifications: boolean;
   leadTime: LeadTime;
+  notifyCategories: NotifyCategory[];
   /** Jedno źródło prawdy dla progów, profilu obserwatora i parametrów sprzętu. */
   config: LunarisConfig;
   /** Czy wczytaliśmy już zapisane ustawienia — do czasu tego UI nie ma czego pokazywać. */
@@ -62,6 +64,8 @@ type Settings = {
   toggleAutoLocation: () => void;
   toggleNotifications: () => void;
   setLeadTime: (value: LeadTime) => void;
+  /** Włącza albo wyłącza jedną kategorię powiadomień o zjawiskach. */
+  toggleNotifyCategory: (id: NotifyCategory) => void;
   /**
    * Zmiana wybranych pól jednej sekcji konfiguracji; reszta zostaje bez zmian.
    * Wynik przechodzi przez walidację, więc UI nie musi pilnować zakresów.
@@ -109,13 +113,16 @@ function defaultSettings(): PersistedSettings {
     autoLocation: false,
     notifications: true,
     leadTime: '2h',
+    notifyCategories: [...DEFAULT_NOTIFY_CATEGORIES],
     config: DEFAULT_CONFIG,
   };
 }
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
-  const [{ placeId, autoLocation, notifications, leadTime, config }, setPersisted] =
-    useState<PersistedSettings>(defaultSettings);
+  const [
+    { placeId, autoLocation, notifications, leadTime, notifyCategories, config },
+    setPersisted,
+  ] = useState<PersistedSettings>(defaultSettings);
   const [hydrated, setHydrated] = useState(false);
 
   const setAutoLocation = (next: boolean | ((on: boolean) => boolean)) =>
@@ -139,8 +146,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   // Zapisujemy dopiero po wczytaniu, żeby nie nadpisać dysku wartościami domyślnymi.
   useEffect(() => {
     if (!hydrated) return;
-    void saveSettings({ placeId, autoLocation, notifications, leadTime, config });
-  }, [hydrated, placeId, autoLocation, notifications, leadTime, config]);
+    void saveSettings({ placeId, autoLocation, notifications, leadTime, notifyCategories, config });
+  }, [hydrated, placeId, autoLocation, notifications, leadTime, notifyCategories, config]);
 
   // Jedna instancja na całą aplikację — inaczej każdy ekran pytałby o uprawnienia osobno.
   const device = useDeviceLocation(autoLocation);
@@ -197,6 +204,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       autoLocation,
       notifications,
       leadTime,
+      notifyCategories,
       config,
       hydrated,
       active,
@@ -205,6 +213,13 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       toggleAutoLocation: () => setAutoLocation((on) => !on),
       toggleNotifications: () => setPersisted((s) => ({ ...s, notifications: !s.notifications })),
       setLeadTime: (value) => setPersisted((s) => ({ ...s, leadTime: value })),
+      toggleNotifyCategory: (id) =>
+        setPersisted((s) => ({
+          ...s,
+          notifyCategories: s.notifyCategories.includes(id)
+            ? s.notifyCategories.filter((c) => c !== id)
+            : [...s.notifyCategories, id],
+        })),
       updateConfig: (section, patch) =>
         setPersisted((s) => ({
           ...s,
@@ -326,7 +341,17 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         }),
       retryGps: device.retry,
     }),
-    [placeId, autoLocation, notifications, leadTime, config, hydrated, active, device.retry],
+    [
+      placeId,
+      autoLocation,
+      notifications,
+      leadTime,
+      notifyCategories,
+      config,
+      hydrated,
+      active,
+      device.retry,
+    ],
   );
 
   return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>;

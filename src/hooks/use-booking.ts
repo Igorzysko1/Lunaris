@@ -11,29 +11,37 @@ import { useSettings } from '@/store/settings';
 /** Stan wpisu w kalendarzu; `unknown`, gdy nie udało się tego sprawdzić. */
 type Presence = 'booked' | 'absent' | 'unknown';
 
-export type BookingView = ReturnType<typeof useBooking>;
+export type BookingView = ReturnType<typeof useBookingEntry>;
 
 /**
- * Rezerwacja nocy w Kalendarzu Google — zawsze na przycisk, nigdy sama.
- *
- * Wpis zasłania termin w kalendarzu, który widzą inni, więc powstaje dopiero
- * po świadomym naciśnięciu. Obejmuje cały wyjazd (`bookingFor`), a cele w opisie
- * idą z listy Nieba — z celami dopisanymi ręcznie do planu tej nocy.
- *
- * Noc bez werdyktu „jedź" nie ma rezerwacji do zbudowania, ale wpis sprzed
- * zmiany prognozy może dalej wisieć — i wtedy odwołanie jest najbardziej
- * potrzebne, więc stan wpisu sprawdzamy także dla takiej nocy.
- *
- * Wpis trafia do kalendarza wybranego w Ustawieniach i tam jest szukany.
+ * Rezerwacja nocy z Planu: cały wyjazd (`bookingFor`), cele w opisie z listy
+ * Nieba — z celami dopisanymi ręcznie do planu tej nocy.
  */
 export function useBooking(card: NightCard, targets: string[]) {
-  const google = useGoogle();
-  const { config } = useSettings();
   const site = useBookingSite();
   const { verdict, rating } = card.session;
 
-  const id = bookingId(verdict.night, site.id);
-  const booking = bookingFor({ verdict, site, rating, targets });
+  return useBookingEntry(
+    bookingId(verdict.night, site.id),
+    bookingFor({ verdict, site, rating, targets }),
+  );
+}
+
+/**
+ * Wpis w Kalendarzu Google pod wyliczanym identyfikatorem — zawsze na przycisk,
+ * nigdy sam. Wspólne dla Planu i arkusza zjawiska: ten sam identyfikator nocy
+ * znaczy ten sam wpis, więc wstępna rezerwacja zjawiska i rezerwacja z Planu
+ * nadpisują się nawzajem zamiast stawać obok.
+ *
+ * `booking` jest `null`, gdy nie ma czego rezerwować. Wpis sprzed zmiany
+ * prognozy może jednak dalej wisieć — i wtedy odwołanie jest najbardziej
+ * potrzebne, więc stan wpisu sprawdzamy także wtedy.
+ *
+ * Wpis trafia do kalendarza wybranego w Ustawieniach i tam jest szukany.
+ */
+export function useBookingEntry(id: string, booking: Booking | null) {
+  const google = useGoogle();
+  const { config } = useSettings();
   const connected = google.connected === true;
   const target = config.calendar.bookingCalendarId;
 

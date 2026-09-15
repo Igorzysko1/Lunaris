@@ -12,6 +12,7 @@ import type { EventNotice, NoticeLog } from './event-review';
 
 const LOG_KEY = 'lunaris.notices.log';
 const PLAN_KEY = 'lunaris.notices.plan';
+const MUTED_KEY = 'lunaris.notices.muted';
 
 /** Zgłoszenie po zapisie: sam event nie przechodzi przez dysk, bo liczy się lokalnie. */
 export type StoredNotice = {
@@ -79,5 +80,29 @@ export async function loadNoticePlan(): Promise<StoredNotice[]> {
     return raw ? (JSON.parse(raw, revive) as StoredNotice[]) : [];
   } catch {
     return [];
+  }
+}
+
+/**
+ * Zjawiska wyciszone ręcznie („Wycisz to zjawisko"), po identyfikatorze.
+ * Identyfikator niesie datę, więc po zjawisku wpis traci znaczenie — przegląd
+ * zostawia tylko te, które jeszcze są w horyzoncie.
+ */
+export async function loadMutedEvents(): Promise<string[]> {
+  try {
+    const raw = await AsyncStorage.getItem(MUTED_KEY);
+    const parsed: unknown = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function saveMutedEvents(ids: string[]): Promise<boolean> {
+  try {
+    await AsyncStorage.setItem(MUTED_KEY, JSON.stringify(ids));
+    return true;
+  } catch {
+    return false;
   }
 }

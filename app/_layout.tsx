@@ -103,8 +103,6 @@ function AppStack() {
         {/* Ekrany sprzed przebudowy — działają, dopóki nowe nie dostaną danych. */}
         <Stack.Screen name="legacy/index" />
         <Stack.Screen name="legacy/night" />
-        <Stack.Screen name="legacy/calendar" />
-        <Stack.Screen name="legacy/events" />
         <Stack.Screen name="legacy/settings" />
       </Stack>
     </ForecastProvider>

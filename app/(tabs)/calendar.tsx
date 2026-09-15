@@ -1,19 +1,15 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import {
-  EVENTS_BEYOND,
-  EVENTS_IN_FORECAST,
-  MONTH_CELLS,
-  MONTH_LABEL,
-  SELECTED_DAY,
-  TODAY,
-  WEEKDAYS,
-  type DayMark,
-  type SkyEvent,
-} from '@/mock/calendar';
+  useCalendarTab,
+  useObservationEditor,
+  type CalendarObservation,
+  type CalendarView,
+} from '@/hooks/use-calendar-tab';
+import { useEventsList, type EventRow } from '@/hooks/use-events';
 import { colors, fonts, hexA } from '@/theme';
 import {
   Button,
@@ -27,8 +23,6 @@ import {
   Screen,
   Segments,
   TitleBar,
-  todo,
-  type Tone,
 } from '@/ui/kit';
 
 type Segment = 'month' | 'events';
@@ -38,12 +32,6 @@ const SEGMENTS: readonly (readonly [Segment, string])[] = [
   ['events', 'Eventy'],
 ];
 
-const MARK_COLOR: Record<Exclude<DayMark, null>, string> = {
-  observation: colors.purple,
-  proposal: colors.teal,
-  other: colors.textMuted,
-};
-
 /**
  * Kalendarz — „kiedy?". Eventy tracą zakładkę, a nie adres: to ta sama oś
  * czasu co siatka miesiąca, tylko w innym porządku.
@@ -52,6 +40,7 @@ export default function CalendarScreen() {
   const params = useLocalSearchParams<{ segment?: string }>();
   const [segment, setSegment] = useState<Segment>(params.segment === 'events' ? 'events' : 'month');
   const [requested, setRequested] = useState(params.segment);
+  const calendar = useCalendarTab();
 
   // Chip „następny event" w Noc › Niebo otwiera od razu listę zjawisk.
   if (params.segment !== requested) {
@@ -61,241 +50,268 @@ export default function CalendarScreen() {
 
   return (
     <Screen>
-      <TitleBar title="Kalendarz" right="Zawoja ▾" onRightPress={() => router.push('/location')} />
+      <TitleBar
+        title="Kalendarz"
+        right={calendar.place}
+        onRightPress={() => router.push('/location')}
+      />
       <Segments items={SEGMENTS} value={segment} onChange={setSegment} />
-      {segment === 'month' ? <Month /> : <Events />}
+      {segment === 'month' ? <Month calendar={calendar} /> : <Events />}
     </Screen>
   );
 }
 
-function Month() {
-  const [selected, setSelected] = useState(SELECTED_DAY.day);
-
+function Month({ calendar }: { calendar: CalendarView }) {
   return (
     <>
+      {calendar.google === 'unavailable' ? (
+        <Notice tone="neutral" mark="·">
+          Kalendarz Google działa tylko we własnym buildzie na Androida. Werdykty nocy widać
+          poniżej, ale bez wpisów z kalendarza.
+        </Notice>
+      ) : null}
+      {calendar.google === 'disconnected' ? (
+        <Panel>
+          <Note>
+            Połącz Kalendarz Google, żeby zobaczyć tu swoje wydarzenia, propozycje sesji i zapisane
+            obserwacje.
+          </Note>
+          <Button
+            label={calendar.connecting ? 'Łączę…' : 'Połącz z Google'}
+            tone="accent"
+            disabled={calendar.connecting}
+            onPress={calendar.connect}
+          />
+        </Panel>
+      ) : null}
+
       <View style={styles.monthNav}>
         <Pressable
-          onPress={() => todo('Poprzedni miesiąc')}
+          onPress={calendar.prevMonth}
           hitSlop={12}
           accessibilityRole="button"
           accessibilityLabel="Poprzedni miesiąc"
+          style={styles.navButton}
         >
           <Text style={styles.chevron}>‹</Text>
         </Pressable>
-        <Text style={styles.month}>{MONTH_LABEL}</Text>
+        <Text style={styles.month}>{calendar.monthLabel}</Text>
         <Pressable
-          onPress={() => todo('Następny miesiąc')}
+          onPress={calendar.nextMonth}
           hitSlop={12}
           accessibilityRole="button"
           accessibilityLabel="Następny miesiąc"
+          style={styles.navButton}
         >
           <Text style={styles.chevron}>›</Text>
         </Pressable>
       </View>
 
       <View style={styles.grid}>
-        {WEEKDAYS.map((day) => (
+        {calendar.weekdays.map((day) => (
           <Text key={day} style={styles.weekday}>
             {day}
           </Text>
         ))}
-        {MONTH_CELLS.map((cell, i) => {
-          const isSelected = cell.day === selected;
-          const isToday = cell.day === TODAY;
-
-          return (
-            <Pressable
-              key={i}
-              disabled={cell.day === null}
-              onPress={() => cell.day !== null && setSelected(cell.day)}
-              accessibilityRole="button"
-              accessibilityState={{ selected: isSelected }}
+        {calendar.cells.map((cell, i) => (
+          <Pressable
+            key={cell.key}
+            onPress={() => calendar.select(i)}
+            accessibilityRole="button"
+            accessibilityLabel={cell.label}
+            accessibilityState={{ selected: cell.selected }}
+            style={[
+              styles.cell,
+              cell.inMonth && styles.cellInMonth,
+              cell.selected && styles.cellSelected,
+            ]}
+          >
+            <Text
               style={[
-                styles.cell,
-                cell.day !== null && styles.cellInMonth,
-                isSelected && styles.cellSelected,
+                styles.cellDay,
+                !cell.inMonth && styles.cellOutside,
+                cell.today && styles.cellToday,
               ]}
             >
-              <Text style={[styles.cellDay, isToday && styles.cellToday]}>{cell.day ?? ''}</Text>
-              {cell.mark ? (
-                <View style={[styles.dot, { backgroundColor: MARK_COLOR[cell.mark] }]} />
-              ) : null}
-            </Pressable>
-          );
-        })}
+              {cell.day}
+            </Text>
+            <View style={styles.dots}>
+              {cell.observation ? <View style={[styles.dot, styles.dotObservation]} /> : null}
+              {cell.proposal ? <View style={[styles.dot, styles.dotProposal]} /> : null}
+              {cell.other ? <View style={[styles.dot, styles.dotOther]} /> : null}
+            </View>
+          </Pressable>
+        ))}
       </View>
 
       <View style={styles.legend}>
-        <LegendDot color={MARK_COLOR.observation} label="obserwacja" />
-        <LegendDot color={MARK_COLOR.proposal} label="propozycja" />
-        <LegendDot color={MARK_COLOR.other} label="inne" />
+        <LegendDot style={styles.dotObservation} label="obserwacja" />
+        <LegendDot style={styles.dotProposal} label="propozycja" />
+        <LegendDot style={styles.dotOther} label="inne" />
       </View>
       <View style={styles.hairline} />
 
-      {selected === SELECTED_DAY.day ? <SelectedDay /> : <EmptyDay day={selected} />}
+      {calendar.loading ? <Note>Wczytuję kalendarz…</Note> : null}
+      {calendar.error ? (
+        <Panel tone="bad">
+          <Note>Nie udało się pobrać kalendarza.</Note>
+          <Button label="Spróbuj ponownie" tone="accent" onPress={calendar.reload} />
+        </Panel>
+      ) : null}
+
+      <Label>{calendar.dayLabel}</Label>
+      {calendar.verdict ? (
+        <Text style={[styles.verdictLine, calendar.verdict.go && styles.go]}>
+          {calendar.verdict.text}
+        </Text>
+      ) : null}
+      {calendar.proposals.map((proposal) => (
+        <ProposalCard key={proposal.id} proposal={proposal} />
+      ))}
+      {calendar.observations.map((observation) => (
+        <ObservationCard key={observation.key} observation={observation} />
+      ))}
+      {calendar.others.map((other) => (
+        <View key={other.id} style={styles.otherRow}>
+          <Text style={styles.otherTime}>{other.time}</Text>
+          <Text style={styles.otherTitle}>{other.title}</Text>
+        </View>
+      ))}
+      {calendar.empty ? <Note>Nic w kalendarzu tego dnia.</Note> : null}
+      {calendar.isToday ? (
+        <Button label="Idź do Nocy" tone="accent" onPress={() => router.navigate('/')} />
+      ) : null}
     </>
   );
 }
 
-function LegendDot({ color, label }: { color: string; label: string }) {
+function LegendDot({ style, label }: { style: object; label: string }) {
   return (
     <View style={styles.legendItem}>
-      <View style={[styles.dot, { backgroundColor: color }]} />
+      <View style={[styles.dot, style]} />
       <Text style={styles.small}>{label}</Text>
     </View>
   );
 }
 
 /**
- * 10a/10b: propozycja z werdyktu „jedź" to zarys bez wypełnienia; ✓ robi
- * to samo, co rezerwacja z Planu — ten sam wpis, ten sam identyfikator.
+ * Propozycja z werdyktu „jedź" to zarys bez wypełnienia; ✓ robi to samo, co
+ * rezerwacja z Planu — ten sam wpis, ten sam identyfikator.
  */
-function SelectedDay() {
-  const [booked, setBooked] = useState(false);
-  const { proposal, observation, others } = SELECTED_DAY;
+function ProposalCard({ proposal }: { proposal: CalendarView['proposals'][number] }) {
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  async function confirm() {
+    setBusy(true);
+    setFailed(false);
+    const ok = await proposal.confirm();
+    setBusy(false);
+    setFailed(!ok);
+  }
 
   return (
-    <>
-      <Label>{SELECTED_DAY.label}</Label>
-      {booked ? (
-        <>
-          <Notice mark="✓" tone="go">
-            Zapisano w kalendarzu.
-          </Notice>
-          <ObservationCard
-            title={proposal.title}
-            start="21:05"
-            startDate="15.09"
-            end="03:25"
-            endDate="16.09"
-            note=""
-            initiallyOpen
-          />
-        </>
-      ) : (
-        <Panel tone="teal" dashed style={styles.proposal}>
-          <View style={styles.flex}>
-            <Text style={[styles.entryTitle, { color: colors.teal }]}>{proposal.title}</Text>
-            <Text style={styles.entryTime}>{proposal.time}</Text>
-            <Text style={styles.entryNote}>{proposal.note}</Text>
-          </View>
-          <Pressable
-            onPress={() => setBooked(true)}
-            accessibilityRole="button"
-            accessibilityLabel="Zarezerwuj propozycję"
-            style={styles.approve}
-          >
-            <Ionicons name="checkmark" size={28} color={colors.teal} />
-          </Pressable>
-        </Panel>
-      )}
-
-      <ObservationCard {...observation} />
-
-      {others.map((event) => (
-        <View key={event.title} style={styles.otherRow}>
-          <Text style={styles.otherTime}>{event.time}</Text>
-          <Text style={styles.otherTitle}>{event.title}</Text>
-        </View>
-      ))}
-    </>
+    <Panel tone="teal" dashed style={styles.proposal}>
+      <View style={styles.flex}>
+        <Text style={[styles.entryTitle, styles.teal]}>{proposal.title}</Text>
+        <Text style={styles.entryTime}>{proposal.time}</Text>
+        <Text style={styles.entryNote}>{proposal.note}</Text>
+        {failed ? (
+          <Text style={[styles.entryNote, styles.bad]}>
+            Nie udało się zarezerwować. Spróbuj ponownie.
+          </Text>
+        ) : null}
+      </View>
+      <Pressable
+        onPress={() => void confirm()}
+        disabled={busy}
+        accessibilityRole="button"
+        accessibilityLabel={`Zarezerwuj: ${proposal.title}`}
+        accessibilityState={{ disabled: busy }}
+        style={[styles.approve, busy && styles.disabled]}
+      >
+        <Ionicons name="checkmark" size={28} color={colors.teal} />
+      </Pressable>
+    </Panel>
   );
 }
 
-function shiftTime(time: string, minutes: number) {
-  const [h, m] = time.split(':').map(Number);
-  const total = (h * 60 + m + minutes + 24 * 60) % (24 * 60);
-  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
-}
+function ObservationCard({ observation }: { observation: CalendarObservation }) {
+  const editor = useObservationEditor(observation);
 
-function ObservationCard({
-  title,
-  start,
-  startDate,
-  end,
-  endDate,
-  note,
-  initiallyOpen = false,
-}: {
-  title: string;
-  start: string;
-  startDate: string;
-  end: string;
-  endDate: string;
-  note: string;
-  initiallyOpen?: boolean;
-}) {
-  const [open, setOpen] = useState(initiallyOpen);
-  const [from, setFrom] = useState(start);
-  const [to, setTo] = useState(end);
-  const [text, setText] = useState(note);
+  function confirmRemove() {
+    Alert.alert('Usunąć obserwację?', `„${editor.title}" zniknie z Kalendarza Google.`, [
+      { text: 'Zostaw', style: 'cancel' },
+      { text: 'Usuń', style: 'destructive', onPress: () => void editor.remove() },
+    ]);
+  }
 
   return (
     <Panel tone="accent">
       <Pressable
-        onPress={() => setOpen((value) => !value)}
+        onPress={editor.toggle}
         accessibilityRole="button"
+        accessibilityState={{ expanded: editor.open }}
         style={styles.observationHead}
       >
         <View style={styles.flex}>
-          <Text style={styles.entryTitle}>{title}</Text>
-          <Text style={styles.entryTime}>
-            {from} → {to}
-          </Text>
-          {!open && text ? <Text style={styles.entryNote}>{text}</Text> : null}
+          <Text style={styles.entryTitle}>{editor.title}</Text>
+          <Text style={styles.entryTime}>{editor.span}</Text>
+          {!editor.open && editor.note ? (
+            <Text style={styles.entryNote} numberOfLines={2}>
+              {editor.note}
+            </Text>
+          ) : null}
         </View>
-        <Text style={styles.chevron}>{open ? '⌃' : '✎'}</Text>
+        <Text style={styles.chevron}>{editor.open ? '⌃' : '✎'}</Text>
       </Pressable>
-      {open ? (
+      {editor.open ? (
         <>
-          <Stepper label="Początek" value={from} date={startDate} onChange={setFrom} />
-          <Stepper label="Koniec" value={to} date={endDate} onChange={setTo} />
+          <Stepper label="Początek" value={editor.start} />
+          <Stepper label="Koniec" value={editor.end} />
           <Field
-            value={text}
-            onChangeText={setText}
+            value={editor.draftNote}
+            onChangeText={editor.setNote}
             placeholder="Notatka — widoczna też w Google Calendar"
             multiline
           />
+          {editor.problem ? <Notice tone="bad">{editor.problem}</Notice> : null}
           <View style={styles.row}>
             <Button
-              label="Zapisz"
+              label={editor.busy ? 'Zapisuję…' : 'Zapisz'}
               tone="teal"
-              onPress={() => {
-                setOpen(false);
-                todo('Zapis zmian wpisu w Kalendarzu Google');
-              }}
+              disabled={editor.busy || editor.problem !== null}
+              onPress={() => void editor.save()}
               style={styles.flex}
             />
             <Button
               label="Usuń"
               tone="bad"
-              onPress={() => todo('Usunięcie wpisu z Kalendarza Google')}
+              disabled={editor.busy}
+              onPress={confirmRemove}
               style={styles.flex}
             />
           </View>
         </>
       ) : null}
+      {editor.failure ? <Notice tone="bad">{editor.failure}</Notice> : null}
     </Panel>
   );
 }
 
-/** Edycja godzin krokiem po kwadransie. */
+/** Edycja godziny krokiem po kwadransie. */
 function Stepper({
   label,
   value,
-  date,
-  onChange,
 }: {
   label: string;
-  value: string;
-  date: string;
-  onChange: (value: string) => void;
+  value: { time: string; date: string; earlier: () => void; later: () => void };
 }) {
   return (
     <View style={styles.stepper}>
       <Text style={[styles.entryTitle, styles.flex]}>{label}</Text>
       <Pressable
-        onPress={() => onChange(shiftTime(value, -15))}
+        onPress={value.earlier}
         accessibilityRole="button"
         accessibilityLabel={`${label} o kwadrans wcześniej`}
         style={styles.stepButton}
@@ -303,11 +319,11 @@ function Stepper({
         <Text style={styles.stepSign}>−</Text>
       </Pressable>
       <View style={styles.stepValue}>
-        <Text style={styles.stepTime}>{value}</Text>
-        <Text style={styles.small}>{date}</Text>
+        <Text style={styles.stepTime}>{value.time}</Text>
+        <Text style={styles.small}>{value.date}</Text>
       </View>
       <Pressable
-        onPress={() => onChange(shiftTime(value, 15))}
+        onPress={value.later}
         accessibilityRole="button"
         accessibilityLabel={`${label} o kwadrans później`}
         style={styles.stepButton}
@@ -318,67 +334,50 @@ function Stepper({
   );
 }
 
-function EmptyDay({ day }: { day: number }) {
-  return (
-    <>
-      <Label>{`${day} września`}</Label>
-      <Note>Nic w kalendarzu tego dnia.</Note>
-      {day === TODAY ? (
-        <Button label="Idź do Nocy" tone="accent" onPress={() => router.navigate('/')} />
-      ) : null}
-    </>
-  );
-}
-
 /**
  * 15a: granica prognozy widoczna w układzie — zjawiska w zasięgu mają werdykt
  * nocy i pełną ramkę, dalsze ramkę przerywaną i słowo „zapowiedź".
  */
 function Events() {
+  const list = useEventsList();
+
   return (
     <>
-      <Note>Policzone dla tego miejsca · prognoza sięga 7 nocy</Note>
-      <Label>W zasięgu prognozy</Label>
-      {EVENTS_IN_FORECAST.map((event) => (
-        <SkyEventCard
-          key={event.id}
-          event={event}
-          tone={event.chips[0]?.[1] === 'go' ? 'go' : undefined}
-        />
+      <Note>{list.note}</Note>
+      {list.inForecast.length > 0 ? <Label>W zasięgu prognozy</Label> : null}
+      {list.inForecast.map((event) => (
+        <SkyEventCard key={event.id} event={event} />
       ))}
       <Label>Dalej niż prognoza</Label>
-      {EVENTS_BEYOND.map((event) => (
+      {list.beyond.map((event) => (
         <SkyEventCard key={event.id} event={event} dashed />
       ))}
     </>
   );
 }
 
-function SkyEventCard({ event, tone, dashed }: { event: SkyEvent; tone?: Tone; dashed?: boolean }) {
+function SkyEventCard({ event, dashed }: { event: EventRow; dashed?: boolean }) {
   return (
     <Panel
-      tone={tone}
+      tone={event.chips[0]?.tone === 'go' ? 'go' : undefined}
       dashed={dashed}
-      onPress={
-        event.quiet
-          ? undefined
-          : () => router.push({ pathname: '/event/[id]', params: { id: event.id } })
-      }
+      onPress={() => router.push({ pathname: '/event/[id]', params: { id: event.id } })}
       style={event.quiet ? styles.quiet : undefined}
     >
       <View style={styles.eventHead}>
         <Text style={[styles.entryTitle, styles.flex]}>{event.title}</Text>
         <Text style={styles.entryTime}>{event.when}</Text>
-        {event.quiet ? null : <Text style={styles.chevron}>›</Text>}
+        <Text style={styles.chevron}>›</Text>
       </View>
       {event.chips.length ? (
         <ChipRow>
-          {event.chips.map(([label, chipTone]) => (
-            <Chip key={label} label={label} tone={chipTone} />
+          {event.chips.map((chip) => (
+            <Chip key={chip.label} label={chip.label} tone={chip.tone} />
           ))}
         </ChipRow>
       ) : null}
       <Text style={styles.entryNote}>{event.description}</Text>
+      {event.note ? <Text style={styles.small}>{event.note}</Text> : null}
     </Panel>
   );
 }
@@ -388,7 +387,11 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: 8 },
   hairline: { height: 1, backgroundColor: colors.border },
   chevron: { fontFamily: fonts.mono, fontSize: 18, color: colors.purple },
-  small: { fontFamily: fonts.mono, fontSize: 11, color: colors.textMuted },
+  small: { fontFamily: fonts.mono, fontSize: 11, lineHeight: 16, color: colors.textMuted },
+  teal: { color: colors.teal },
+  go: { color: colors.green },
+  bad: { color: colors.coral },
+  disabled: { opacity: 0.4 },
   monthNav: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -396,6 +399,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     minHeight: 44,
   },
+  navButton: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   month: { fontFamily: fonts.sansMedium, fontSize: 17, color: colors.textPrimary },
   grid: { flexDirection: 'row', flexWrap: 'wrap', rowGap: 4 },
   weekday: {
@@ -419,10 +423,21 @@ const styles = StyleSheet.create({
   cellInMonth: { backgroundColor: 'rgba(255,255,255,0.02)' },
   cellSelected: { backgroundColor: hexA(colors.purple, 0.18), borderColor: colors.purple },
   cellDay: { fontFamily: fonts.mono, fontSize: 13, color: colors.textPrimary },
+  cellOutside: { color: colors.textMuted },
   cellToday: { fontFamily: fonts.monoSemiBold, color: colors.purple },
+  dots: { flexDirection: 'row', gap: 3, minHeight: 6 },
   dot: { width: 6, height: 6, borderRadius: 3 },
+  dotObservation: { backgroundColor: colors.purple },
+  dotProposal: { borderWidth: 1, borderStyle: 'dashed', borderColor: colors.teal },
+  dotOther: { backgroundColor: colors.textMuted },
   legend: { flexDirection: 'row', gap: 16 },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  verdictLine: {
+    fontFamily: fonts.sans,
+    fontSize: 13,
+    lineHeight: 19,
+    color: colors.textSecondary,
+  },
   proposal: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   approve: {
     width: 52,

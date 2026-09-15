@@ -37,6 +37,11 @@ export function formatMonth(date: Date): string {
   return `${MONTHS_NOMINATIVE[date.getMonth()]} ${date.getFullYear()}`;
 }
 
+/** np. „14 października". */
+export function formatDayMonth(date: Date): string {
+  return `${date.getDate()} ${MONTHS_GENITIVE[date.getMonth()]}`;
+}
+
 /**
  * Noc jako dwie doby: „14/15 września", a na przełomie miesiąca
  * „30 września/1 października".

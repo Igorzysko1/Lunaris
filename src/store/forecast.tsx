@@ -23,13 +23,14 @@ import {
   rateLimitCooldown,
   type CycleState,
 } from '@/lib/daily-cycle';
-import { reviewEvents } from '@/lib/event-review';
+import { reviewEvents, type NotifyCategory } from '@/lib/event-review';
 import { upcomingEvents } from '@/lib/events';
 import { loadCalendarDays } from '@/lib/google-account';
 import { planNights } from '@/lib/night-plan';
 import { planNotifications } from '@/lib/notification-plan';
 import { syncNotifications } from '@/lib/notification-store';
 import {
+  loadMutedEvents,
   loadNoticeLog,
   loadNoticePlan,
   saveNoticeLog,
@@ -74,6 +75,8 @@ type ForecastStore = ForecastState & {
   refreshing: boolean;
   /** Znaczniki próby i sukcesu — widoczne w ustawieniach, żeby cichy zastój było widać. */
   cycle: CycleState;
+  /** Przegląd zjawisk od nowa, bez pobierania — po wyciszeniu zjawiska. */
+  reviewAgain: () => void;
 };
 
 const ForecastContext = createContext<ForecastStore | null>(null);
@@ -96,6 +99,7 @@ async function runEventReview(input: {
   /** Przełącznik z ustawień — wyłączony kasuje to, co wisi w systemie. */
   notifications: boolean;
   siteName: string;
+  categories: readonly NotifyCategory[];
 }): Promise<StoredNotice[]> {
   const { bundle, coords, bortle, walkMinutes, config, leadTime } = input;
   const now = new Date();
@@ -124,14 +128,27 @@ async function runEventReview(input: {
 
   const verdicts = planned.map((night) => night.verdict);
 
-  const { notices, log } = reviewEvents({
+  const {
+    notices: fresh,
+    pending,
+    log,
+  } = reviewEvents({
     now,
     events,
     verdicts,
     leadHours: leadHours(leadTime),
     refreshHour: config.refresh.hourOfDay,
     previous: await loadNoticeLog(),
+    categories: input.categories,
+    muted: await loadMutedEvents(),
   });
+
+  // Plan liczy się od zera, więc zgłoszenia z poprzednich przeglądów, które
+  // jeszcze się nie odezwały, muszą w nim zostać — inaczej `reconcile` odwoła je
+  // w systemie dzień po zaplanowaniu.
+  const notices = [...fresh, ...pending].sort(
+    (a, b) => a.notifyAt.getTime() - b.notifyAt.getTime(),
+  );
 
   await saveNoticeLog(log);
   await saveNoticePlan(notices);
@@ -181,7 +198,7 @@ async function runEventReview(input: {
  * a dotąd każde z nich odpytywało Open-Meteo osobno.
  */
 export function ForecastProvider({ children }: { children: ReactNode }) {
-  const { active, config, notifications, leadTime } = useSettings();
+  const { active, config, notifications, leadTime, notifyCategories } = useSettings();
   const { lat, lon } = active.coords;
   const hour = config.refresh.hourOfDay;
 
@@ -196,6 +213,8 @@ export function ForecastProvider({ children }: { children: ReactNode }) {
   const [refreshing, setRefreshing] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [notices, setNotices] = useState<StoredNotice[]>([]);
+  const [reviewRevision, setReviewRevision] = useState(0);
+  const reviewAgain = useCallback(() => setReviewRevision((n) => n + 1), []);
 
   /** Czy pobranie właśnie trwa — po to, żeby powrót do aplikacji go nie przerywał. */
   const fetching = useRef(false);
@@ -302,23 +321,7 @@ export function ForecastProvider({ children }: { children: ReactNode }) {
         // sprzątanie raz na cykl wystarcza, żeby nie rosły w nieskończoność.
         void pruneExpired();
 
-        // Przegląd zjawisk pomijamy przy wyłączonych powiadomieniach — inaczej
-        // pamięć przeglądu zapisywałaby zgłoszenia, których nikt nie zobaczył,
-        // a po włączeniu powiadomień te zjawiska byłyby już „ogłoszone".
-        const review = reviewInput.current;
-        if (review.notifications) {
-          const planned = await runEventReview({
-            bundle,
-            coords,
-            bortle: review.bortle,
-            walkMinutes: review.walkMinutes,
-            config: review.config,
-            leadTime: review.leadTime,
-            notifications: review.notifications,
-            siteName: review.siteName,
-          });
-          if (active) setNotices(planned);
-        }
+        // Przegląd zjawisk rusza efekt niżej — po każdej nowej prognozie.
       } catch (error) {
         if (!active || (error instanceof Error && error.name === 'AbortError')) return;
 
@@ -353,6 +356,45 @@ export function ForecastProvider({ children }: { children: ReactNode }) {
     // żądania sieciowego.
   }, [lat, lon, hour, attempt]);
 
+  // Przegląd zjawisk po każdej nowej prognozie — z zapisu i z sieci — oraz po
+  // zmianie tego, o czym i z jakim wyprzedzeniem powiadamiać. Bez sieci: werdykty
+  // liczą się z prognozy, która już jest. Przy wyłączonych powiadomieniach
+  // przeglądu nie ma — pamięć zapisywałaby zgłoszenia, których nikt nie zobaczył,
+  // a po włączeniu te zjawiska byłyby już „ogłoszone". Wyłączenie kasuje za to
+  // to, co wisi w systemie.
+  const categoriesKey = notifyCategories.join(',');
+  useEffect(() => {
+    const bundle = state.bundle;
+    if (!notifications) {
+      void syncNotifications([]);
+      return;
+    }
+    if (!bundle) return;
+
+    let live = true;
+    const review = reviewInput.current;
+    void runEventReview({
+      bundle,
+      coords: { lat, lon },
+      bortle: review.bortle,
+      walkMinutes: review.walkMinutes,
+      config: review.config,
+      leadTime,
+      notifications,
+      siteName: review.siteName,
+      categories: notifyCategories,
+    }).then((planned) => {
+      if (live) setNotices(planned);
+    });
+
+    return () => {
+      live = false;
+    };
+    // Kategorie po kluczu, punkt razem z prognozą: nowa prognoza dla nowego
+    // miejsca przychodzi i tak nową tożsamością `bundle`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.bundle, notifications, leadTime, categoriesKey, reviewRevision]);
+
   // Plan z poprzedniego uruchomienia: cykl mógł policzyć go wczoraj, a zgłoszenia
   // odzywają się dopiero za kilka dni.
   useEffect(() => {
@@ -372,8 +414,8 @@ export function ForecastProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo<ForecastStore>(
-    () => ({ ...state, notices, refresh, refreshing, cycle }),
-    [state, notices, refresh, refreshing, cycle],
+    () => ({ ...state, notices, refresh, refreshing, cycle, reviewAgain }),
+    [state, notices, refresh, refreshing, cycle, reviewAgain],
   );
 
   return <ForecastContext.Provider value={value}>{children}</ForecastContext.Provider>;

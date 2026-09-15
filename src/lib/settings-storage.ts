@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { findPlaceById } from '@/data/places';
 import { mergeConfig, type LunarisConfig } from '@/lib/config';
+import { NOTIFY_CATEGORIES, type NotifyCategory } from '@/lib/event-review';
 
 /**
  * Klucz jest wersjonowany, więc zmiana kształtu stanu nie wywraca aplikacji po
@@ -35,6 +36,8 @@ export type PersistedSettings = {
   autoLocation: boolean;
   notifications: boolean;
   leadTime: LeadTime;
+  /** Kategorie powiadomień o zjawiskach — patrz `event-review.categoryOf`. */
+  notifyCategories: NotifyCategory[];
   /** Konfiguracja obserwatora: profil, optyka, tryb sesji, progi. Patrz src/lib/config.ts. */
   config: LunarisConfig;
 };
@@ -75,6 +78,11 @@ function migrate(raw: unknown, defaults: PersistedSettings): PersistedSettings {
     notifications:
       typeof stored.notifications === 'boolean' ? stored.notifications : defaults.notifications,
     leadTime: isLeadTime(stored.leadTime) ? stored.leadTime : defaults.leadTime,
+    notifyCategories: Array.isArray(stored.notifyCategories)
+      ? stored.notifyCategories.filter((c): c is NotifyCategory =>
+          (NOTIFY_CATEGORIES as readonly unknown[]).includes(c),
+        )
+      : defaults.notifyCategories,
     config: mergeConfig(configSource),
   };
 }

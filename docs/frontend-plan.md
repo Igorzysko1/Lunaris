@@ -204,23 +204,27 @@ Usunięte: `app/sites.tsx`, `app/review.tsx`, `src/mock/where.ts`. Zdania i wali
 
 ### Etap 7 — Kalendarz, Eventy, powiadomienia
 
-| Element                                                     | Źródło                                                                          | Status                                                                                         |
-| ----------------------------------------------------------- | ------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| Siatka miesiąca, kropki, nawigacja ‹ ›                      | `useCalendarMonth`, `calendar-view.monthCells`, `eventsOnDay`                   | jest                                                                                           |
-| Propozycja sesji z ✓                                        | `calendar-view.unbookedNights`, `upsertBooking`                                 | jest                                                                                           |
-| Edycja godzin po kwadransie, notatka, Zapisz/Usuń           | `patchEventTimes`, `checkObservationTimes`, `patchObservation`, `deleteBooking` | jest                                                                                           |
-| Dzień dzisiejszy → „Idź do Nocy"                            | nawigacja                                                                       | **UI**                                                                                         |
-| Eventy: 60 dni, granica prognozy, werdykt nocy              | `events.upcomingEvents`, `event-review.reviewEvents`                            | jest                                                                                           |
-| Szczegół zjawiska: radiant, Księżyc, ZHR, kiedy się odezwie | `meteor-showers`, `planetary-events`, `reviewEvents`, `notification-plan`       | jest                                                                                           |
-| „Zarezerwuj tę noc" dla zjawiska poza prognozą              | `bookingFor` wymaga planu nocy                                                  | **DO ZROBIENIA**: rozstrzygnąć, co rezerwuje zapowiedź bez planu (całą noc? blokuje przycisk?) |
-| „Wycisz to zjawisko"                                        | brak listy wyciszeń                                                             | **DO ZROBIENIA**: wyciszenia pojedynczych zjawisk w `NoticeLog` / `event-review`               |
-| Powiadomienia: wyprzedzenie                                 | `settings.leadTime`, `LEAD_TIMES`                                               | jest                                                                                           |
-| Powiadomienia: zaplanowane i przemilczane z powodem         | `notice-store.loadNoticePlan`, `loadNoticeLog`, `NoticeReason`                  | jest                                                                                           |
-| Kategorie: zaćmienia, roje, koniunkcje, fazy Księżyca       | brak w `LunarisConfig`                                                          | **DO ZROBIENIA**: pole kategorii + filtr w `reviewEvents`/`planNotifications`                  |
-| Pora przeglądu 18:00                                        | `config.refresh.hourOfDay` dotyczy odświeżania prognozy                         | **DO ZROBIENIA**: sprawdzić, czy przegląd zjawisk ma własną godzinę; jeśli nie — pole          |
-| „Pokaż Oriona"                                              | arkusz gwiazdozbioru                                                            | **UI**                                                                                         |
+| Element                                                          | Źródło                                                                               | Status                                                                                                 |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
+| Siatka miesiąca, kropki, nawigacja ‹ ›                           | `useCalendarTab` (`useCalendarMonth`, `monthCells`, `eventsOnDay`)                   | podpięte                                                                                               |
+| Propozycja sesji z ✓                                             | `unbookedNights`, `upsertBooking`                                                    | podpięte — ten sam identyfikator co rezerwacja z Planu                                                 |
+| Edycja godzin po kwadransie, notatka, Zapisz/Usuń                | `useObservationEditor`, `checkObservationTimes`, `patchObservation`, `deleteBooking` | podpięte                                                                                               |
+| Dzień dzisiejszy → „Idź do Nocy"                                 | nawigacja                                                                            | podpięte                                                                                               |
+| Eventy: 60 dni, granica prognozy, werdykt nocy                   | `upcomingEvents`, `event-review.eventOutlook`, `calendar-text.eventChips`            | podpięte — powód milczenia pod opisem                                                                  |
+| Szczegół zjawiska: stan, Księżyc, ZHR, kiedy się odezwie         | `eventStatus`, `eventFacts`, `notifyText` z planu ostatniego przeglądu               | podpięte                                                                                               |
+| „Zarezerwuj tę noc" dla zjawiska poza prognozą                   | `session-booking.previewBookingFor`, `useBookingEntry`                               | podpięte — wstępny wpis na całą noc (decyzja 15 września), ten sam identyfikator co rezerwacja z Planu |
+| „Wycisz to zjawisko"                                             | `notice-store.loadMutedEvents`, `saveMutedEvents`, `reviewEvents({ muted })`         | podpięte — przegląd rusza od razu, bez sieci                                                           |
+| Powiadomienia: wyprzedzenie                                      | `settings.leadTime`, `LEAD_TIMES`                                                    | podpięte — dotknięcie przełącza na kolejne                                                             |
+| Powiadomienia: zaplanowane i przemilczane z powodem              | `useForecast().notices`, `eventOutlook` → `silenceText`                              | podpięte — przemilczane z najbliższych dwóch tygodni                                                   |
+| Kategorie: zaćmienia, roje, koniunkcje i opozycje, fazy Księżyca | `PersistedSettings.notifyCategories`, `event-review.categoryOf`                      | podpięte — domyślnie bez faz Księżyca                                                                  |
+| Pora przeglądu                                                   | `config.refresh.hourOfDay`                                                           | podpięte — ta sama godzina co odświeżanie prognozy (decyzja 15 września)                               |
+| „Pokaż Oriona"                                                   | `calendar-text.showTargetFor`                                                        | podpięte — gwiazdozbiór radiantu, planeta w opozycji albo Księżyc                                      |
 
-Po etapie usuwamy `app/legacy/calendar.tsx` i `app/legacy/events.tsx`.
+Poprawiony błąd cyklu: plan powiadomień liczył się tylko ze zgłoszeń nowych w danym przeglądzie,
+więc `reconcile` odwoływał w systemie zapowiedzi zaplanowane dzień wcześniej. Przegląd oddaje teraz
+też `pending` (pamiętane w `NoticeLog`) i rusza po każdej nowej prognozie oraz po zmianie kategorii,
+wyprzedzenia albo wyciszeń. Usunięte: `app/legacy/calendar.tsx`, `app/legacy/events.tsx`,
+`src/components/calendar-cards.tsx`, `src/mock/calendar.ts`. Test: `tests/calendar-text.test.ts`.
 
 ### Etap 8 — Więcej, nastawy, biblioteki
 
@@ -274,10 +278,10 @@ komponenty z `src/components`. `grep -rn "todo(" app src` ma zwrócić pusto.
 | 8   | ~~Cele dopisane ręcznie do planu nocy~~ — zrobione: `night-picks`, w opisie rezerwacji z listy Nieba | 4–5  |
 | 9   | ~~Notatki przy miejscówce~~ — już były: `ObservingSite.notes`                                        | 6    |
 | 10  | ~~Pobranie prognozy tylko dla brakujących miejsc~~ — zrobione: `useSiteReview.fetchMissing`          | 6    |
-| 11  | Rezerwacja nocy zjawiska bez planu — decyzja                                                         | 7    |
-| 12  | Wyciszanie pojedynczego zjawiska                                                                     | 7    |
-| 13  | Kategorie powiadomień                                                                                | 7    |
-| 14  | Pora przeglądu zjawisk (do sprawdzenia)                                                              | 7    |
+| 11  | ~~Rezerwacja nocy zjawiska bez planu~~ — wstępny wpis na całą noc (`previewBookingFor`)              | 7    |
+| 12  | ~~Wyciszanie pojedynczego zjawiska~~ — zrobione: `loadMutedEvents`, `reviewEvents({ muted })`        | 7    |
+| 13  | ~~Kategorie powiadomień~~ — zrobione: `notifyCategories`, `categoryOf`                               | 7    |
+| 14  | ~~Pora przeglądu zjawisk~~ — ta sama co odświeżanie prognozy                                         | 7    |
 | 15  | Lista prognoz w pamięci                                                                              | 8    |
 | 16  | Gwiazdozbiór i opis przy obiekcie głębokiego nieba                                                   | 8    |
 | 17  | Najlepszy miesiąc i górowanie jako funkcja domeny                                                    | 8    |
