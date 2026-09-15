@@ -18,6 +18,45 @@
  * Importy względne (nie alias @/), żeby moduł dało się uruchomić poza Metro.
  */
 
+/** Dlaczego ostatnie pobranie się nie udało — rodzaj błędu z `ForecastError`. */
+export type ForecastFailure = 'offline' | 'api' | 'rate-limit';
+
+/**
+ * Brak prognozy po ludzku: pełne zdanie na ekran bez danych i skrót na pasek
+ * nad danymi z zapisu.
+ *
+ * Trzy różne stany, nie dwa. Brak rodzaju błędu znaczy, że żadne żądanie nie
+ * doszło do skutku — obwinianie o to serwisu pogodowego wysyłało szukających
+ * w złą stronę.
+ */
+export function describeForecastFailure(failure: ForecastFailure | null): {
+  message: string;
+  bar: string;
+} {
+  switch (failure) {
+    case 'offline':
+      return {
+        message: 'Brak połączenia, a nie mam zapisanej prognozy dla tego miejsca.',
+        bar: 'Brak sieci',
+      };
+    case 'rate-limit':
+      return {
+        message: 'Za dużo zapytań do serwisu pogodowego — spróbuję ponownie za pół godziny.',
+        bar: 'Limit zapytań',
+      };
+    case 'api':
+      return {
+        message: 'Serwis pogodowy nie odpowiedział poprawnie.',
+        bar: 'Serwis nie odpowiada',
+      };
+    case null:
+      return {
+        message: 'Nie mam jeszcze prognozy dla tego miejsca.',
+        bar: 'Dane nie odświeżyły się o porze',
+      };
+  }
+}
+
 /** Pora podejmowania decyzji o wyjeździe — wtedy dane mają być świeże. */
 export const DEFAULT_REFRESH_HOUR = 17;
 
@@ -171,6 +210,22 @@ export function markSuccess(state: CycleState, now: Date): CycleState {
  */
 export function markFailure(state: CycleState, reason: string, rateLimited = false): CycleState {
   return { ...state, lastError: reason, rateLimited };
+}
+
+/**
+ * Do kiedy ręczne odświeżenie musi czekać po odbiciu się od limitu zapytań.
+ *
+ * Ręczne odświeżenie pomija terminarz — użytkownik wie więcej niż zegar — ale
+ * nie limit. Każde żądanie po 429 przedłuża blokadę u dostawcy, więc przycisk
+ * wciśnięty w tej chwili tylko oddala moment, w którym dane przyjdą. Liczone od
+ * próby, która dostała 429, a nie od terminu: po zmianie terminu blokada
+ * u dostawcy wciąż trwa. `null`, gdy nic nie blokuje.
+ */
+export function rateLimitCooldown(state: CycleState, now: Date): Date | null {
+  if (!state.rateLimited || !state.lastAttemptAt) return null;
+
+  const until = new Date(state.lastAttemptAt.getTime() + RATE_LIMIT_DELAY_MINUTES * 60_000);
+  return now < until ? until : null;
 }
 
 /**

@@ -165,6 +165,16 @@ export type NightInput = {
 };
 
 /**
+ * Zachmurzenie nieprzejrzyste — wielkość, którą mierzy próg całkowity.
+ *
+ * Wystawione, żeby zdanie odrzucenia podawało tę samą liczbę, na której padł
+ * werdykt, a nie zachmurzenie całkowite, które przy cirrusach bywa wyższe.
+ */
+export function cloudBelowHigh(hour: NightHour): number {
+  return Math.max(0, hour.cloud - hour.cloudHigh, hour.cloudMid);
+}
+
+/**
  * Pierwszy próg, którego godzina nie spełnia. Kolejność od najcięższego powodu.
  *
  * Chmury wysokie mają własny, łagodniejszy próg, więc próg całkowity stosujemy
@@ -186,12 +196,10 @@ function blockerFor(hour: NightHour, config: LunarisConfig, windLimit: number): 
   // stało wtedy pełne — a altostratus zasłania gwiazdy tak samo jak stratus.
   // Znając piętro średnie wprost, bierzemy większą z dwóch ocen. To ta sama
   // wielkość i ten sam próg, tylko liczone bez dziury.
-  const cloudBelowHigh = Math.max(0, hour.cloud - hour.cloudHigh, hour.cloudMid);
-
   if (hour.precipitation > 0) return 'precipitation';
   if (hour.cloudLow > conditions.maxCloudLow) return 'cloud-low';
   if (hour.cloudHigh > conditions.maxCloudHigh) return 'cloud-high';
-  if (cloudBelowHigh > conditions.maxCloudTotal) return 'cloud-total';
+  if (cloudBelowHigh(hour) > conditions.maxCloudTotal) return 'cloud-total';
   if (hour.windGust >= windLimit) return 'wind';
   return null;
 }

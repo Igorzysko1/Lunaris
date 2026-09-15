@@ -41,6 +41,23 @@ export const colors = {
   skeleton: 'rgba(255,255,255,0.06)',
 } as const;
 
+/**
+ * Paleta trybu czerwonego z projektu „Lunaris tryb czerwony": trzy poziomy
+ * jasności jednej barwy na tle #0A0303 (7,9:1 · 6,0:1 · 4,8:1). Kolory
+ * znaczeniowe znikają, więc stan niesie wypełnienie, obrys i znak przed treścią.
+ * Na razie tylko podgląd w arkuszu trybu nocnego — przełączanie całej aplikacji
+ * to osobny krok planu.
+ */
+export const redColors = {
+  bg: '#0A0303',
+  surface: '#160606',
+  surfaceRaised: '#1C0808',
+  textPrimary: '#FF7A5E',
+  textSecondary: '#E8604A',
+  textMuted: '#CE5540',
+  border: 'rgba(255,122,94,0.12)',
+} as const;
+
 export const fonts = {
   sans: 'IBMPlexSans_400Regular',
   sansMedium: 'IBMPlexSans_500Medium',

@@ -64,6 +64,18 @@ export function ratingMeta(rating: number): { label: string; color: string } {
   return { label: 'Słaba', color: colors.coral };
 }
 
+/**
+ * Ocena nocy w skali 1–5, jak na karcie werdyktu („JEDŹ · 4/5").
+ * Progi te same co w `ratingMeta`, żeby piątka i „Doskonała" znaczyły to samo.
+ */
+export function ratingScore(rating: number): 1 | 2 | 3 | 4 | 5 {
+  if (rating >= 80) return 5;
+  if (rating >= 60) return 4;
+  if (rating >= 40) return 3;
+  if (rating >= 20) return 2;
+  return 1;
+}
+
 /** Colour for a single cloud-cover bar: the more cloud, the worse. */
 export function cloudBarColor(cloudPct: number): string {
   if (cloudPct < 20) return colors.teal;

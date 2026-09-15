@@ -20,6 +20,7 @@ import {
   decideRefresh,
   lastScheduledRefresh,
   planAppFetch,
+  rateLimitCooldown,
   markAttempt,
   markFailure,
   markSuccess,
@@ -268,5 +269,55 @@ describe('planAppFetch', () => {
     }
 
     assert.equal(plan(state, false, true), 'fetch');
+  });
+});
+
+describe('ręczne odświeżenie po limicie zapytań', () => {
+  // Ręczne odświeżenie pomija terminarz, ale nie limit: każde żądanie po 429
+  // przedłuża blokadę u dostawcy, więc przycisk czeka razem z cyklem.
+  const now = new Date(2026, 4, 12, 20, 0);
+  const term = lastScheduledRefresh(now, HOUR);
+  const limited = (minutesAgo: number) =>
+    markFailure(
+      markAttempt(EMPTY_CYCLE_STATE, minutesBefore(now, minutesAgo), term),
+      'Open-Meteo: limit zapytań (429)',
+      true,
+    );
+
+  it('blokuje przez pół godziny od próby, która dostała 429', () => {
+    const state = limited(10);
+    const until = rateLimitCooldown(state, now);
+
+    assert.deepEqual(until, new Date(now.getTime() + (RATE_LIMIT_DELAY_MINUTES - 10) * 60_000));
+    // Tak woła to provider: wymuszenie przestaje obowiązywać, zostaje zwykła decyzja.
+    const forced = rateLimitCooldown(state, now) === null;
+    assert.equal(planAppFetch(decideRefresh(now, state, HOUR), true, forced), 'skip');
+  });
+
+  it('po odczekaniu wolno znowu', () => {
+    assert.equal(rateLimitCooldown(limited(RATE_LIMIT_DELAY_MINUTES), now), null);
+  });
+
+  it('zwykła awaria nie blokuje przycisku', () => {
+    const ordinary = markFailure(
+      markAttempt(EMPTY_CYCLE_STATE, minutesBefore(now, 1), term),
+      '503',
+    );
+
+    assert.equal(rateLimitCooldown(ordinary, now), null);
+  });
+
+  it('blokada trwa także po zmianie terminu', () => {
+    // 429 o 16:50, termin o 17:00 — cykl uznaje próbę za starą, dostawca nie.
+    const at = new Date(2026, 4, 12, 16, 50);
+    const state = markFailure(
+      markAttempt(EMPTY_CYCLE_STATE, at, lastScheduledRefresh(at, HOUR)),
+      '429',
+      true,
+    );
+    const later = new Date(2026, 4, 12, 17, 10);
+
+    assert.equal(decideRefresh(later, state, HOUR).run, true);
+    assert.deepEqual(rateLimitCooldown(state, later), new Date(2026, 4, 12, 17, 20));
   });
 });

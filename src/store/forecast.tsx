@@ -20,6 +20,7 @@ import {
   markFailure,
   markSuccess,
   planAppFetch,
+  rateLimitCooldown,
   type CycleState,
 } from '@/lib/daily-cycle';
 import { reviewEvents } from '@/lib/event-review';
@@ -270,7 +271,12 @@ export function ForecastProvider({ children }: { children: ReactNode }) {
         if (!hit) setState((s) => ({ ...s, status: 'error' }));
       };
 
-      const plan = planAppFetch(decision, hit !== null, force);
+      // Ręczne odświeżenie nie przebija limitu zapytań — patrz `rateLimitCooldown`.
+      const plan = planAppFetch(
+        decision,
+        hit !== null,
+        force && rateLimitCooldown(stored, now) === null,
+      );
       if (plan === 'give-up') return giveUp();
       if (plan === 'skip') return;
 

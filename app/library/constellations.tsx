@@ -1,0 +1,101 @@
+import { router } from 'expo-router';
+import { useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+
+import { CONSTELLATIONS } from '@/data/constellations';
+import { FIGURES, SEASON_ORDER, foldForSearch } from '@/mock/constellation-figures';
+import { colors, fonts } from '@/theme';
+import { ConstellationFigure } from '@/ui/figure';
+import { Field, Label, Note, Screen, TitleBar } from '@/ui/kit';
+
+/**
+ * 8a: biblioteka gwiazdozbiorów (Więcej › Poza decyzją). Galeria dłuższa niż
+ * ekran jest w porządku — to przegląd do nauki, nie widok decyzyjny.
+ */
+export default function ConstellationLibraryScreen() {
+  const [query, setQuery] = useState('');
+  const folded = foldForSearch(query.trim());
+
+  const groups = SEASON_ORDER.map(([label, ids]) => {
+    const all = ids.flatMap((id) => {
+      const entry = CONSTELLATIONS.find((c) => c.id === id);
+      return entry ? [entry] : [];
+    });
+    const items = folded
+      ? all.filter((c) => foldForSearch(`${c.name} ${c.latin} ${c.star}`).includes(folded))
+      : all;
+
+    return { label, total: all.length, items };
+  }).filter((group) => group.items.length > 0);
+
+  const shown = groups.reduce((sum, group) => sum + group.items.length, 0);
+
+  return (
+    <Screen>
+      <TitleBar
+        back
+        title="Biblioteka gwiazdozbiorów"
+        subtitle={`${shown} z ${CONSTELLATIONS.length}`}
+      />
+      <Field
+        value={query}
+        onChangeText={setQuery}
+        placeholder="Szukaj po nazwie, łacinie albo gwieździe"
+        autoCorrect={false}
+      />
+      {groups.length === 0 ? <Note>{`Nic nie pasuje do „${query}".`}</Note> : null}
+
+      {groups.map((group) => (
+        <View key={group.label} style={styles.group}>
+          <Label right={folded ? `${group.items.length} z ${group.total}` : `${group.total}`}>
+            {group.label}
+          </Label>
+          <View style={styles.grid}>
+            {group.items.map((c) => (
+              <Pressable
+                key={c.id}
+                onPress={() =>
+                  router.push({ pathname: '/constellation/[id]', params: { id: c.id } })
+                }
+                accessibilityRole="button"
+                style={styles.card}
+              >
+                {FIGURES[c.id] ? (
+                  <ConstellationFigure figure={FIGURES[c.id]} rotation={0} size={80} compact />
+                ) : null}
+                <Text style={styles.name} numberOfLines={1}>
+                  {c.name}
+                </Text>
+                <Text style={styles.latin} numberOfLines={1}>
+                  {c.latin}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      ))}
+
+      <Note>
+        Nazwy, kotwice i podpowiedzi są z katalogu. Współrzędne kształtów są schematyczne — przy
+        wdrożeniu do zastąpienia rektascensją i deklinacją z katalogu jasnych gwiazd.
+      </Note>
+    </Screen>
+  );
+}
+
+const styles = StyleSheet.create({
+  group: { gap: 8 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  card: {
+    width: '31.5%',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  name: { fontFamily: fonts.sans, fontSize: 12, color: colors.textPrimary },
+  latin: { fontFamily: fonts.mono, fontSize: 10, color: colors.textMuted },
+});

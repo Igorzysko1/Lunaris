@@ -101,6 +101,22 @@ export type NightPlanInput = {
   nextDay?: (night: NightWindow) => NextDay;
 };
 
+/**
+ * Próg porywów, którym ocenia się noc: najłagodniejszy spośród zestawów — noc
+ * dobra dla sprzętu na statywie nie ma przepadać przez to, że w konfiguracji
+ * stoi obok niego lornetka trzymana z ręki.
+ */
+export function nightWindLimit(config: LunarisConfig): number {
+  return Math.max(
+    ...config.opticsProfiles.map((p) =>
+      windLimitKmh(p.optics, {
+        tripod: config.conditions.maxWindGustKmh,
+        handheld: config.conditions.maxWindGustHandheldKmh,
+      }),
+    ),
+  );
+}
+
 export function planNights({
   nights,
   target,
@@ -111,17 +127,7 @@ export function planNights({
   events = [],
   nextDay,
 }: NightPlanInput): PlannedNight[] {
-  // Okno oceniamy najłagodniejszym progiem wiatru spośród zestawów — noc dobra
-  // dla sprzętu na statywie nie ma przepadać przez to, że w konfiguracji stoi
-  // obok niego lornetka trzymana z ręki.
-  const windLimit = Math.max(
-    ...config.opticsProfiles.map((p) =>
-      windLimitKmh(p.optics, {
-        tripod: config.conditions.maxWindGustKmh,
-        handheld: config.conditions.maxWindGustHandheldKmh,
-      }),
-    ),
-  );
+  const windLimit = nightWindLimit(config);
 
   const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
 

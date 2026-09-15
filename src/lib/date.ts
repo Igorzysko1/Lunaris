@@ -37,6 +37,19 @@ export function formatMonth(date: Date): string {
   return `${MONTHS_NOMINATIVE[date.getMonth()]} ${date.getFullYear()}`;
 }
 
+/**
+ * Noc jako dwie doby: „14/15 września", a na przełomie miesiąca
+ * „30 września/1 października".
+ */
+export function formatNightSpan(from: Date, to: Date): string {
+  const fromMonth = MONTHS_GENITIVE[from.getMonth()];
+  const toMonth = MONTHS_GENITIVE[to.getMonth()];
+
+  return fromMonth === toMonth
+    ? `${from.getDate()}/${to.getDate()} ${toMonth}`
+    : `${from.getDate()} ${fromMonth}/${to.getDate()} ${toMonth}`;
+}
+
 export function isSameDay(a: Date, b: Date): boolean {
   return (
     a.getFullYear() === b.getFullYear() &&
