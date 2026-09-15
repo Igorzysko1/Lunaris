@@ -26,6 +26,7 @@ import {
   type VerdictChip,
 } from '@/lib/session-text';
 import { liveNightIndex } from '@/lib/session-timeline';
+import type { NightSlice } from '@/lib/weather';
 import { useNow } from '@/hooks/use-now';
 import { useSessions, type Session } from '@/hooks/use-sessions';
 import { useForecast, type ForecastStatus } from '@/store/forecast';
@@ -50,6 +51,8 @@ export type NightCard = {
   score: number;
   session: Session;
   summary: NightSummary;
+  /** Godziny prognozy tej nocy — z nich liczy się segment Warunki. */
+  slice: NightSlice;
   /** Tylko przy „jedź". */
   window: { from: string; to: string; duration: string; bar: NightBar } | null;
   narrative: Narration;
@@ -141,6 +144,7 @@ export function useNightVerdicts(): NightVerdicts {
           score: ratingScore(session.rating),
           session,
           summary,
+          slice,
           window: observing
             ? {
                 from: formatTime(observing.from),

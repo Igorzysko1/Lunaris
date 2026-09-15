@@ -40,6 +40,21 @@ export type Moon = {
 
 const phaseOf = (date: Date) => SunCalc.getMoonIllumination(date).phase;
 
+/**
+ * Nów albo pełnia między dwiema kolejnymi próbkami fazy.
+ *
+ * Faza z suncalc nie rośnie równo: kilka godzin przed pełnią i przed nowiem
+ * cofa się o setne części, zanim przeskoczy. Dotąd każdy taki spadek liczył się
+ * jako nów — 15 września 2026, przy sierpie 22%, opis mówił „Nów za 11 dni"
+ * o dniu, w którym wypada pełnia, a kalendarz znaczył ją jako nów. Nów to
+ * wyłącznie przewinięcie fazy z okolic 1 do okolic 0; pełnia — przejście przez 0,5.
+ */
+function phaseEvent(previous: number, phase: number): 'new' | 'full' | null {
+  if (previous > 0.75 && phase < 0.25) return 'new';
+  if (previous < 0.5 && phase >= 0.5) return 'full';
+  return null;
+}
+
 /** suncalc podaje fazę jako ułamek cyklu — mapujemy ją na jedną z ośmiu nazwanych faz. */
 function phaseInfo(phase: number) {
   return PHASES[Math.round(phase * 8) % 8];
@@ -67,10 +82,8 @@ function nextMilestone(from: Date): { label: string; when: Date } {
     const at = new Date(from.getTime() + h * HOUR);
     const phase = phaseOf(at);
 
-    // Nów: faza przewija się z ~1 z powrotem do ~0.
-    if (phase < previous) return { label: 'Nów', when: at };
-    // Pełnia: faza przekracza 0.5.
-    if (previous < 0.5 && phase >= 0.5) return { label: 'Pełnia', when: at };
+    const event = phaseEvent(previous, phase);
+    if (event) return { label: event === 'new' ? 'Nów' : 'Pełnia', when: at };
 
     previous = phase;
   }
@@ -130,9 +143,7 @@ export function moonDay(day: Date, lat: number, lon: number, inMonth = true): Mo
 
   let event: MoonEvent | null = null;
   for (let i = 1; i < phases.length; i++) {
-    // Nów: faza przewija się z ~1 z powrotem do ~0. Pełnia: przekracza 0.5.
-    if (phases[i] < phases[i - 1]) event = 'new';
-    else if (phases[i - 1] < 0.5 && phases[i] >= 0.5) event = 'full';
+    event = phaseEvent(phases[i - 1], phases[i]);
     if (event) break;
   }
 

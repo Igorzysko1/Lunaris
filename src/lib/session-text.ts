@@ -11,6 +11,7 @@
 
 import { formatTime } from './date.ts';
 import type { PlannedNight } from './night-plan.ts';
+import type { NightConditions } from './night-conditions.ts';
 import type { CloudSummary, MoonOverNight, NightSummary } from './night-summary.ts';
 import type { NightVerdict, Rejection, Warning } from './session-engine.ts';
 
@@ -374,15 +375,45 @@ export function verdictChips(
   return chips;
 }
 
+/** Wschód albo zachód Księżyca tej nocy: „wschód 02:51"; `null`, gdy żadne nie wypada. */
+export function moonEventTonight(moon: MoonOverNight): string | null {
+  if (moon.rise && moon.up?.from.getTime() === moon.rise.getTime()) {
+    return `wschód ${formatTime(moon.rise)}`;
+  }
+  if (moon.set && moon.up?.to.getTime() === moon.set.getTime()) {
+    return `zachód ${formatTime(moon.set)}`;
+  }
+  return null;
+}
+
 /** Księżyc tej nocy jednym wierszem: „Księżyc 12%, wschód 02:51". */
 export function describeMoonTonight(moon: MoonOverNight): string {
   const lit = `Księżyc ${percent(moon.illumination)}`;
+  const event = moonEventTonight(moon);
 
-  if (moon.rise && moon.up?.from.getTime() === moon.rise.getTime()) {
-    return `${lit}, wschód ${formatTime(moon.rise)}`;
-  }
-  if (moon.set && moon.up?.to.getTime() === moon.set.getTime()) {
-    return `${lit}, zachód ${formatTime(moon.set)}`;
-  }
+  if (event) return `${lit}, ${event}`;
   return moon.up ? `${lit}, nad horyzontem całą noc` : `${lit}, pod horyzontem całą noc`;
+}
+
+/**
+ * Rosa pod wilgotnością: zapas nad punktem rosy, minimum temperatury i to,
+ * o której szkło zaparuje. Godzina, a nie samo „uważaj", bo od niej zależy,
+ * czy ogrzewacz trzeba włączyć od razu, czy po północy.
+ */
+export function describeDew(
+  conditions: Pick<NightConditions, 'minDewSpread' | 'minTemperature' | 'dewFrom'>,
+): Narration | null {
+  const { minDewSpread, minTemperature, dewFrom } = conditions;
+  if (minDewSpread === null || minTemperature === null) return null;
+
+  const head: Narration = [
+    ['Zapas ', false],
+    [`${decimal(minDewSpread)} K`, true],
+    [' nad punktem rosy, minimum ', false],
+    [`${decimal(minTemperature)} °C`, true],
+  ];
+
+  return dewFrom
+    ? [...head, [' — szkło zaparuje około ', false], [formatTime(dewFrom), true], ['.', false]]
+    : [...head, [' — rosa nie powinna osiąść.', false]];
 }

@@ -1,9 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useKnownTonight } from '@/hooks/use-known-tonight';
+import { useNightConditions } from '@/hooks/use-night-conditions';
 import {
   useNightVerdicts,
   type NightCard,
@@ -12,20 +13,14 @@ import {
 } from '@/hooks/use-night-verdicts';
 import type { Narration } from '@/lib/session-text';
 import {
-  ASTRO_TIMES,
   BOOKING_WARNING,
-  CLOUDS,
-  HOUR_AXIS,
-  HUMIDITY,
   LIVE,
-  MOON,
   NEXT_EVENT,
   OPTICS,
   OUT_OF_REACH,
   PLAN,
   SKY_CONSTELLATIONS,
   TARGETS,
-  THRESHOLDS_SUMMARY,
 } from '@/mock/night';
 import { useMock } from '@/mock/state';
 import { colors, fonts, hexA } from '@/theme';
@@ -126,7 +121,7 @@ export default function NightScreen() {
         />
       )}
       <Segments items={SEGMENTS} value={segment} onChange={setSegment} />
-      {segment === 'conditions' ? <Conditions /> : null}
+      {segment === 'conditions' ? <Conditions card={card} /> : null}
       {segment === 'sky' ? <Sky /> : null}
       {segment === 'plan' ? live ? <LivePlan /> : <Plan go={card.go} /> : null}
     </Screen>
@@ -339,53 +334,80 @@ function StaleBar({ verdicts }: { verdicts: NightVerdicts }) {
   );
 }
 
-function Conditions() {
+/** Warunki mówią, jaka będzie noc — z tych godzin wynika werdykt nad segmentami. */
+function Conditions({ card }: { card: NightCard }) {
+  const view = useNightConditions(card);
+
   return (
     <>
-      <Panel>
-        <Label flush right={CLOUDS.minimum}>
-          Zachmurzenie
-        </Label>
-        <HourBars
-          values={CLOUDS.percent}
-          highlight={CLOUDS.window}
-          axis={HOUR_AXIS}
-          threshold={CLOUDS.threshold}
-        />
-        <View style={styles.legend}>
-          <Legend color={hexA(colors.green, 0.6)} label="w oknie" />
-          <Legend color="rgba(255,255,255,0.12)" label="poza oknem" />
-          <Legend color={hexA(colors.coral, 0.6)} label={`próg ${CLOUDS.threshold}%`} />
-        </View>
-      </Panel>
+      {view.clouds ? (
+        <Panel>
+          <Label flush right={view.clouds.lowest}>
+            Zachmurzenie
+          </Label>
+          <HourBars
+            values={view.clouds.values}
+            highlight={view.clouds.highlight}
+            axis={view.clouds.axis}
+            threshold={view.clouds.threshold}
+          />
+          <View style={styles.legend}>
+            {view.clouds.highlight ? (
+              <Legend color={hexA(colors.green, 0.6)} label="w oknie" />
+            ) : null}
+            <Legend
+              color="rgba(255,255,255,0.12)"
+              label={view.clouds.highlight ? 'poza oknem' : 'noc bez okna'}
+            />
+            <Legend color={hexA(colors.coral, 0.6)} label={`próg ${view.clouds.threshold}%`} />
+          </View>
+        </Panel>
+      ) : null}
 
       <Panel>
         <Label flush>Wilgotność i rosa</Label>
         <View style={styles.stats}>
-          {HUMIDITY.stats.map(([label, value]) => (
+          {view.humidity.map(([label, value]) => (
             <Stat key={label} label={label} value={value} style={styles.flex} />
           ))}
         </View>
-        <Notice dashed>
-          Zapas <Strong>{HUMIDITY.margin}</Strong> nad punktem rosy przy minimum{' '}
-          <Strong>{HUMIDITY.minTemperature}</Strong> — szkło zaparuje po północy.
-        </Notice>
+        {view.dew ? (
+          <Notice dashed mark={view.dewWarn ? '!' : '·'} tone={view.dewWarn ? 'warn' : 'neutral'}>
+            {view.dew.map(([text, strong], i) => (
+              <Fragment key={i}>{strong ? <Strong>{text}</Strong> : text}</Fragment>
+            ))}
+          </Notice>
+        ) : null}
       </Panel>
+
+      {/* Tylko przy sprzęcie, który seeing może ograniczyć — przy lornetce zostaje żeton w werdykcie. */}
+      {view.seeing ? (
+        <Panel>
+          <Label flush right={view.seeing.score}>
+            Seeing
+          </Label>
+          <Body>{view.seeing.detail}</Body>
+          <Note>{`Dla zestawu ${view.seeing.profile}.`}</Note>
+        </Panel>
+      ) : null}
 
       <Panel>
         <Label flush>Czasy astronomiczne</Label>
         <View style={styles.stats}>
-          {ASTRO_TIMES.map(([label, value]) => (
+          {view.astro.map(([label, value]) => (
             <Stat key={label} label={label} value={value} style={styles.flex} />
           ))}
         </View>
       </Panel>
 
-      <Panel onPress={() => router.push('/moon')} style={styles.rowPanel}>
+      <Panel
+        onPress={() => router.push({ pathname: '/moon', params: { date: view.moon.date } })}
+        style={styles.rowPanel}
+      >
         <Ionicons name="moon" size={26} color={colors.amber} />
         <View style={styles.flex}>
-          <Text style={styles.rowTitle}>{MOON.title}</Text>
-          <Text style={styles.rowSubtitle}>{MOON.subtitle}</Text>
+          <Text style={styles.rowTitle}>{view.moon.title}</Text>
+          <Text style={styles.rowSubtitle}>{view.moon.subtitle}</Text>
         </View>
         <Text style={styles.chevron}>›</Text>
       </Panel>
@@ -393,7 +415,7 @@ function Conditions() {
       <MenuRow
         dashed
         title="Progi warunków"
-        value={THRESHOLDS_SUMMARY}
+        value={view.thresholds}
         onPress={() => router.push('/thresholds')}
       />
     </>

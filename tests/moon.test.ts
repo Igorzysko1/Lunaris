@@ -118,3 +118,25 @@ describe('moonAt', () => {
     }
   });
 });
+
+describe('nów i pełnia przy nierównej fazie', () => {
+  // Faza z suncalc cofa się o setne części tuż przed pełnią i nowiem. Wrzesień
+  // 2026: nów 11.09, pełnia 26.09, nów 10.10 — pełnia była dotąd brana za nów.
+  it('przed pełnią opis zapowiada pełnię, nie nów', () => {
+    const moon = moonAt(new Date(2026, 8, 15, 21, 0), KATOWICE.lat, KATOWICE.lon);
+    assert.match(moon.detail, /^Pełnia za 11 dni · 26 wrz\.$/);
+  });
+
+  it('kalendarz znaczy pełnię jako pełnię', () => {
+    const events = inMonthDays(moonMonth(2026, 8, KATOWICE.lat, KATOWICE.lon))
+      .filter((d) => d.event)
+      .map((d) => `${d.date.getDate()} ${d.event}`);
+
+    assert.deepEqual(events, ['11 new', '26 full']);
+  });
+
+  it('po pełni następnym zdarzeniem jest nów', () => {
+    const moon = moonAt(new Date(2026, 8, 27, 21, 0), KATOWICE.lat, KATOWICE.lon);
+    assert.match(moon.detail, /^Nów za 13 dni · 10 paź\.$/);
+  });
+});

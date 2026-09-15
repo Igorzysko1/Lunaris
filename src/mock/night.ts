@@ -6,41 +6,13 @@ import type { Tone } from '@/ui/kit';
  * z `session-text.ts` i `night-plan.ts` — przy podpinaniu mają przyjść stamtąd.
  */
 
-/** Godziny 20:00–07:00, jedenaście slotów; okno obserwacyjne to sloty 22:00–03:00. */
+/** Oś profilu wysokości w panelu celu (etap 4): godziny 20:00–07:00, jedenaście slotów. */
 export const HOUR_AXIS = [
   { slot: 0, label: '20' },
   { slot: 3, label: '23' },
   { slot: 6, label: '02' },
   { slot: 9, label: '05' },
 ];
-
-export const CLOUDS = {
-  percent: [35, 22, 15, 12, 5, 8, 10, 14, 18, 30, 45],
-  window: [2, 6] as [number, number],
-  minimum: 'min. 5% o 00:00',
-  threshold: 40,
-};
-
-export const HUMIDITY = {
-  stats: [
-    ['wilgotność', '78%'],
-    ['punkt rosy', '1,8 °C'],
-    ['opady', '0,0 mm'],
-  ] as [string, string][],
-  margin: '2,3 K',
-  minTemperature: '4,1 °C',
-};
-
-export const ASTRO_TIMES: [string, string][] = [
-  ['zachód', '19:18'],
-  ['ciemno', '21:04'],
-  ['świt astr.', '04:12'],
-  ['wschód', '06:32'],
-];
-
-export const MOON = { title: 'Ubywający sierp · 12%', subtitle: 'wschód 02:51 · nów za 4 dni' };
-
-export const THRESHOLDS_SUMMARY = 'chmury 40% · rosa 2 K';
 
 export const OPTICS = [
   { id: 'sct', label: 'SCT 8″ · 203/2032', reach: 'SCT 8″' },

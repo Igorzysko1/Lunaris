@@ -152,7 +152,8 @@ export function HourBars({
 }: {
   values: number[];
   max?: number;
-  highlight: [number, number];
+  /** Okno sesji w indeksach słupków; `null`, gdy noc okna nie ma. */
+  highlight: [number, number] | null;
   axis: { slot: number; label: string }[];
   threshold?: number;
   height?: number;
@@ -163,7 +164,7 @@ export function HourBars({
     <View style={styles.wrap}>
       <View style={[styles.bars, { height }]}>
         {values.map((value, i) => {
-          const inWindow = i >= highlight[0] && i <= highlight[1];
+          const inWindow = highlight !== null && i >= highlight[0] && i <= highlight[1];
 
           return (
             <View
@@ -178,15 +179,17 @@ export function HourBars({
             />
           );
         })}
-        <View
-          style={[
-            styles.highlight,
-            {
-              left: pct(highlight[0] / slots),
-              width: pct((highlight[1] - highlight[0] + 1) / slots),
-            },
-          ]}
-        />
+        {highlight ? (
+          <View
+            style={[
+              styles.highlight,
+              {
+                left: pct(highlight[0] / slots),
+                width: pct((highlight[1] - highlight[0] + 1) / slots),
+              },
+            ]}
+          />
+        ) : null}
         {threshold !== undefined ? (
           <View style={[styles.threshold, { bottom: (threshold / max) * height }]} />
         ) : null}

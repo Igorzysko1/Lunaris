@@ -126,6 +126,18 @@ const USABLE_MAGNIFICATION: Record<SeeingIndex, number> = {
   5: 350,
 };
 
+/**
+ * Czy seeing w ogóle może ograniczyć sprzęt o tym powiększeniu.
+ *
+ * Poniżej progu najsłabszego seeingu obraz ogranicza optyka, nie powietrze —
+ * lornetce 15x drganie atmosfery nie odbiera niczego, więc karta seeingu byłaby
+ * dla niej szumem. Rozstrzygamy z liczby, nie z nazwy sprzętu, tak jak rachunek
+ * zasięgu w `optics.ts`.
+ */
+export function seeingCanLimit(magnification: number): boolean {
+  return magnification >= USABLE_MAGNIFICATION[1];
+}
+
 /** Ocena dla jednej godziny prognozy. */
 export function seeingAt(hour: NightHour): Seeing {
   const jet = jetPenalty(hour.windJet) + midPenalty(hour.windMid);
