@@ -42,6 +42,11 @@ export type TargetObservation = {
   conditions: AttemptConditions;
   /** Zestaw sprzętu — `SkyTarget` nosi go już przy sobie, więc nikt o to nie pyta. */
   profileId: string;
+  /**
+   * Dlaczego nie wyszło — jedno słowo z `FAILURE_REASONS` albo własny wpis.
+   * Tylko przy `failed`; brak pola znaczy „nie podano", nie „bez powodu".
+   */
+  reason?: string;
 };
 
 /**
@@ -84,7 +89,11 @@ export type Journal = {
  * wartości domyślnych po nieudanym odczycie — właściwy dla konfiguracji —
  * kasowałby tu sezon obserwacji.
  */
-export const JOURNAL_VERSION = 1;
+export const JOURNAL_VERSION = 2;
+
+// Historia wersji:
+// 2 — powód nieudanego podejścia (`TargetObservation.reason`). Zapis v1 wczytuje
+//     się bez zmian: brak pola znaczy tylko, że powodu nie podano.
 
 export const EMPTY_JOURNAL: Journal = { version: JOURNAL_VERSION, logs: [] };
 
@@ -325,7 +334,7 @@ export function parseJournal(raw: string | null): Journal | null {
       .filter((l): l is NightLog => typeof l === 'object' && l !== null && typeof l.id === 'string')
       .map((l) => ({
         ...l,
-        observations: Array.isArray(l.observations) ? l.observations : [],
+        observations: Array.isArray(l.observations) ? l.observations.map(cleanObservation) : [],
         transparency: typeof l.transparency === 'number' ? l.transparency : null,
         seeing: typeof l.seeing === 'number' ? l.seeing : null,
         note: typeof l.note === 'string' ? l.note : '',
@@ -338,4 +347,117 @@ export function parseJournal(raw: string | null): Journal | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * Powody nieudanego podejścia (4b): pięć wracających i „inne" z własnym wpisem.
+ * Klawiatura otwiera się dopiero po „inne" — w rękawicach to dwa dotknięcia.
+ */
+export const FAILURE_REASONS = [
+  'rosa',
+  'chmury',
+  'zmęczenie',
+  'sprzęt',
+  'zwinąłem',
+  'inne',
+] as const;
+
+/** Powód, który nie opisuje celu, tylko koniec nocy. */
+export const PACKED_UP = 'zwinąłem';
+
+/** Wybór otwierający pole na własny powód. */
+export const OTHER_REASON = 'inne';
+
+/** Dłużej niż kilka słów to już notatka, a nie powód. */
+const REASON_MAX = 60;
+
+/** Powód zostaje tylko przy nieudanym podejściu i tylko jako niepusty tekst. */
+function cleanObservation(observation: TargetObservation): TargetObservation {
+  if (typeof observation !== 'object' || observation === null) return observation;
+
+  const { reason, ...rest } = observation;
+  const text = typeof reason === 'string' ? reason.trim().slice(0, REASON_MAX) : '';
+  return observation.outcome === 'failed' && text ? { ...rest, reason: text } : rest;
+}
+
+/** Wieczór nocy z identyfikatora `RRRR-MM-DD`, w południe; `null` dla daty, której nie ma. */
+export function parseNightId(id: string): Date | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(id);
+  if (!match) return null;
+
+  const evening = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12);
+  return nightLogId(evening) === id ? evening : null;
+}
+
+/**
+ * Własne powody z dziennika, od najświeższych — trafiają do podpowiedzi obok
+ * pięciu stałych, żeby „bateria w montażu" wpisać raz, a nie przy każdej nocy.
+ */
+export function customReasons(journal: Journal, limit = 5): string[] {
+  const standard = new Set<string>(FAILURE_REASONS);
+  const found: string[] = [];
+
+  for (const log of [...journal.logs].reverse()) {
+    for (const observation of log.observations) {
+      const reason = observation.reason;
+      if (reason && !standard.has(reason) && !found.includes(reason)) found.push(reason);
+    }
+  }
+
+  return found.slice(0, limit);
+}
+
+/**
+ * Czy noc skończyła się zwinięciem sprzętu, i przez co.
+ *
+ * Nie osobne pole wpisu: „zwinąłem" pada jako powód przy celach, do których się
+ * nie doszło, a przyczyną jest najczęstszy inny powód tej nocy. Dzięki temu
+ * arkusz nie zadaje drugiego pytania o to samo. `null`, gdy noc nie była zwinięta.
+ */
+export function packedUp(log: NightLog): { reason: string | null } | null {
+  const failed = log.observations.filter((o) => o.outcome === 'failed');
+  if (!failed.some((o) => o.reason === PACKED_UP)) return null;
+
+  const counts = new Map<string, number>();
+  for (const observation of failed) {
+    const reason = observation.reason;
+    if (reason && reason !== PACKED_UP) counts.set(reason, (counts.get(reason) ?? 0) + 1);
+  }
+
+  return { reason: [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null };
+}
+
+/** Podsumowanie roku na górze Dziennika: noce, widziane i nieudane podejścia. */
+export function yearStats(journal: Journal, year: number) {
+  const logs = journal.logs.filter((log) => log.id.startsWith(`${year}-`));
+  const observations = logs.flatMap((log) => log.observations);
+
+  return {
+    nights: logs.length,
+    seen: observations.filter((o) => o.outcome === 'seen').length,
+    failed: observations.filter((o) => o.outcome === 'failed').length,
+  };
+}
+
+/**
+ * Propozycja podniesienia progu rosy po nocy, w której cel przepadł przez rosę,
+ * choć prognoza jej nie zapowiadała.
+ *
+ * Gdy prognoza schodziła poniżej progu, ostrzeżenie zadziałało i nie ma czego
+ * poprawiać. W przeciwnym razie próg podnosimy do pierwszej pełnej wartości nad
+ * najmniejszym prognozowanym zapasem — tej, przy której ta noc dostałaby
+ * ostrzeżenie. `null`, gdy propozycji nie ma.
+ */
+export function dewThresholdSuggestion(input: {
+  reasons: readonly string[];
+  forecastMinSpread: number | null;
+  threshold: number;
+  max: number;
+}): number | null {
+  const { reasons, forecastMinSpread, threshold, max } = input;
+  if (!reasons.includes('rosa') || forecastMinSpread === null) return null;
+  if (forecastMinSpread < threshold) return null;
+
+  const proposed = Math.min(max, Math.floor(forecastMinSpread) + 1);
+  return proposed > threshold ? proposed : null;
 }

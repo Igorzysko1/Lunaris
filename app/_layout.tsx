@@ -108,7 +108,6 @@ function AppStack() {
         <Stack.Screen name="legacy/settings" />
         <Stack.Screen name="sites" />
         <Stack.Screen name="review" />
-        <Stack.Screen name="journal" />
       </Stack>
     </ForecastProvider>
   );

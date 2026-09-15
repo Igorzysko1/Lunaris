@@ -582,3 +582,18 @@ export function describeOutOfReach(target: SkyTarget): string {
       return '';
   }
 }
+
+/**
+ * Cele w zasięgu, każdy raz. `nightTargetsForProfiles` zwraca obiekt osobno dla
+ * każdego zestawu; tam, gdzie liczy się „co jest do zobaczenia", a nie „czym",
+ * zostaje pierwszy wpis — najwyżej położony, bo tak lista jest posortowana.
+ */
+export function visibleOnce(targets: SkyTarget[]): SkyTarget[] {
+  const seen = new Set<string>();
+
+  return targets.filter((target) => {
+    if (!target.visible || seen.has(target.id)) return false;
+    seen.add(target.id);
+    return true;
+  });
+}

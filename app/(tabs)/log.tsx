@@ -1,15 +1,52 @@
 import { router } from 'expo-router';
+import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { BETTER_TODAY, JOURNAL_MONTHS, SUMMARY } from '@/mock/journal';
+import { useJournal } from '@/hooks/use-journal';
+import { useRetryTonight } from '@/hooks/use-retry-tonight';
+import { yearStats } from '@/lib/journal';
+import { exportJournalToFile } from '@/lib/journal-store';
+import {
+  entryChips,
+  logsByMonth,
+  nightSpanOfLog,
+  ratingsLabel,
+  retryLine,
+} from '@/lib/journal-text';
 import { colors, fonts } from '@/theme';
-import { Chip, ChipRow, Label, MenuRow, Panel, Screen, Stat, TitleBar } from '@/ui/kit';
+import {
+  Chip,
+  ChipRow,
+  Label,
+  MenuRow,
+  Note,
+  Notice,
+  Panel,
+  Screen,
+  Stat,
+  TitleBar,
+} from '@/ui/kit';
 
 /**
  * Dziennik — „co widziałem?". Bez segmentów: jedna historia z podsumowaniem
- * sezonu na górze. Zapis nocy to arkusz, ten sam co z zakładki Noc.
+ * roku na górze. Zapis nocy to arkusz, ten sam co z zakładki Noc.
  */
 export default function LogScreen() {
+  const { journal, readable, loaded } = useJournal();
+  const retry = useRetryTonight(journal);
+  const [year] = useState(() => new Date().getFullYear());
+  const [exported, setExported] = useState<string | null>(null);
+
+  const stats = yearStats(journal, year);
+  const months = logsByMonth(journal.logs);
+
+  async function exportAll() {
+    const path = await exportJournalToFile();
+    setExported(
+      path ? `Zapisano kopię: ${path}` : 'Eksport się nie powiódł — dziennik jest nietknięty.',
+    );
+  }
+
   return (
     <Screen>
       <TitleBar
@@ -18,48 +55,83 @@ export default function LogScreen() {
         onRightPress={() => router.push('/close-night')}
       />
 
+      {!readable ? (
+        <Notice tone="bad">
+          Zapisanego dziennika nie da się odczytać. Nic go nie nadpisze, dopóki się to nie zmieni —
+          zapis zostaje na dysku nietknięty.
+        </Notice>
+      ) : null}
+
       <View style={styles.stats}>
         <Panel style={styles.flex}>
-          <Stat label={`nocy w ${SUMMARY.year}`} value={String(SUMMARY.nights)} />
+          <Stat label={`nocy w ${year}`} value={String(stats.nights)} />
         </Panel>
         <Panel style={styles.flex}>
-          <Stat label="widzianych" value={String(SUMMARY.seen)} tone="go" />
+          <Stat label="widzianych" value={String(stats.seen)} tone="go" />
         </Panel>
         <Panel style={styles.flex}>
-          <Stat label="nie wyszło" value={String(SUMMARY.failed)} tone="warn" />
+          <Stat label="nie wyszło" value={String(stats.failed)} tone="warn" />
         </Panel>
       </View>
 
-      <MenuRow
-        tone="accent"
-        title={BETTER_TODAY}
-        onPress={() => router.navigate({ pathname: '/', params: { segment: 'sky' } })}
-      />
+      {retry ? (
+        <MenuRow
+          tone="accent"
+          title={retryLine(retry)}
+          onPress={() => router.navigate({ pathname: '/', params: { segment: 'sky' } })}
+        />
+      ) : null}
 
-      {JOURNAL_MONTHS.map((month) => (
-        <View key={month.label} style={styles.group}>
-          <Label>{month.label}</Label>
-          {month.entries.map((entry) => (
+      {loaded && journal.logs.length === 0 ? (
+        <Panel dashed>
+          <Text style={styles.note}>
+            Jeszcze żadnej zapisanej nocy. Po wyjeździe „+ zapisz noc” — cele tej nocy są już na
+            liście, wystarczy je odhaczyć.
+          </Text>
+        </Panel>
+      ) : null}
+
+      {months.map((month) => (
+        <View key={month.heading} style={styles.group}>
+          <Label>{month.heading}</Label>
+          {month.logs.map((log) => (
             <Panel
-              key={entry.id}
-              onPress={() => router.push({ pathname: '/entry/[id]', params: { id: entry.id } })}
+              key={log.id}
+              onPress={() => router.push({ pathname: '/entry/[id]', params: { id: log.id } })}
             >
               <View style={styles.head}>
-                <Text style={styles.date}>{entry.date}</Text>
-                <Text style={styles.meta}>{entry.ratings}</Text>
+                <Text style={styles.date}>{nightSpanOfLog(log)}</Text>
+                <Text style={styles.meta}>{ratingsLabel(log)}</Text>
                 <Text style={styles.chevron}>›</Text>
               </View>
-              <Text style={styles.meta}>{entry.place}</Text>
-              <ChipRow>
-                {entry.chips.map(([label, tone]) => (
-                  <Chip key={label} label={label} tone={tone} />
-                ))}
-              </ChipRow>
-              <Text style={styles.note}>{entry.note}</Text>
+              <Text style={styles.meta}>{log.siteName}</Text>
+              {entryChips(log).length > 0 ? (
+                <ChipRow>
+                  {entryChips(log).map((chip) => (
+                    <Chip key={chip.label} label={chip.label} tone={chip.tone} />
+                  ))}
+                </ChipRow>
+              ) : null}
+              {log.note ? (
+                <Text style={styles.note} numberOfLines={2}>
+                  {log.note}
+                </Text>
+              ) : null}
             </Panel>
           ))}
         </View>
       ))}
+
+      {journal.logs.length > 0 ? (
+        <MenuRow
+          dashed
+          title="Eksportuj dziennik"
+          subtitle="plik JSON w dokumentach telefonu — da się go wczytać z powrotem"
+          chevron="↓"
+          onPress={() => void exportAll()}
+        />
+      ) : null}
+      {exported ? <Note>{exported}</Note> : null}
     </Screen>
   );
 }

@@ -6,7 +6,7 @@ import { horizonOf } from '@/lib/horizon';
 import { moonOverNight, sunAxis } from '@/lib/night-summary';
 import { currentNightWindow } from '@/lib/night-window';
 import { describeMoonTonight } from '@/lib/session-text';
-import { nightTargetsForProfiles } from '@/lib/sky-targets';
+import { nightTargetsForProfiles, visibleOnce } from '@/lib/sky-targets';
 import { useNow } from '@/hooks/use-now';
 import { useSettings } from '@/store/settings';
 
@@ -31,19 +31,15 @@ export function useKnownTonight() {
     const coords = { lat, lon };
     const moon = moonOverNight(sunAxis(night, coords), coords, night.from);
 
-    // Ten sam obiekt przez dwa zestawy to dwa wpisy — tu liczy się, co jest do zobaczenia.
-    const seen = new Set<string>();
-    const targets = nightTargetsForProfiles(
-      night,
-      coords,
-      config.opticsProfiles,
-      active.bortle,
-      horizonOf(active.horizonMask, active.horizonOverrides),
-    ).filter((target) => {
-      if (!target.visible || seen.has(target.id)) return false;
-      seen.add(target.id);
-      return true;
-    });
+    const targets = visibleOnce(
+      nightTargetsForProfiles(
+        night,
+        coords,
+        config.opticsProfiles,
+        active.bortle,
+        horizonOf(active.horizonMask, active.horizonOverrides),
+      ),
+    );
 
     return {
       dusk: formatTime(night.from),

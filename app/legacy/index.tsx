@@ -32,7 +32,6 @@ export default function LegacyScreens() {
       />
       <MenuRow title="Gdzie dziś jechać" onPress={() => router.push('/review')} />
       <MenuRow title="Miejscówki" onPress={() => router.push('/sites')} />
-      <MenuRow title="Dziennik" onPress={() => router.push('/journal')} />
       <Note>Nowe ekrany są makietą: dane są stałe, a przyciski bez logiki mówią to wprost.</Note>
     </Screen>
   );

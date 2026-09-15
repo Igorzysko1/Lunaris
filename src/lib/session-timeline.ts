@@ -157,6 +157,44 @@ export function adjustStep(
   return inOrder(next) ? next : null;
 }
 
+/**
+ * Wpisuje godziny kroków z pamięci — także tych, których w terenie nie zapisano
+ * („w domu: nie zmierzono"). Wszystkie zmiany naraz: przesunięcie wyjazdu
+ * i dojazdu o godzinę później sprawdzane krok po kroku odbiłoby się od starej
+ * godziny dojazdu. `null`, gdy któraś godzina wypada w przyszłości albo nie po kolei.
+ */
+export function setStepTimes(
+  timeline: SessionTimeline | null,
+  changes: Partial<Record<TimelineStep, Date>>,
+  now: Date,
+): SessionTimeline | null {
+  const entries = Object.entries(changes) as [TimelineStep, Date][];
+  if (entries.some(([, at]) => Number.isNaN(at.getTime()) || at.getTime() > now.getTime())) {
+    return null;
+  }
+
+  const next: SessionTimeline = { ...(timeline ?? blank()), updatedAt: now.toISOString() };
+  for (const [step, at] of entries) next[step] = at.toISOString();
+
+  return inOrder(next) ? next : null;
+}
+
+/** Planowana godzina kroku z zamrożonego planu: wyjazd, start okna, koniec okna, powrót. */
+export function plannedStep(planned: PlannedTimes | null, step: TimelineStep): string | null {
+  if (!planned) return null;
+
+  switch (step) {
+    case 'departed':
+      return planned.departAt;
+    case 'arrived':
+      return planned.windowFrom;
+    case 'packing':
+      return planned.windowTo;
+    case 'home':
+      return planned.returnAt;
+  }
+}
+
 const minutesBetween = (from: string | null, to: string | null) =>
   from && to ? Math.round((Date.parse(to) - Date.parse(from)) / MINUTE_MS) : null;
 

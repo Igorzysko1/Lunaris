@@ -233,7 +233,7 @@ export default function NightScreen() {
 
                 <Pressable
                   accessibilityRole="button"
-                  onPress={() => router.push('/journal')}
+                  onPress={() => router.push('/close-night')}
                   style={[styles.reviewLink, styles.gap]}
                 >
                   <Ionicons name="create-outline" size={18} color={colors.purple} />

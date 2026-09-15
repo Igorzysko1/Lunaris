@@ -97,20 +97,29 @@ Z `src/mock/night.ts` zniknęły `CLOUDS`, `HUMIDITY`, `ASTRO_TIMES`, `MOON`, `T
 
 ### Etap 3 — Zapis nocy i Dziennik
 
-| Element                                                             | Źródło                                                                     | Status                                                                                 |
-| ------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| Arkusz „Jak było?": cele z planu, dwie skale, notatka, zapis        | `journal.upsertLog`, `journal-store.saveNightLog`, `planNights`            | jest                                                                                   |
-| „Dopisz, co doszło" — cel spoza planu                               | `TargetObservation.targetId` przyjmuje dowolny cel                         | **UI**: wybór celu z katalogu                                                          |
-| Historia nocy pogrupowana miesiącami                                | `journal-store.loadJournal`, `date.formatMonth`                            | jest                                                                                   |
-| Podsumowanie sezonu: noce / widziane / nie wyszło                   | `monthly-report.buildMonthlyReport` liczy miesiąc                          | **UI**: agregacja roczna z tych samych danych                                          |
-| „Dziś lepiej niż wtedy: M33…"                                       | `journal.conditionsImproved`, `orderByHistory`                             | jest                                                                                   |
-| Wpis nocy: cele, oceny, notatka, powód „nie wyszło przy…"           | `NightLog`, `AttemptConditions`                                            | jest                                                                                   |
-| Przebieg nocy: zmierzone godziny obok planowanych, „Popraw godziny" | `session-timeline.adjustStep`, `plannedFrom`, `journal-store.saveTimeline` | jest                                                                                   |
-| „Edytuj" — ten sam arkusz na istniejącym wpisie                     | `journal.nightLogId` (jedna noc = jeden wpis)                              | jest                                                                                   |
-| Chip „zwinąłem — rosa" (powód zakończenia nocy)                     | `NightLog` nie ma takiego pola                                             | **DO ZROBIENIA**: pole powodu przerwania + podbicie `JOURNAL_VERSION`                  |
-| Eksport dziennika                                                   | `journal-store.exportJournalToFile`                                        | jest (zapis na dysk); **DO ZROBIENIA**, jeśli ma być „udostępnij": brak `expo-sharing` |
+**Stan: podpięte w kodzie 15 września 2026, bez commita — czeka na przejście na telefonie.**
+Dane: `src/hooks/use-journal.ts` (dziennik z dysku, odświeżany po każdym zapisie),
+`use-night-log.ts` (noc i cele arkusza), `use-retry-tonight.ts`; rachunek w `src/lib/journal.ts`,
+zdania w `src/lib/journal-text.ts` (test: `tests/night-log.test.ts`). Usunięte `app/journal.tsx`
+i `src/mock/journal.ts`.
 
-Po etapie usuwamy `app/journal.tsx`.
+| Element                                                            | Źródło                                                                                       | Status                                                                                                                                                  |
+| ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Arkusz „Jak było?": cele tej nocy, trzy stany, dwie skale, notatka | `useNightLog` (`nightTargetsForProfiles` → `visibleOnce` → `orderByHistory`), `saveNightLog` | podpięte — pięć celów z góry listy, ‹ › cofa do 14 dni wstecz, szkic zapisuje się przy każdej zmianie                                                   |
+| „Dopisz, co doszło"                                                | reszta celów w zasięgu tej nocy                                                              | podpięte — rozwijana lista, dotknięcie dopisuje cel jako widziany; obiekty spoza zasięgu zostają w bibliotece celów (etap 8)                            |
+| Powód „nie wyszło"                                                 | `TargetObservation.reason`, `FAILURE_REASONS`, `customReasons`                               | podpięte — dziennik w wersji 2, zapis v1 wczytuje się bez zmian; własne powody wracają w podpowiedziach                                                 |
+| Propozycja korekty progu rosy                                      | `dewThresholdSuggestion`, `config.conditions.dewWarningSpreadC`                              | podpięte — gdy cel przepadł przez rosę, a prognoza nie schodziła poniżej progu; jedno dotknięcie podnosi próg, tylko dla nocy wciąż obecnej w prognozie |
+| Historia pogrupowana miesiącami                                    | `useJournal`, `logsByMonth`, `entryChips`, `ratingsLabel`                                    | podpięte                                                                                                                                                |
+| Podsumowanie roku: noce / widziane / nie wyszło                    | `yearStats`                                                                                  | podpięte                                                                                                                                                |
+| „Dziś lepiej niż wtedy"                                            | `useRetryTonight` (`orderByHistory` → `retry`)                                               | podpięte — wiersz znika, gdy nie ma celu do drugiego podejścia                                                                                          |
+| Wpis nocy: cele, oceny, powód z warunkami, notatka                 | `failureWhy`, `targetLabel`                                                                  | podpięte                                                                                                                                                |
+| Przebieg nocy i „Popraw godziny"                                   | `setStepTimes`, `plannedStep`, `timeOnNight`, `saveTimeline`                                 | podpięte — godziny wpisuje się z klawiatury, także niezmierzone kroki; wszystkie zmiany sprawdzane naraz (po kolei, nie w przyszłości)                  |
+| „Edytuj" — ten sam arkusz na wpisie                                | `close-night?id=…`, `nightLogId`                                                             | podpięte — jedna noc = jeden wpis; warunki podejść zostają z pierwszego zapisu                                                                          |
+| Chip „zwinąłem — rosa"                                             | `packedUp`                                                                                   | podpięte — bez nowego pola: „zwinąłem" przy celach plus najczęstszy inny powód tej nocy                                                                 |
+| Eksport dziennika                                                  | `exportJournalToFile`                                                                        | podpięte (plik JSON w dokumentach telefonu); **DO ZROBIENIA**: „udostępnij" wymaga `expo-sharing` — moduł natywny, czyli nowego buildu aplikacji        |
+
+Zostaje na etap 4: odhaczanie z panelu celu w trakcie nocy i godzina odhaczenia (`seenAt`). Dopiero
+z nią propozycja progu może powiedzieć, o ile rosa wyprzedziła prognozę.
 
 ### Etap 4 — Noc › Niebo i panel celu
 
@@ -146,20 +155,20 @@ Po etapie znika sekcja „Nadchodzące sesje" ze starej Nocy.
 Pierwsza wersja planu powstała z pliku uciętego po turze 6. Te pozycje doszły po lekturze całości
 i należą do etapów w nawiasach.
 
-| Element                                                                                    | Źródło                                                                          | Status                                                                        |
-| ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| (1) Stan „ODPUŚĆ · 1/5": pasek zakreskowany w całości, zdanie z liczbami, żetony           | `evaluateNight` → `Rejection`, `session-text.rejectionLabels`, `narrateVerdict` | podpięte (etap 1)                                                             |
-| (1) Żeton „czwartek 4/5 ›" — najbliższa dobra noc                                          | `useNightVerdicts.bestNight`                                                    | podpięte w zakresie 3 nocy (etap 1)                                           |
-| (2) Karta seeing tylko przy teleskopie, przy lornetce żeton w werdykcie                    | `night-conditions.seeingProfile`, `seeing.seeingCanLimit`                       | podpięte (etap 2) — z powiększenia zestawu (≥ 80x), bez nowego pola w profilu |
-| (3) Trzy stany celu w arkuszu: puste / widziałem / nie wyszło                              | `Outcome = 'seen' \| 'failed'`                                                  | jest                                                                          |
-| (3) Powód „nie wyszło" z listy: rosa · chmury · zmęczenie · sprzęt · zwinąłem · inne       | `TargetObservation` nie ma powodu                                               | **DO ZROBIENIA**: pole powodu + własne wpisy w podpowiedziach                 |
-| (3) „Rosa wyprzedziła prognozę o godzinę. Podnieść próg zapasu do 3 K?"                    | `config.conditions.dewWarningSpreadC`                                           | **DO ZROBIENIA**: reguła propozycji korekty progu z nieudanych celów          |
-| (3) Szkic wpisu istnieje od pierwszego odhaczenia i przeżywa zamknięcie arkusza            | `journal-store.saveNightLog`                                                    | **DO ZROBIENIA**: zapis szkicu w trakcie nocy (razem z `seenAt`)              |
-| (4) Panel celu poza sesją: „Pokrywa się z oknem tylko na 2 h 30 min"                       | `skyPathOverNight` ∩ okno nocy                                                  | jest — zdanie do dopisania w `session-text`                                   |
-| (4) „W tym zestawie: pow. 81× okularem 25 mm · pole 36′"                                   | `optics.ts`                                                                     | **DO ZROBIENIA**: sprawdzić, czy profil zna okular; jeśli nie — pole okularu  |
-| (4) Pusta historia: „Jeszcze nie widziany. Po zapisaniu nocy pojawi się tu pierwszy wpis." | `journal.historyOf`                                                             | **UI**                                                                        |
-| (5) „Ta noc nie przechodzi już progów, a jej rezerwacja wciąż jest w kalendarzu."          | `unbookedNights` odwrotnie: wpis bez werdyktu „jedź"                            | **DO ZROBIENIA**: wykrycie rezerwacji nocy, która spadła poniżej progów       |
-| (9) Zasięg trzystanowy w trybie czerwonym: w zasięgu / graniczny / poza                    | `optics.ts` zwraca tak/nie                                                      | **DO ZROBIENIA**: próg „graniczny" w rachunku zasięgu                         |
+| Element                                                                                    | Źródło                                                                          | Status                                                                                        |
+| ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| (1) Stan „ODPUŚĆ · 1/5": pasek zakreskowany w całości, zdanie z liczbami, żetony           | `evaluateNight` → `Rejection`, `session-text.rejectionLabels`, `narrateVerdict` | podpięte (etap 1)                                                                             |
+| (1) Żeton „czwartek 4/5 ›" — najbliższa dobra noc                                          | `useNightVerdicts.bestNight`                                                    | podpięte w zakresie 3 nocy (etap 1)                                                           |
+| (2) Karta seeing tylko przy teleskopie, przy lornetce żeton w werdykcie                    | `night-conditions.seeingProfile`, `seeing.seeingCanLimit`                       | podpięte (etap 2) — z powiększenia zestawu (≥ 80x), bez nowego pola w profilu                 |
+| (3) Trzy stany celu w arkuszu: puste / widziałem / nie wyszło                              | `Outcome = 'seen' \| 'failed'`                                                  | podpięte (etap 3)                                                                             |
+| (3) Powód „nie wyszło" z listy: rosa · chmury · zmęczenie · sprzęt · zwinąłem · inne       | `TargetObservation.reason`, `customReasons`                                     | podpięte (etap 3) — dziennik v2                                                               |
+| (3) „Rosa wyprzedziła prognozę o godzinę. Podnieść próg zapasu do 3 K?"                    | `dewThresholdSuggestion`                                                        | podpięte (etap 3) — bez „o godzinę", bo odhaczenia nie niosą jeszcze czasu (`seenAt`, etap 4) |
+| (3) Szkic wpisu istnieje od pierwszego odhaczenia i przeżywa zamknięcie arkusza            | `saveNightLog` przy każdej zmianie w arkuszu                                    | podpięte (etap 3) — odhaczenia z panelu celu dojdą w etapie 4                                 |
+| (4) Panel celu poza sesją: „Pokrywa się z oknem tylko na 2 h 30 min"                       | `skyPathOverNight` ∩ okno nocy                                                  | jest — zdanie do dopisania w `session-text`                                                   |
+| (4) „W tym zestawie: pow. 81× okularem 25 mm · pole 36′"                                   | `optics.ts`                                                                     | **DO ZROBIENIA**: sprawdzić, czy profil zna okular; jeśli nie — pole okularu                  |
+| (4) Pusta historia: „Jeszcze nie widziany. Po zapisaniu nocy pojawi się tu pierwszy wpis." | `journal.historyOf`                                                             | **UI**                                                                                        |
+| (5) „Ta noc nie przechodzi już progów, a jej rezerwacja wciąż jest w kalendarzu."          | `unbookedNights` odwrotnie: wpis bez werdyktu „jedź"                            | **DO ZROBIENIA**: wykrycie rezerwacji nocy, która spadła poniżej progów                       |
+| (9) Zasięg trzystanowy w trybie czerwonym: w zasięgu / graniczny / poza                    | `optics.ts` zwraca tak/nie                                                      | **DO ZROBIENIA**: próg „graniczny" w rachunku zasięgu                                         |
 
 Rozstrzygnięcie projektu: Dziennik bez segmentów (tura 14) zastępuje „Dziennik › Ta noc / Miesiąc /
 Historia" z tury 4c; zapisany wpis czyta się jako Wpis nocy (14b).
@@ -246,32 +255,32 @@ komponenty z `src/components`. `grep -rn "todo(" app src` ma zwrócić pusto.
 
 ## Zbiorczo: czego brakuje poza widokiem
 
-| #   | Brak                                                                                           | Etap |
-| --- | ---------------------------------------------------------------------------------------------- | ---- |
-| 1   | ~~Zdanie werdyktu w aplikacji~~ — zrobione: `session-text.narrateVerdict`                      | 1    |
-| 2   | ~~Treść ostatniego błędu w `ForecastState`~~ — już było: `cycle.lastError`                     | 1    |
-| 3   | ~~Ręczne odświeżenie prognozy~~ — już było; dodana blokada 30 min po 429 (`rateLimitCooldown`) | 1    |
-| 4   | ~~Opady w godzinach prognozy~~ — już były w `NightHour`                                        | 2    |
-| 5   | Powód przerwania nocy w `NightLog`                                                             | 3    |
-| 6   | Udostępnianie eksportu (`expo-sharing`)                                                        | 3    |
-| 7   | Godzina odhaczenia celu (`seenAt`)                                                             | 4    |
-| 8   | Cele dopisane ręcznie do planu nocy                                                            | 4    |
-| 9   | Notatki przy miejscówce (do sprawdzenia)                                                       | 6    |
-| 10  | Pobranie prognozy tylko dla brakujących miejsc                                                 | 6    |
-| 11  | Rezerwacja nocy zjawiska bez planu — decyzja                                                   | 7    |
-| 12  | Wyciszanie pojedynczego zjawiska                                                               | 7    |
-| 13  | Kategorie powiadomień                                                                          | 7    |
-| 14  | Pora przeglądu zjawisk (do sprawdzenia)                                                        | 7    |
-| 15  | Lista prognoz w pamięci                                                                        | 8    |
-| 16  | Gwiazdozbiór i opis przy obiekcie głębokiego nieba                                             | 8    |
-| 17  | Najlepszy miesiąc i górowanie jako funkcja domeny                                              | 8    |
-| 18  | Prawdziwe kształty gwiazdozbiorów (`figure`)                                                   | 8    |
-| 19  | Kąt obrotu gwiazdozbioru nad horyzontem                                                        | 8    |
-| 20  | Żyroskop (`expo-sensors`)                                                                      | 8    |
-| 21  | Kontekst motywu dla trybu czerwonego                                                           | 9    |
-| 22  | Jasność ekranu (`expo-brightness`)                                                             | 9    |
-| 23  | Gest trzech palców                                                                             | 9    |
-| 24  | Automatyczny tryb czerwony po zmierzchu                                                        | 9    |
+| #   | Brak                                                                                            | Etap |
+| --- | ----------------------------------------------------------------------------------------------- | ---- |
+| 1   | ~~Zdanie werdyktu w aplikacji~~ — zrobione: `session-text.narrateVerdict`                       | 1    |
+| 2   | ~~Treść ostatniego błędu w `ForecastState`~~ — już było: `cycle.lastError`                      | 1    |
+| 3   | ~~Ręczne odświeżenie prognozy~~ — już było; dodana blokada 30 min po 429 (`rateLimitCooldown`)  | 1    |
+| 4   | ~~Opady w godzinach prognozy~~ — już były w `NightHour`                                         | 2    |
+| 5   | ~~Powód przerwania nocy w `NightLog`~~ — wynika z powodów celów (`packedUp`), bez osobnego pola | 3    |
+| 6   | Udostępnianie eksportu (`expo-sharing`) — moduł natywny, wymaga nowego buildu                   | 3    |
+| 7   | Godzina odhaczenia celu (`seenAt`)                                                              | 4    |
+| 8   | Cele dopisane ręcznie do planu nocy                                                             | 4    |
+| 9   | Notatki przy miejscówce (do sprawdzenia)                                                        | 6    |
+| 10  | Pobranie prognozy tylko dla brakujących miejsc                                                  | 6    |
+| 11  | Rezerwacja nocy zjawiska bez planu — decyzja                                                    | 7    |
+| 12  | Wyciszanie pojedynczego zjawiska                                                                | 7    |
+| 13  | Kategorie powiadomień                                                                           | 7    |
+| 14  | Pora przeglądu zjawisk (do sprawdzenia)                                                         | 7    |
+| 15  | Lista prognoz w pamięci                                                                         | 8    |
+| 16  | Gwiazdozbiór i opis przy obiekcie głębokiego nieba                                              | 8    |
+| 17  | Najlepszy miesiąc i górowanie jako funkcja domeny                                               | 8    |
+| 18  | Prawdziwe kształty gwiazdozbiorów (`figure`)                                                    | 8    |
+| 19  | Kąt obrotu gwiazdozbioru nad horyzontem                                                         | 8    |
+| 20  | Żyroskop (`expo-sensors`)                                                                       | 8    |
+| 21  | Kontekst motywu dla trybu czerwonego                                                            | 9    |
+| 22  | Jasność ekranu (`expo-brightness`)                                                              | 9    |
+| 23  | Gest trzech palców                                                                              | 9    |
+| 24  | Automatyczny tryb czerwony po zmierzchu                                                         | 9    |
 
 ## Otwarte pytania z projektu
 
