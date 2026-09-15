@@ -1,27 +1,39 @@
 import { useEffect, useState } from 'react';
 import { AppState } from 'react-native';
 
+import { useBookingSite } from '@/hooks/use-booking-site';
+import { saveEntryTimeline } from '@/hooks/use-journal';
+import { formatTime } from '@/lib/date';
 import { bookingCalendar, googleAccessToken } from '@/lib/google-account';
 import { patchEventTimes } from '@/lib/google-calendar';
 import { nightLogId } from '@/lib/journal';
-import { loadJournal, saveTimeline } from '@/lib/journal-store';
+import { loadJournal } from '@/lib/journal-store';
+import { describeSegments } from '@/lib/plan-text';
 import {
+  STEP_LABELS,
+  TIMELINE_STEPS,
   adjustStep,
   calendarWindow,
+  lastStep,
   markSynced,
   needsCalendarSync,
+  nextStep,
   plannedFrom,
   plannedWindow,
   recordStep,
+  segmentMinutes,
   undoLastStep,
   type SessionTimeline,
   type TimelineStep,
 } from '@/lib/session-timeline';
-import { useBookingSite } from '@/hooks/use-booking-site';
+import { formatDuration } from '@/lib/session-text';
 import { useGoogle } from '@/store/google';
 import { useSettings } from '@/store/settings';
 
 type Plan = { departAt: Date; returnAt: Date } | null;
+
+/** Krok poprawki godziny. Pięć minut — tyle zwykle dzieli dotknięcie od faktu. */
+const ADJUST_MINUTES = 5;
 
 /**
  * Przebieg trwającej nocy: odczyt z dziennika, zapis kolejnych kroków
@@ -90,9 +102,9 @@ export function useSessionTimeline({
 
   const persist = async (next: SessionTimeline) => {
     // Najpierw ekran, potem dysk: dotknięcie w rękawicach ma dać natychmiastowy
-    // skutek, a zapis nie może go opóźniać.
+    // skutek, a zapis nie może go opóźniać. Zapis powiadamia Dziennik.
     setState({ nightId, timeline: next });
-    setFailed((await saveTimeline(nightBase, next)) === null);
+    setFailed((await saveEntryTimeline(nightBase, next)) === null);
   };
 
   useEffect(() => {
@@ -121,7 +133,7 @@ export function useSessionTimeline({
 
       const synced = markSynced(timeline);
       setState({ nightId, timeline: synced });
-      await saveTimeline(nightBase, synced);
+      await saveEntryTimeline(nightBase, synced);
     })();
 
     return () => {
@@ -132,20 +144,50 @@ export function useSessionTimeline({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connected, timeline, attempt, bookingId, config.calendar.bookingCalendarId]);
 
+  const now = new Date();
+  const next = nextStep(timeline);
+  const last = lastStep(timeline);
+  const segments = timeline ? segmentMinutes(timeline) : null;
+
   return {
     loaded,
-    timeline,
     failed,
+    adjustMinutes: ADJUST_MINUTES,
+    /** Etykieta dużego przycisku — kolejny krok; `null`, gdy noc jest zamknięta. */
+    next: next ? STEP_LABELS[next].action : null,
+    steps: timeline
+      ? TIMELINE_STEPS.flatMap((step) => {
+          const at = timeline[step];
+          if (!at) return [];
+          return [
+            {
+              step,
+              label: STEP_LABELS[step].done,
+              time: formatTime(new Date(at)),
+              canEarlier: adjustStep(timeline, step, -ADJUST_MINUTES, now) !== null,
+              canLater: adjustStep(timeline, step, ADJUST_MINUTES, now) !== null,
+            },
+          ];
+        })
+      : [],
+    summary:
+      !next && segments && segments.total !== null
+        ? `Od wyjazdu do powrotu ${formatDuration(segments.total)}.`
+        : null,
+    detail: segments ? describeSegments(segments) || null : null,
+    planned: timeline?.planned
+      ? `Plan z chwili wyjazdu: ${formatTime(new Date(timeline.planned.departAt))} → ${formatTime(new Date(timeline.planned.returnAt))}`
+      : null,
+    undoLabel: last ? `Cofnij: ${STEP_LABELS[last].done.toLowerCase()}` : null,
+    pendingSync: connected === true && needsCalendarSync(timeline),
     record: () => void persist(recordStep(timeline, new Date(), plannedFrom(plan, window))),
     undo: () => {
       if (timeline) void persist(undoLastStep(timeline, new Date()));
     },
     adjust: (step: TimelineStep, minutes: number) => {
       if (!timeline) return;
-      const next = adjustStep(timeline, step, minutes, new Date());
-      if (next) void persist(next);
+      const moved = adjustStep(timeline, step, minutes, new Date());
+      if (moved) void persist(moved);
     },
-    canAdjust: (step: TimelineStep, minutes: number) =>
-      timeline !== null && adjustStep(timeline, step, minutes, new Date()) !== null,
   };
 }

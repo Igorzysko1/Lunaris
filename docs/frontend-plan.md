@@ -142,18 +142,21 @@ zniknęły z `src/mock/night.ts`; zostały tylko Plan, noc w trakcie i ostrzeże
 
 ### Etap 5 — Noc › Plan i rezerwacja
 
-| Element                                                      | Źródło                                                                                                | Status                                                                                |
-| ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| Przebieg nocy: wyjazd, parking, sesja, powrót, początek dnia | `night-plan.planNights`                                                                               | jest                                                                                  |
-| Sen, min. temperatura, odczuwalna                            | `PlannedNight.minTemperature`, `feltTemperature`                                                      | jest                                                                                  |
-| Ostrzeżenia                                                  | `session-text.describeWarning`                                                                        | jest                                                                                  |
-| Zarezerwuj / Zaktualizuj wpis / Odwołaj sesję                | `session-booking.bookingFor`, `google-calendar.upsertBooking`, `deleteBooking` (jak `BookingButtons`) | jest                                                                                  |
-| Brak konta Google → „Połącz Kalendarz Google"                | `google-account.isGoogleConnected`, `GOOGLE_AVAILABLE`                                                | jest                                                                                  |
-| Noc w trakcie: odhaczenia, „co dalej dziś", „zapisz noc"     | `session-timeline`, `moon`, etap 3 i 4                                                                | jest — `seenAt` od etapu 4                                                            |
-| Cele dopisane do planu w opisie rezerwacji                   | `night-picks` + `PlannedNight.targets`                                                                | **DO ZROBIENIA**: `planNights` dobiera cele sam — dołożyć wybór przed `rankedTargets` |
-| Tryb sesji (nocleg w terenie)                                | `config.session.overnight`                                                                            | jest — otwarte pytanie projektu: czy zmienia Plan na tyle, żeby dostać osobny segment |
+| Element                                                                         | Źródło                                                                                   | Status                                                                                                                                                          |
+| ------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Przebieg nocy: bloki dojazd / sesja / powrót / sen, kroki od wyjazdu do pobudki | `plan-text.planSchedule` z `PlannedNight`, `useNightPlan`                                | podpięte — bez punktu startowego plan nie udaje drogi („wyjazd", „koniec wyjazdu"); ostatni krok to pobudka z planu, a nie „zakładany początek dnia" z projektu |
+| Sen, min. temperatura, odczuwalna                                               | `planSchedule` (`minTemperature`, `feltTemperature`, `sleepHours`)                       | podpięte — odczuwalna tylko przy różnicy ≥ 1 °C, sen bursztynowy przy „śnie na styk"                                                                            |
+| Ostrzeżenia                                                                     | `session-text.describeWarning`                                                           | podpięte — dosłownie; ton z rodzaju ostrzeżenia, trzecia doba jako uwaga                                                                                        |
+| Zarezerwuj / Zaktualizuj wpis / Odwołaj sesję                                   | `useBooking` (logika z `BookingButtons`), `bookingFor`, `upsertBooking`, `deleteBooking` | podpięte — wpis obejmuje cały wyjazd; odwołanie pyta jeszcze raz                                                                                                |
+| Brak konta Google → „Połącz Kalendarz Google"                                   | `useGoogle`                                                                              | podpięte — łączy od razu z Planu; bez logowania w środowisku (Expo Go) przycisków nie ma                                                                        |
+| Noc w trakcie: odhaczenia, „co dalej dziś", „zapisz noc"                        | lista Nieba z `seenAt`, `plan-text.tonightAhead`, `sky-text.describeSettingSoon`         | podpięte — „zachodzi za 2 h 1 min — teraz albo nigdy" od 150 min przed zachodem                                                                                 |
+| Przebieg w terenie: wyjazd, na miejscu, zwijanie, w domu                        | `useSessionTimeline`                                                                     | podpięte — przeniesione ze starej Nocy; zapis powiadamia Dziennik, godziny idą do wpisu w kalendarzu                                                            |
+| Cele dopisane do planu w opisie rezerwacji                                      | lista Nieba (`night-picks`) → `bookingFor({ targets })`                                  | podpięte — bez zmiany `planNights`                                                                                                                              |
+| „Ta noc nie przechodzi już progów, a jej rezerwacja wciąż jest w kalendarzu."   | `fetchBooking` + `bookingFor` → `null`                                                   | było w `BookingButtons` — przeniesione                                                                                                                          |
+| Tryb sesji (nocleg w terenie)                                                   | `config.session.overnight`                                                               | jest w silniku; otwarte pytanie projektu o osobny segment — widok bez zmian                                                                                     |
 
-Po etapie znika sekcja „Nadchodzące sesje" ze starej Nocy.
+Usunięte: sekcja „Nadchodzące sesje" ze starej Nocy, `src/components/{BookingButtons,SessionTimeline,session-cards}.tsx`,
+`src/mock/night.ts` i przełącznik makiety „Kalendarz Google". Zostaje przełącznik „noc w trakcie".
 
 ### Uzupełnienia z pełnego pliku projektu (tury 2–6)
 
@@ -172,7 +175,7 @@ i należą do etapów w nawiasach.
 | (4) Panel celu poza sesją: „Pokrywa się z oknem tylko na 2 h 30 min"                       | `sky-text.describeShortOverlap`                                                 | podpięte (etap 4) — zdanie mówi też, co zrobić: złapać na początku, zostawić na koniec                                                |
 | (4) „W tym zestawie: pow. 81× okularem 25 mm · pole 36′"                                   | `sky-text.describeOpticsReach`                                                  | podpięte bez okularu (etap 4) — profil zna powiększenie i pole, nie okular; **DO ZROBIENIA** w etapie 8, jeśli okular ma być widoczny |
 | (4) Pusta historia: „Jeszcze nie widziany. Po zapisaniu nocy pojawi się tu pierwszy wpis." | `journal-text.sightingsOf`                                                      | podpięte (etap 4)                                                                                                                     |
-| (5) „Ta noc nie przechodzi już progów, a jej rezerwacja wciąż jest w kalendarzu."          | `unbookedNights` odwrotnie: wpis bez werdyktu „jedź"                            | **DO ZROBIENIA**: wykrycie rezerwacji nocy, która spadła poniżej progów                                                               |
+| (5) „Ta noc nie przechodzi już progów, a jej rezerwacja wciąż jest w kalendarzu."          | `fetchBooking` + `bookingFor` → `null`                                          | podpięte (etap 5) — wykrycie było już w `BookingButtons`                                                                              |
 | (9) Zasięg trzystanowy w trybie czerwonym: w zasięgu / graniczny / poza                    | `optics.ts` zwraca tak/nie                                                      | **DO ZROBIENIA**: próg „graniczny" w rachunku zasięgu                                                                                 |
 
 Rozstrzygnięcie projektu: Dziennik bez segmentów (tura 14) zastępuje „Dziennik › Ta noc / Miesiąc /
@@ -260,32 +263,32 @@ komponenty z `src/components`. `grep -rn "todo(" app src` ma zwrócić pusto.
 
 ## Zbiorczo: czego brakuje poza widokiem
 
-| #   | Brak                                                                                            | Etap |
-| --- | ----------------------------------------------------------------------------------------------- | ---- |
-| 1   | ~~Zdanie werdyktu w aplikacji~~ — zrobione: `session-text.narrateVerdict`                       | 1    |
-| 2   | ~~Treść ostatniego błędu w `ForecastState`~~ — już było: `cycle.lastError`                      | 1    |
-| 3   | ~~Ręczne odświeżenie prognozy~~ — już było; dodana blokada 30 min po 429 (`rateLimitCooldown`)  | 1    |
-| 4   | ~~Opady w godzinach prognozy~~ — już były w `NightHour`                                         | 2    |
-| 5   | ~~Powód przerwania nocy w `NightLog`~~ — wynika z powodów celów (`packedUp`), bez osobnego pola | 3    |
-| 6   | Udostępnianie eksportu (`expo-sharing`) — moduł natywny, wymaga nowego buildu                   | 3    |
-| 7   | ~~Godzina odhaczenia celu~~ — zrobione: `TargetObservation.seenAt`, dziennik v3                 | 4    |
-| 8   | ~~Cele dopisane ręcznie do planu nocy~~ — zrobione: `night-picks`; do rezerwacji w etapie 5     | 4    |
-| 9   | Notatki przy miejscówce (do sprawdzenia)                                                        | 6    |
-| 10  | Pobranie prognozy tylko dla brakujących miejsc                                                  | 6    |
-| 11  | Rezerwacja nocy zjawiska bez planu — decyzja                                                    | 7    |
-| 12  | Wyciszanie pojedynczego zjawiska                                                                | 7    |
-| 13  | Kategorie powiadomień                                                                           | 7    |
-| 14  | Pora przeglądu zjawisk (do sprawdzenia)                                                         | 7    |
-| 15  | Lista prognoz w pamięci                                                                         | 8    |
-| 16  | Gwiazdozbiór i opis przy obiekcie głębokiego nieba                                              | 8    |
-| 17  | Najlepszy miesiąc i górowanie jako funkcja domeny                                               | 8    |
-| 18  | Prawdziwe kształty gwiazdozbiorów (`figure`)                                                    | 8    |
-| 19  | Kąt obrotu gwiazdozbioru nad horyzontem                                                         | 8    |
-| 20  | Żyroskop (`expo-sensors`)                                                                       | 8    |
-| 21  | Kontekst motywu dla trybu czerwonego                                                            | 9    |
-| 22  | Jasność ekranu (`expo-brightness`)                                                              | 9    |
-| 23  | Gest trzech palców                                                                              | 9    |
-| 24  | Automatyczny tryb czerwony po zmierzchu                                                         | 9    |
+| #   | Brak                                                                                                 | Etap |
+| --- | ---------------------------------------------------------------------------------------------------- | ---- |
+| 1   | ~~Zdanie werdyktu w aplikacji~~ — zrobione: `session-text.narrateVerdict`                            | 1    |
+| 2   | ~~Treść ostatniego błędu w `ForecastState`~~ — już było: `cycle.lastError`                           | 1    |
+| 3   | ~~Ręczne odświeżenie prognozy~~ — już było; dodana blokada 30 min po 429 (`rateLimitCooldown`)       | 1    |
+| 4   | ~~Opady w godzinach prognozy~~ — już były w `NightHour`                                              | 2    |
+| 5   | ~~Powód przerwania nocy w `NightLog`~~ — wynika z powodów celów (`packedUp`), bez osobnego pola      | 3    |
+| 6   | Udostępnianie eksportu (`expo-sharing`) — moduł natywny, wymaga nowego buildu                        | 3    |
+| 7   | ~~Godzina odhaczenia celu~~ — zrobione: `TargetObservation.seenAt`, dziennik v3                      | 4    |
+| 8   | ~~Cele dopisane ręcznie do planu nocy~~ — zrobione: `night-picks`, w opisie rezerwacji z listy Nieba | 4–5  |
+| 9   | Notatki przy miejscówce (do sprawdzenia)                                                             | 6    |
+| 10  | Pobranie prognozy tylko dla brakujących miejsc                                                       | 6    |
+| 11  | Rezerwacja nocy zjawiska bez planu — decyzja                                                         | 7    |
+| 12  | Wyciszanie pojedynczego zjawiska                                                                     | 7    |
+| 13  | Kategorie powiadomień                                                                                | 7    |
+| 14  | Pora przeglądu zjawisk (do sprawdzenia)                                                              | 7    |
+| 15  | Lista prognoz w pamięci                                                                              | 8    |
+| 16  | Gwiazdozbiór i opis przy obiekcie głębokiego nieba                                                   | 8    |
+| 17  | Najlepszy miesiąc i górowanie jako funkcja domeny                                                    | 8    |
+| 18  | Prawdziwe kształty gwiazdozbiorów (`figure`)                                                         | 8    |
+| 19  | Kąt obrotu gwiazdozbioru nad horyzontem                                                              | 8    |
+| 20  | Żyroskop (`expo-sensors`)                                                                            | 8    |
+| 21  | Kontekst motywu dla trybu czerwonego                                                                 | 9    |
+| 22  | Jasność ekranu (`expo-brightness`)                                                                   | 9    |
+| 23  | Gest trzech palców                                                                                   | 9    |
+| 24  | Automatyczny tryb czerwony po zmierzchu                                                              | 9    |
 
 ## Otwarte pytania z projektu
 

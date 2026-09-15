@@ -76,6 +76,8 @@ export type NightVerdicts = {
   moments: NightMoment[];
   /** Najbliższa dobra noc inna niż wskazana — do żetonu przy „odpuść". */
   bestNight: (index: number) => number | null;
+  /** Noc, której przebieg zapisuje się na żywo (`liveNightIndex`); `-1`, gdy żadna. */
+  liveIndex: number;
   place: string;
   /** „Bortle 4 · policzone dla tego punktu" */
   placeNote: string;
@@ -202,6 +204,7 @@ export function useNightVerdicts(): NightVerdicts {
     nights,
     moments,
     bestNight,
+    liveIndex,
     place: active.label,
     placeNote: `Bortle ${active.bortle} · ${
       active.bortleSource === 'map' ? 'policzone dla tego punktu' : 'z najbliższej miejscowości'

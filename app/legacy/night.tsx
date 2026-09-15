@@ -17,9 +17,6 @@ import {
   SeeingCard,
 } from '@/components/night-cards';
 import { LightPollutionLink } from '@/components/LightPollutionLink';
-import { BookingButtons } from '@/components/BookingButtons';
-import { SessionTimeline } from '@/components/SessionTimeline';
-import { SessionCard, SessionsSkeleton } from '@/components/session-cards';
 import { Card, SectionLabel } from '@/components/primitives';
 import { dayBucket, formatLongDate, formatTime } from '@/lib/date';
 import { upcomingEvents } from '@/lib/events';
@@ -27,34 +24,19 @@ import { formatAge } from '@/lib/forecast-cache';
 import { horizonOf } from '@/lib/horizon';
 import { constellationsTonight } from '@/lib/constellations';
 import { currentNightWindow } from '@/lib/night-window';
-import { bookingFor, bookingId } from '@/lib/session-booking';
-import { liveNightIndex } from '@/lib/session-timeline';
-import { nightTargetsForProfiles, rankedTargets } from '@/lib/sky-targets';
+import { nightTargetsForProfiles } from '@/lib/sky-targets';
 import { useApod } from '@/hooks/use-apod';
-import { useBookingSite } from '@/hooks/use-booking-site';
-import { useSessions } from '@/hooks/use-sessions';
 import { useNightData } from '@/hooks/use-night-data';
 import { useForecast } from '@/store/forecast';
 import { useSettings } from '@/store/settings';
 import { HAIRLINE, colors, fonts, radius, touchSlop } from '@/theme';
 
-/** Ile celów wymieniamy w opisie rezerwacji — tyle, ile czyta się w aucie. */
-const TARGETS_IN_BOOKING = 5;
-
 export default function NightScreen() {
   const router = useRouter();
   const { active, config } = useSettings();
-  const bookingSite = useBookingSite();
   const { status, data, savedAt, stale, failure, refresh, refreshing } = useNightData(
     active.coords,
     active.bortle,
-  );
-  const sessions = useSessions(active.coords, active.bortle, config, active.walkMinutes);
-  // Przebieg na żywo tylko przy nocy, która trwa albo zaraz się zacznie —
-  // pozostałe karty nie mają czego mierzyć.
-  const liveIndex = liveNightIndex(
-    sessions.sessions.map((session) => session.verdict.night),
-    new Date(),
   );
   const { cycle } = useForecast();
   // Ozdoba, nie dana wejściowa: `null` znaczy „nie ma karty", a nie „błąd".
@@ -245,44 +227,6 @@ export default function NightScreen() {
                   </View>
                   <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
                 </Pressable>
-
-                <SectionLabel style={styles.sessionsLabel}>
-                  {(sessions.savedAt
-                    ? `Nadchodzące sesje · z prognozy ${formatAge(sessions.savedAt)}`
-                    : 'Nadchodzące sesje') + (sessions.calendar ? ' · z kalendarzem' : '')}
-                </SectionLabel>
-                {sessions.status === 'loading' && <SessionsSkeleton />}
-                {sessions.status === 'ready' &&
-                  sessions.sessions.map((session, index) => (
-                    <SessionCard
-                      key={session.verdict.night.from.toISOString()}
-                      session={session}
-                      locationLabel={active.label}
-                      footer={
-                        <>
-                          {index === liveIndex && (
-                            <SessionTimeline
-                              night={session.verdict.night}
-                              plan={session.verdict.plan}
-                              window={session.verdict.window}
-                              bookingId={bookingId(session.verdict.night, bookingSite.id)}
-                            />
-                          )}
-                          <BookingButtons
-                            bookingId={bookingId(session.verdict.night, bookingSite.id)}
-                            booking={bookingFor({
-                              verdict: session.verdict,
-                              site: bookingSite,
-                              rating: session.rating,
-                              targets: rankedTargets(session.targets, TARGETS_IN_BOOKING).map(
-                                (t) => t.name,
-                              ),
-                            })}
-                          />
-                        </>
-                      }
-                    />
-                  ))}
 
                 <SectionLabel style={styles.eventLabel}>Następny event</SectionLabel>
                 <EventCard
@@ -481,10 +425,6 @@ const styles = StyleSheet.create({
     color: colors.purple,
   },
   eventLabel: {
-    marginBottom: 8,
-  },
-  sessionsLabel: {
-    marginTop: 4,
     marginBottom: 8,
   },
 });

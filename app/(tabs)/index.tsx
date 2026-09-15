@@ -1,10 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Fragment, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { useBooking, type BookingView } from '@/hooks/use-booking';
 import { useKnownTonight } from '@/hooks/use-known-tonight';
 import { useNightConditions } from '@/hooks/use-night-conditions';
+import { useNightPlan } from '@/hooks/use-night-plan';
 import { useNightSky, type SkyView } from '@/hooks/use-night-sky';
 import {
   useNightVerdicts,
@@ -12,9 +14,10 @@ import {
   type NightMoment,
   type NightVerdicts,
 } from '@/hooks/use-night-verdicts';
+import { useSessionTimeline } from '@/hooks/use-session-timeline';
 import { plural } from '@/lib/journal-text';
+import { STALE_BOOKING } from '@/lib/plan-text';
 import type { Narration } from '@/lib/session-text';
-import { BOOKING_WARNING, LIVE, PLAN } from '@/mock/night';
 import { useMock } from '@/mock/state';
 import { colors, fonts, hexA } from '@/theme';
 import {
@@ -32,7 +35,6 @@ import {
   Segments,
   Stat,
   Strong,
-  todo,
   type Tone,
 } from '@/ui/kit';
 import { BlockedBar, HourBars, ProgressBar, WindowBar, pct } from '@/ui/night';
@@ -52,8 +54,8 @@ type Live = NonNullable<NightMoment['live']>;
  * selektor nocy zmienia cały widok zakładki. Warunki mówią, jaka będzie noc,
  * Niebo — co w niej widać, Plan — co to znaczy dla mnie.
  *
- * Podpięte: werdykt i selektor nocy (etap 1), Warunki (etap 2), Niebo i cele
- * Planu (etap 4). Reszta Planu jest jeszcze makietą (etap 5).
+ * Podpięte: werdykt i selektor nocy (etap 1), Warunki (etap 2), Niebo (etap 4),
+ * Plan z rezerwacją i nocą w trakcie (etap 5).
  */
 export default function NightScreen() {
   const params = useLocalSearchParams<{ segment?: string }>();
@@ -162,9 +164,14 @@ function NightView({
       ) : null}
       {segment === 'plan' ? (
         live ? (
-          <LivePlan onTarget={openTarget} />
+          <LivePlan card={card} sky={sky} onTarget={openTarget} />
         ) : (
-          <Plan go={card.go} sky={sky} onTarget={openTarget} />
+          <Plan
+            card={card}
+            tonight={index === verdicts.liveIndex}
+            sky={sky}
+            onTarget={openTarget}
+          />
         )
       ) : null}
     </Screen>
@@ -620,90 +627,115 @@ function blockColor(tone: Tone) {
   return 'rgba(255,255,255,0.08)';
 }
 
+/**
+ * 9a: Plan — „co to dla mnie znaczy". Przebieg doby od wyjazdu do pobudki, sen
+ * i zimno, ostrzeżenia, cele tej nocy i rezerwacja całego wyjazdu.
+ */
 function Plan({
-  go,
+  card,
+  tonight,
   sky,
   onTarget,
 }: {
-  go: boolean;
+  card: NightCard;
+  /** Noc, której przebieg zapisuje się na żywo — tylko przy niej „W terenie". */
+  tonight: boolean;
   sky: SkyView;
   onTarget: (id: string) => void;
 }) {
-  const { googleConnected } = useMock();
+  const plan = useNightPlan(card);
+  const booking = useBooking(
+    card,
+    sky.targets.map((target) => target.name),
+  );
   const [expanded, setExpanded] = useState(false);
-  const [booked, setBooked] = useState(false);
   const shown = expanded ? sky.targets : sky.targets.slice(0, 2);
   const hidden = sky.targets.length - shown.length;
+  const { schedule } = plan;
 
   return (
     <>
-      <Panel>
-        <Label flush>Przebieg nocy</Label>
-        <Text style={styles.rowSubtitle}>{PLAN.summary}</Text>
-        <View style={styles.blocks}>
-          {PLAN.blocks.map((block) => (
-            <View
-              key={block.label}
-              style={[
-                styles.block,
-                { flex: block.minutes, backgroundColor: blockColor(block.tone) },
-              ]}
-            >
-              <Text
-                numberOfLines={1}
-                style={[styles.blockLabel, block.tone === 'go' && styles.bold]}
-              >
-                {block.label}
-              </Text>
+      {schedule ? (
+        <>
+          <Panel>
+            <Label flush>Przebieg nocy</Label>
+            <Text style={styles.rowSubtitle}>{schedule.summary}</Text>
+            <View style={styles.blocks}>
+              {schedule.blocks.map((block) => (
+                <View
+                  key={block.label}
+                  style={[
+                    styles.block,
+                    { flex: block.minutes, backgroundColor: blockColor(block.tone) },
+                  ]}
+                >
+                  <Text
+                    numberOfLines={1}
+                    style={[styles.blockLabel, block.tone === 'go' && styles.bold]}
+                  >
+                    {block.label}
+                  </Text>
+                </View>
+              ))}
             </View>
-          ))}
-        </View>
-        <View style={styles.axis}>
-          {PLAN.axis.map((tick) => (
-            <Text
-              key={tick.label}
-              style={[
-                styles.axisLabel,
-                tick.at === 1 ? styles.axisEnd : { left: pct(tick.at) },
-                tick.at > 0 && tick.at < 1 && styles.axisMiddle,
-              ]}
-            >
-              {tick.label}
-            </Text>
-          ))}
-        </View>
-        <View style={styles.hairline} />
-        {PLAN.steps.map((step) => (
-          <View key={step.time + step.text} style={styles.step}>
-            <Text style={[styles.stepTime, step.session && styles.go]}>{step.time}</Text>
-            <Text style={[styles.stepText, step.session && styles.go]}>{step.text}</Text>
-          </View>
-        ))}
-      </Panel>
+            <View style={styles.axis}>
+              {schedule.axis.map((tick) => (
+                <Text
+                  key={`${tick.at}-${tick.label}`}
+                  style={[
+                    styles.axisLabel,
+                    tick.at === 1 ? styles.axisEnd : { left: pct(tick.at) },
+                    tick.at > 0 && tick.at < 1 && styles.axisMiddle,
+                  ]}
+                >
+                  {tick.label}
+                </Text>
+              ))}
+            </View>
+            <View style={styles.hairline} />
+            {schedule.steps.map((step) => (
+              <View key={`${step.time}-${step.text}`} style={styles.step}>
+                <Text style={[styles.stepTime, step.session && styles.go]}>{step.time}</Text>
+                <Text style={[styles.stepText, step.session && styles.go]}>{step.text}</Text>
+              </View>
+            ))}
+          </Panel>
 
-      <Panel>
-        <Label flush>Co z tego wychodzi</Label>
-        <View style={styles.stats}>
-          {PLAN.outcomes.map((outcome) => (
-            <Stat
-              key={outcome.label}
-              label={outcome.label}
-              value={outcome.value}
-              tone={outcome.tone}
-              style={styles.flex}
-            />
-          ))}
-        </View>
-      </Panel>
+          <Panel>
+            <Label flush>Co z tego wychodzi</Label>
+            <View style={styles.stats}>
+              {schedule.outcomes.map((outcome) => (
+                <Stat
+                  key={outcome.label}
+                  label={outcome.label}
+                  value={outcome.value}
+                  tone={outcome.tone}
+                  style={styles.flex}
+                />
+              ))}
+            </View>
+          </Panel>
 
-      <Label>Ostrzeżenia</Label>
-      {PLAN.warnings.map((warning) => (
-        <Notice key={warning.text} mark={warning.mark} tone={warning.tone}>
-          {warning.text}
-        </Notice>
-      ))}
+          {schedule.warnings.length > 0 ? (
+            <>
+              <Label>Ostrzeżenia</Label>
+              {schedule.warnings.map((warning) => (
+                <Notice key={warning.text} mark={warning.mark} tone={warning.tone}>
+                  {warning.text}
+                </Notice>
+              ))}
+            </>
+          ) : null}
+        </>
+      ) : (
+        <Panel dashed>
+          <Body>{plan.noPlan}</Body>
+        </Panel>
+      )}
 
-      <Label right={`${sky.targets.length} · kolejność z segmentu Niebo`}>Cele na tę noc</Label>
+      {sky.targets.length > 0 ? (
+        <Label right={`${sky.targets.length} · kolejność z segmentu Niebo`}>Cele na tę noc</Label>
+      ) : null}
       {shown.map((target) => (
         <Panel key={target.id} onPress={() => onTarget(target.id)} style={styles.rowPanel}>
           <Text style={[styles.rowTitle, styles.flex]}>{target.name}</Text>
@@ -724,83 +756,199 @@ function Plan({
         />
       ) : null}
 
-      {!googleConnected ? (
-        <MenuRow
-          title="Połącz Kalendarz Google, żeby zarezerwować"
-          onPress={() => router.push('/legacy/settings')}
-        />
-      ) : booked ? (
-        <>
-          {go ? null : <Notice>{BOOKING_WARNING}</Notice>}
-          <View style={styles.row}>
-            <Button
-              label="Zaktualizuj wpis"
-              icon="refresh"
-              tone="teal"
-              onPress={() => todo('Aktualizacja rezerwacji w Kalendarzu Google')}
-              style={styles.flex}
-            />
-            <Button
-              label="Odwołaj sesję"
-              icon="close"
-              tone="bad"
-              onPress={() => setBooked(false)}
-              style={styles.flex}
-            />
-          </View>
-        </>
-      ) : (
-        <Button
-          label="Zarezerwuj w kalendarzu"
-          icon="square-outline"
-          tone="teal"
-          onPress={() => setBooked(true)}
-        />
-      )}
-      <Note>{PLAN.bookingNote}</Note>
+      {tonight ? <TimelinePanel card={card} bookingId={plan.bookingId} /> : null}
+      <BookingActions booking={booking} />
+      {schedule && !booking.hidden && (booking.canBook || booking.booked) ? (
+        <Note>{schedule.bookingNote}</Note>
+      ) : null}
     </>
   );
 }
 
-/** 9b: noc w trakcie — lista odhaczeń z paneli celów i to, co jeszcze dziś czeka. */
-function LivePlan({ onTarget }: { onTarget: (id: string) => void }) {
+/** Rezerwacja całego wyjazdu — zawsze na przycisk; odwołanie pyta jeszcze raz. */
+function BookingActions({ booking }: { booking: BookingView }) {
+  if (booking.hidden) return null;
+
+  if (!booking.connected) {
+    return booking.canBook ? (
+      <MenuRow
+        title="Połącz Kalendarz Google, żeby zarezerwować"
+        value={booking.connecting ? 'łączę…' : undefined}
+        onPress={booking.connect}
+      />
+    ) : null;
+  }
+
+  if (!booking.canBook && !booking.booked) return null;
+
   return (
     <>
-      <Label tone="go" right={LIVE.checked}>
+      {booking.stale ? <Notice>{STALE_BOOKING}</Notice> : null}
+      <View style={styles.row}>
+        {booking.canBook ? (
+          <Button
+            label={booking.booked ? 'Zaktualizuj wpis' : 'Zarezerwuj w kalendarzu'}
+            icon={booking.booked ? 'refresh' : 'calendar-outline'}
+            tone="teal"
+            disabled={booking.busy || booking.checking}
+            onPress={booking.book}
+            style={styles.flex}
+          />
+        ) : null}
+        {booking.canCancel ? (
+          <Button
+            label="Odwołaj sesję"
+            icon="close"
+            tone="bad"
+            disabled={booking.busy}
+            onPress={() =>
+              Alert.alert('Odwołać sesję?', 'Wpis tej nocy zniknie z Kalendarza Google.', [
+                { text: 'Zostaw', style: 'cancel' },
+                { text: 'Odwołaj', style: 'destructive', onPress: booking.cancel },
+              ])
+            }
+            style={styles.flex}
+          />
+        ) : null}
+      </View>
+      {booking.checking ? <Note>Sprawdzam, czy ta noc jest już w kalendarzu…</Note> : null}
+      {booking.message ? (
+        <Notice
+          tone={booking.message.error ? 'bad' : 'go'}
+          mark={booking.message.error ? '!' : '✓'}
+        >
+          {booking.message.text}
+        </Notice>
+      ) : null}
+    </>
+  );
+}
+
+/**
+ * Przebieg nocy w terenie — jeden duży przycisk na raz. Po ciemku i w rękawicach,
+ * więc bez wpisywania: przycisk proponuje kolejny krok, pomyłki poprawia się
+ * cofnięciem albo przesunięciem godziny o pięć minut. Zapis idzie do dziennika,
+ * a godziny — do wpisu w kalendarzu, gdy jest zasięg.
+ */
+function TimelinePanel({ card, bookingId }: { card: NightCard; bookingId: string }) {
+  const { verdict } = card.session;
+  const run = useSessionTimeline({
+    night: verdict.night,
+    plan: verdict.plan,
+    window: verdict.window,
+    bookingId,
+  });
+
+  if (!run.loaded) return null;
+
+  return (
+    <Panel>
+      <Label flush right="zapisuje się w dzienniku">
+        W terenie
+      </Label>
+      {run.next ? (
+        <Button label={run.next} variant="primary" tone="teal" onPress={run.record} />
+      ) : run.summary ? (
+        <Body>{run.summary}</Body>
+      ) : null}
+      {run.steps.map((step) => (
+        <View key={step.step} style={styles.timelineRow}>
+          <Text style={styles.stepTime}>{step.time}</Text>
+          <Text style={styles.stepText}>{step.label}</Text>
+          <Pressable
+            onPress={() => run.adjust(step.step, -run.adjustMinutes)}
+            disabled={!step.canEarlier}
+            accessibilityRole="button"
+            accessibilityLabel={`${step.label}: ${run.adjustMinutes} minut wcześniej`}
+            accessibilityState={{ disabled: !step.canEarlier }}
+            style={[styles.shift, !step.canEarlier && styles.disabled]}
+          >
+            <Text style={styles.shiftText}>−{run.adjustMinutes}</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => run.adjust(step.step, run.adjustMinutes)}
+            disabled={!step.canLater}
+            accessibilityRole="button"
+            accessibilityLabel={`${step.label}: ${run.adjustMinutes} minut później`}
+            accessibilityState={{ disabled: !step.canLater }}
+            style={[styles.shift, !step.canLater && styles.disabled]}
+          >
+            <Text style={styles.shiftText}>+{run.adjustMinutes}</Text>
+          </Pressable>
+        </View>
+      ))}
+      {run.detail ? <Note>{run.detail}</Note> : null}
+      {run.planned ? <Note>{run.planned}</Note> : null}
+      {run.undoLabel ? (
+        <Pressable onPress={run.undo} accessibilityRole="button" style={styles.undo}>
+          <Text style={styles.link}>{run.undoLabel}</Text>
+        </Pressable>
+      ) : null}
+      {run.failed ? (
+        <Notice tone="bad">
+          Nie udało się zapisać w dzienniku — poprzednie wpisy zostały nietknięte.
+        </Notice>
+      ) : null}
+      {run.pendingSync ? <Note>Kalendarz dostanie godziny, gdy wróci zasięg.</Note> : null}
+    </Panel>
+  );
+}
+
+/** 9b: noc w trakcie — odhaczenia z paneli celów, to, co jeszcze dziś czeka, i przebieg w terenie. */
+function LivePlan({
+  card,
+  sky,
+  onTarget,
+}: {
+  card: NightCard;
+  sky: SkyView;
+  onTarget: (id: string) => void;
+}) {
+  const plan = useNightPlan(card);
+
+  return (
+    <>
+      <Label tone="go" right={sky.checked}>
         Cele
       </Label>
-      {LIVE.targets.map((target) => (
+      {sky.targets.length === 0 ? (
+        <Note>Tej nocy żaden cel nie jest w zasięgu tego zestawu.</Note>
+      ) : null}
+      {sky.targets.map((target) => (
         <Panel
           key={target.id}
-          tone={target.seenAt ? 'go' : target.warning ? 'warn' : undefined}
+          tone={target.seen ? 'go' : target.setsSoon ? 'warn' : undefined}
           onPress={() => onTarget(target.id)}
           style={styles.rowPanel}
         >
-          <CheckBox checked={Boolean(target.seenAt)} />
+          <CheckBox checked={target.seen !== null} />
           <View style={styles.flex}>
             <Text style={styles.rowTitle}>{target.name}</Text>
-            {target.warning ? (
-              <Text style={[styles.rowSubtitle, styles.warn]}>{target.warning}</Text>
+            {target.setsSoon ? (
+              <Text style={[styles.rowSubtitle, styles.warn]}>{target.setsSoon}</Text>
             ) : null}
           </View>
-          {target.seenAt ? (
-            <Text style={styles.rowSubtitle}>{target.seenAt}</Text>
+          {target.seen ? (
+            <Text style={styles.rowSubtitle}>{target.seenTime ?? '✓'}</Text>
           ) : (
             <Text style={styles.chevron}>›</Text>
           )}
         </Panel>
       ))}
 
-      <Panel>
-        <Label flush>Co dalej dziś</Label>
-        {LIVE.next.map(([time, text]) => (
-          <View key={time} style={styles.step}>
-            <Text style={styles.stepTime}>{time}</Text>
-            <Text style={styles.stepText}>{text}</Text>
-          </View>
-        ))}
-      </Panel>
+      {plan.ahead.length > 0 ? (
+        <Panel>
+          <Label flush>Co dalej dziś</Label>
+          {plan.ahead.map((item) => (
+            <View key={`${item.time}-${item.text}`} style={styles.step}>
+              <Text style={styles.stepTime}>{item.time}</Text>
+              <Text style={styles.stepText}>{item.text}</Text>
+            </View>
+          ))}
+        </Panel>
+      ) : null}
 
+      <TimelinePanel card={card} bookingId={plan.bookingId} />
       <Button label="zapisz noc ▲" tone="accent" onPress={() => router.push('/close-night')} />
     </>
   );
@@ -1016,6 +1164,18 @@ const styles = StyleSheet.create({
   },
   errorMark: { fontFamily: fonts.monoSemiBold, fontSize: 18, color: colors.coral },
   bad: { color: colors.coral },
+  timelineRow: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 48 },
+  shift: {
+    minWidth: 44,
+    minHeight: 44,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  shiftText: { fontFamily: fonts.monoMedium, fontSize: 12.5, color: colors.purple },
+  undo: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
   teal: { color: colors.teal },
   urgent: { backgroundColor: colors.surface },
   urgentFill: { backgroundColor: colors.amber },

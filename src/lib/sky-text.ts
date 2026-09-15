@@ -98,6 +98,24 @@ export function describeAzimuth(azimuth: number): string {
   return `azymut ${degrees}° ${compassLabel(azimuth)}`;
 }
 
+/** Od ilu minut przed zachodem cel w nocy w trakcie dostaje „teraz albo nigdy". */
+const SETTING_SOON_MINUTES = 150;
+
+/**
+ * Noc w trakcie (9b): cel, który zaraz zachodzi — „zachodzi za 2 h 01 min — teraz
+ * albo nigdy". Po zachodzie sama godzina; `null`, gdy do zachodu jeszcze daleko
+ * albo cel tej nocy nie zachodzi.
+ */
+export function describeSettingSoon(up: UpSpan | null, now: Date): string | null {
+  if (!up?.sets) return null;
+
+  const minutes = Math.round((up.to.getTime() - now.getTime()) / 60_000);
+  if (minutes <= 0) return `zaszedł o ${formatTime(up.to)}`;
+  return minutes <= SETTING_SOON_MINUTES
+    ? `zachodzi za ${formatDuration(minutes)} — teraz albo nigdy`
+    : null;
+}
+
 /** Tytuł odhaczenia w panelu: „Widziałem — 23:04", a bez godziny samo „Widziałem". */
 export function seenTitle(seenAt: string | undefined): string {
   return seenAt ? `Widziałem — ${formatTime(new Date(seenAt))}` : 'Widziałem';

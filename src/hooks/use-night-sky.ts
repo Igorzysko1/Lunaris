@@ -5,6 +5,7 @@ import { DEEP_SKY_OBJECTS } from '@/data/deep-sky';
 import { useJournal } from '@/hooks/use-journal';
 import { useNightPicks } from '@/hooks/use-night-picks';
 import type { NightCard } from '@/hooks/use-night-verdicts';
+import { useNow } from '@/hooks/use-now';
 import { constellationsTonight } from '@/lib/constellations';
 import { formatTime } from '@/lib/date';
 import { upcomingEvents } from '@/lib/events';
@@ -13,7 +14,12 @@ import { historyOf, nightLogId } from '@/lib/journal';
 import { picksFor } from '@/lib/night-picks';
 import { isFirstTime, nextVisibleEvent, outOfReach, skyList } from '@/lib/night-sky';
 import { profileLabel } from '@/lib/optics';
-import { describeEventWhen, describeUpSpan, outOfReachTitle } from '@/lib/sky-text';
+import {
+  describeEventWhen,
+  describeSettingSoon,
+  describeUpSpan,
+  outOfReachTitle,
+} from '@/lib/sky-text';
 import { describeOutOfReach, nightTargetsForProfiles } from '@/lib/sky-targets';
 import { useSettings } from '@/store/settings';
 
@@ -37,6 +43,10 @@ export type SkyTargetRow = {
   firstTime: boolean;
   /** „widziany 23:04" — stan po odhaczeniu w panelu celu; `null`, gdy jeszcze nie. */
   seen: string | null;
+  /** Sama godzina odhaczenia — do listy odhaczeń w nocy w trakcie. */
+  seenTime: string | null;
+  /** „zachodzi za 2 h 01 min — teraz albo nigdy"; tylko przy celu jeszcze nieodhaczonym. */
+  setsSoon: string | null;
 };
 
 export type SkyView = {
@@ -49,6 +59,8 @@ export type SkyView = {
   /** Zestaw po dotknięciu „zmień". */
   nextProfileId: string;
   targets: SkyTargetRow[];
+  /** „2 z 5 odhaczone w panelach celów" */
+  checked: string;
   outOfReach: {
     title: string;
     rows: { id: string; name: string; why: string }[];
@@ -72,7 +84,8 @@ export function useNightSky(card: NightCard, profileId: string | null, enabled: 
   const { active, config } = useSettings();
   const { journal } = useJournal();
   const picks = useNightPicks();
-  const [now] = useState(() => new Date());
+  const [opened] = useState(() => new Date());
+  const now = useNow();
   const { lat, lon } = active.coords;
 
   const session = card.session.verdict.window;
@@ -112,9 +125,9 @@ export function useNightSky(card: NightCard, profileId: string | null, enabled: 
 
   const nextEvent = useMemo(() => {
     if (!enabled) return null;
-    const event = nextVisibleEvent(upcomingEvents(now, { lat, lon }), now);
-    return event ? describeEventWhen(event, now) : null;
-  }, [enabled, now, lat, lon]);
+    const event = nextVisibleEvent(upcomingEvents(opened, { lat, lon }), opened);
+    return event ? describeEventWhen(event, opened) : null;
+  }, [enabled, opened, lat, lon]);
 
   const history = useMemo(() => historyOf(journal), [journal]);
 
@@ -131,7 +144,8 @@ export function useNightSky(card: NightCard, profileId: string | null, enabled: 
   const seenOf = (id: string) => {
     const seen = tonight?.observations.find((o) => o.targetId === id && o.outcome === 'seen');
     if (!seen) return null;
-    return seen.seenAt ? `widziany ${formatTime(new Date(seen.seenAt))}` : 'widziany';
+    const time = seen.seenAt ? formatTime(new Date(seen.seenAt)) : null;
+    return { time, label: time ? `widziany ${time}` : 'widziany' };
   };
 
   return {
@@ -140,18 +154,22 @@ export function useNightSky(card: NightCard, profileId: string | null, enabled: 
     profiles,
     profile: current,
     nextProfileId: next.id,
-    targets: rows.map(({ target, urgent, picked }) => ({
-      id: target.id,
-      name: shortName(target.name),
-      meta: [target.detail, picked ? 'w planie' : null, seenOf(target.id)]
-        .filter(Boolean)
-        .join(' · '),
-      seen: seenOf(target.id),
-      window: describeUpSpan(target.up),
-      altitude: Math.round(target.maxAltitude),
-      urgent,
-      firstTime: isFirstTime(target, history.get(target.id), journal),
-    })),
+    targets: rows.map(({ target, urgent, picked }) => {
+      const seen = seenOf(target.id);
+      return {
+        id: target.id,
+        name: shortName(target.name),
+        meta: [target.detail, picked ? 'w planie' : null, seen?.label].filter(Boolean).join(' · '),
+        seen: seen?.label ?? null,
+        seenTime: seen?.time ?? null,
+        setsSoon: seen ? null : describeSettingSoon(target.up, now),
+        window: describeUpSpan(target.up),
+        altitude: Math.round(target.maxAltitude),
+        urgent,
+        firstTime: isFirstTime(target, history.get(target.id), journal),
+      };
+    }),
+    checked: `${rows.filter((row) => seenOf(row.target.id)).length} z ${rows.length} odhaczone w panelach celów`,
     outOfReach: {
       title: outOfReachTitle(out.length, current.label),
       rows: out.slice(0, OUT_OF_REACH_SHOWN).map((target) => ({

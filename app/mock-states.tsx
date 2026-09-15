@@ -26,24 +26,11 @@ export default function MockStatesScreen() {
         ))}
       </ChipRow>
 
-      <Label>Kalendarz Google</Label>
-      <ChipRow>
-        <Chip
-          label="połączony"
-          tone={mock.googleConnected ? 'accent' : 'neutral'}
-          onPress={() => mock.set({ googleConnected: true })}
-        />
-        <Chip
-          label="bez konta"
-          tone={mock.googleConnected ? 'neutral' : 'accent'}
-          onPress={() => mock.set({ googleConnected: false })}
-        />
-      </ChipRow>
-
       <Note>
-        Noc w trakcie zamienia segment Plan w listę odhaczeń i dodaje odhaczanie w panelu celu. Gdy
-        sesja nie trwa naprawdę, werdykt pokazuje wtedy start okna jako „teraz”. Werdykt, prognoza i
-        brak prognozy są już prawdziwe — zależą od danych, nie od przełącznika.
+        Noc w trakcie zamienia segment Plan w listę odhaczeń i otwiera odhaczanie w panelu celu —
+        także za dnia, więc odhaczenie zapisuje się w dzienniku naprawdę. Gdy sesja nie trwa,
+        werdykt pokazuje start okna jako „teraz”. Werdykt, prognoza, rezerwacja i konto Google są
+        prawdziwe — zależą od danych, nie od przełącznika.
       </Note>
     </Screen>
   );
