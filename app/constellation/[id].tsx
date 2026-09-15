@@ -3,8 +3,9 @@ import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { CONSTELLATIONS } from '@/data/constellations';
-import { useConstellationTonight } from '@/hooks/use-constellation-tonight';
-import { FIGURES, FIGURE_TARGETS } from '@/mock/constellation-figures';
+import { useConstellationView } from '@/hooks/use-constellation-tonight';
+import { useDeviceRoll } from '@/hooks/use-device-roll';
+import { FIGURES } from '@/mock/constellation-figures';
 import { colors, fonts } from '@/theme';
 import { ConstellationFigure } from '@/ui/figure';
 import { Body, Button, Label, Note, Panel, Sheet } from '@/ui/kit';
@@ -19,38 +20,43 @@ const EASE: Record<1 | 2 | 3, string> = {
 const STEP = 15;
 
 /**
- * 7a/8a: panel gwiazdozbioru. Nazwy, kotwica, podpowiedź i łatwość pochodzą
- * z `src/data/constellations.ts`, „gdzie szukać" — z efemeryd nocy wybranej
- * w Niebie (bez niej: nocy bieżącej); kształt z makiety pola `figure`.
+ * 7a/8a: panel gwiazdozbioru. Nazwy, kotwica, podpowiedź i łatwość z katalogu;
+ * „gdzie szukać" i ułożenie nad horyzontem z efemeryd; obiekty z granic IAU.
+ * Kształt figury jest schematyczny (decyzja 15 września) — obrót liczy się dla
+ * środka gwiazdozbioru.
  */
 export default function ConstellationSheet() {
   const { id, night } = useLocalSearchParams<{ id: string; night?: string }>();
   const meta = CONSTELLATIONS.find((c) => c.id === id) ?? CONSTELLATIONS[0];
-  const where = useConstellationTonight(meta, night);
+  const view = useConstellationView(meta, night);
   const figure = FIGURES[meta.id];
-  const targets = FIGURE_TARGETS[meta.id] ?? [];
-  const [rotation, setRotation] = useState(0);
+  const [offset, setOffset] = useState(0);
   const [gyro, setGyro] = useState(false);
+  const motion = useDeviceRoll(gyro);
 
-  const normalized = ((rotation % 360) + 360) % 360;
+  const following = gyro && motion.roll !== null;
+  const rotation = following ? view.skyRotation - (motion.roll ?? 0) : view.skyRotation + offset;
+  const shift = ((offset % 360) + 360) % 360;
   const rotationLabel = gyro
-    ? 'podąża za telefonem'
-    : normalized === 0
-      ? 'orientacja rzeczywista'
-      : normalized <= 180
-        ? `+${normalized}°`
-        : `−${360 - normalized}°`;
+    ? motion.available === false
+      ? 'czujnik ruchu niedostępny — potrzebny nowy build'
+      : 'podąża za telefonem'
+    : shift === 0
+      ? view.orientation
+      : shift <= 180
+        ? `+${shift}° od ułożenia na niebie`
+        : `−${360 - shift}° od ułożenia na niebie`;
 
   function rotate(delta: number) {
     setGyro(false);
-    setRotation((value) => value + delta);
+    setOffset((value) => value + delta);
   }
 
   return (
     <Sheet title={meta.name} subtitle={`${meta.latin} · kotwica: ${meta.star}`}>
       <Panel>
         <Label flush>Gdzie szukać</Label>
-        <Text style={styles.where}>{where}</Text>
+        <Text style={styles.where}>{view.where}</Text>
         <Body>{meta.hint}</Body>
         <Text style={[styles.ease, meta.ease === 3 && styles.easeHard]}>● {EASE[meta.ease]}</Text>
       </Panel>
@@ -61,7 +67,7 @@ export default function ConstellationSheet() {
         </Label>
         <View style={styles.figure}>
           {figure ? (
-            <ConstellationFigure figure={figure} rotation={gyro ? 0 : rotation} size={280} />
+            <ConstellationFigure figure={figure} rotation={rotation} size={280} />
           ) : (
             <Note>Brak rysunku w danych.</Note>
           )}
@@ -70,10 +76,10 @@ export default function ConstellationSheet() {
           <Button label="↺" onPress={() => rotate(-STEP)} style={styles.rotate} />
           <Button
             label="jak widzisz teraz"
-            tone={normalized === 0 && !gyro ? 'accent' : undefined}
+            tone={shift === 0 && !gyro ? 'accent' : undefined}
             onPress={() => {
               setGyro(false);
-              setRotation(0);
+              setOffset(0);
             }}
             style={styles.flex}
           />
@@ -85,9 +91,10 @@ export default function ConstellationSheet() {
           tone={gyro ? 'accent' : undefined}
           onPress={() => {
             setGyro((value) => !value);
-            setRotation(0);
+            setOffset(0);
           }}
         />
+        <Note>Kształt jest schematyczny; obrót liczy się dla środka gwiazdozbioru.</Note>
       </Panel>
 
       {figure ? (
@@ -103,34 +110,28 @@ export default function ConstellationSheet() {
         </>
       ) : null}
 
-      <Label right={`${targets.length} ${targets.length === 1 ? 'cel' : 'cele'} z podpowiedzi`}>
-        Cele w tym gwiazdozbiorze
-      </Label>
-      {targets.length ? (
-        targets.map(([designation, detail]) => (
-          <Panel
-            key={designation}
-            onPress={() =>
-              router.push({
-                pathname: '/library/target/[id]',
-                params: { id: designation.split(' ')[0].toLowerCase() },
-              })
-            }
-            style={styles.row}
-          >
-            <View style={styles.flex}>
-              <Text style={styles.title}>{designation}</Text>
-              <Text style={styles.subtitle}>{detail}</Text>
-            </View>
-            <Text style={styles.chevron}>›</Text>
-          </Panel>
-        ))
-      ) : (
-        <Note>
-          Podpowiedź katalogu nie wymienia tu obiektów. W aplikacji listę dobiera filtr celów po
-          współrzędnych i progach optyki, więc puste miejsce nie znaczy „nic nie ma”.
-        </Note>
-      )}
+      <Label right={`${view.targets.length} w katalogu`}>Obiekty w tym gwiazdozbiorze</Label>
+      {view.targets.length === 0 ? (
+        <Note>W katalogu nie ma obiektów w granicach tego gwiazdozbioru.</Note>
+      ) : null}
+      {view.targets.map((target) => (
+        <Panel
+          key={target.id}
+          onPress={() =>
+            router.push({ pathname: '/library/target/[id]', params: { id: target.id } })
+          }
+          style={styles.row}
+        >
+          <Text style={[styles.reach, !target.reach && styles.outOfReach]}>
+            {target.reach ? '●' : '○'}
+          </Text>
+          <View style={styles.flex}>
+            <Text style={styles.title}>{target.designation}</Text>
+            <Text style={styles.subtitle}>{target.detail}</Text>
+          </View>
+          <Text style={styles.chevron}>›</Text>
+        </Panel>
+      ))}
     </Sheet>
   );
 }
@@ -153,5 +154,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
     color: colors.purple,
   },
+  reach: { width: 14, fontSize: 10, color: colors.purple },
+  outOfReach: { color: colors.textMuted },
   chevron: { fontFamily: fonts.mono, fontSize: 16, color: colors.purple },
 });

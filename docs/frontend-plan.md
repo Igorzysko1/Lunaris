@@ -228,24 +228,29 @@ wyprzedzenia albo wyciszeń. Usunięte: `app/legacy/calendar.tsx`, `app/legacy/e
 
 ### Etap 8 — Więcej, nastawy, biblioteki
 
-| Element                                                              | Źródło                                                                                    | Status                                                                                             |
-| -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| Menu z bieżącą wartością w drugiej linijce                           | settings store                                                                            | jest                                                                                               |
-| Podstrony: Sprzęt, Profil obserwatora, Kalendarz Google, Lokalizacja | sekcje z `app/legacy/settings.tsx`                                                        | **UI**: rozbicie jednego ekranu na podstrony + reskin                                              |
-| Zdjęcie dnia NASA                                                    | `apod.fetchApod`, `useApod`, `ApodCard`                                                   | jest                                                                                               |
-| Źródła danych i o aplikacji                                          | `weather.forecastSources`                                                                 | **UI**                                                                                             |
-| Prognozy w pamięci: ile miejsc, wiek                                 | `forecast-cache.formatAge`, `expiredKeys`                                                 | **DO ZROBIENIA**: listowanie zapisanych prognoz                                                    |
-| Biblioteka celów: szukanie, filtry, „tylko w zasięgu"                | `DEEP_SKY_OBJECTS`, `optics.limitingMagnitude`, `surfaceBrightness`, `minimumAngularSize` | jest (makieta ma zastępczy próg 9 mag)                                                             |
-| Profil celu: „czy to zobaczysz" z powodem                            | te same wzory `optics.ts` dla obu zestawów                                                | jest                                                                                               |
-| Profil celu: macierzysty gwiazdozbiór                                | `DeepSkyObject` nie ma pola                                                               | **DO ZROBIENIA (dane)**: pole gwiazdozbioru; wtedy obie biblioteki linkują się nawzajem            |
-| Profil celu: zdanie „po czym poznać"                                 | brak w katalogu                                                                           | **DO ZROBIENIA (dane)**: opis na obiekt                                                            |
-| Profil celu: najlepszy miesiąc, wysokość w górowaniu                 | makieta liczy przybliżenie z projektu                                                     | **DO ZROBIENIA**: funkcja w `sky-targets` zamiast rachunku w widoku                                |
-| Biblioteka gwiazdozbiorów: galeria, szukanie bez ogonków             | `CONSTELLATIONS`                                                                          | jest                                                                                               |
-| Rysunek gwiazdozbioru                                                | `src/mock/constellation-figures.ts` ma schematyczne współrzędne                           | **DO ZROBIENIA (dane)**: pole `figure` z RA/dec z katalogu jasnych gwiazd (offline, jak `sky-map`) |
-| „Jak widzisz teraz" — obrót jak nad horyzontem                       | `skyPathOverNight` daje wysokość i azymut                                                 | **DO ZROBIENIA**: kąt obrotu figury (kąt paralaktyczny) dla miejsca i godziny                      |
-| „Podążaj za telefonem" (żyroskop)                                    | brak `expo-sensors`                                                                       | **DO ZROBIENIA**: zależność + orientacja urządzenia                                                |
+| Element                                                              | Źródło                                                                        | Status                                                                                                                                  |
+| -------------------------------------------------------------------- | ----------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Menu z bieżącą wartością w drugiej linijce                           | `useMore`                                                                     | podpięte                                                                                                                                |
+| Podstrony: Sprzęt, Profil obserwatora, Kalendarz Google, Lokalizacja | `app/settings/{equipment,observer,google,location}.tsx`, `useCalendarChoices` | podpięte — rozbite ze starych Ustawień; tryb sesji w Profilu obserwatora                                                                |
+| Zdjęcie dnia NASA                                                    | `app/apod.tsx`, `useApod`, `ApodCard`                                         | podpięte                                                                                                                                |
+| Źródła danych i o aplikacji                                          | `app/about.tsx`                                                               | podpięte                                                                                                                                |
+| Prognozy w pamięci: ile miejsc, wiek                                 | `forecast-cache.summarizeForecasts`, `listForecasts`, `app/forecasts.tsx`     | podpięte — razem ze stanem pobierania ze starych Ustawień                                                                               |
+| Eksport dziennika                                                    | `exportJournalToFile`                                                         | podpięte — plik JSON; udostępnianie dalej czeka na `expo-sharing`                                                                       |
+| Biblioteka celów: szukanie, filtry, „tylko w zasięgu"                | `useTargetLibrary`, `sky-targets.libraryReach`                                | podpięte — ten sam rachunek zasięgu co w Niebie, dla wszystkich zestawów pod niebem aktywnego miejsca                                   |
+| Profil celu: „czy to zobaczysz" z powodem                            | `libraryReach`, `sky-library.describeLibraryReach`                            | podpięte — osobno dla każdego zestawu                                                                                                   |
+| Profil celu: macierzysty gwiazdozbiór                                | `sky-library.constellationOf` (granice IAU z Astronomy Engine)                | podpięte — bez pola w katalogu; obie biblioteki linkują się nawzajem                                                                    |
+| Profil celu: zdanie „po czym poznać"                                 | brak w katalogu                                                               | **DO ZROBIENIA (dane)**: decyzja 15 września — bez opisu, dopóki nie będzie sprawdzony                                                  |
+| Profil celu: najlepszy miesiąc, wysokość w górowaniu                 | `sky-library.bestMonth`, `culminationAltitude`                                | podpięte — z położenia Słońca i szerokości aktywnego miejsca                                                                            |
+| Profil celu: historia i „Dopisz do planu tej nocy"                   | `describeHistory`, `togglePlanPick`                                           | podpięte                                                                                                                                |
+| Biblioteka gwiazdozbiorów: galeria, szukanie bez ogonków             | `useConstellationLibrary`, `sky-library.foldForSearch`                        | podpięte                                                                                                                                |
+| Panel gwiazdozbioru: obiekty w jego granicach                        | `sky-library.objectsInConstellation`                                          | podpięte — zamiast listy z makiety                                                                                                      |
+| Rysunek gwiazdozbioru                                                | `src/mock/constellation-figures.ts` (schematyczne)                            | **DO ZROBIENIA (dane)**: decyzja 15 września — zostają schematyczne; pole `figure` z RA/dec z katalogu jasnych gwiazd na osobne zadanie |
+| „Jak widzisz teraz" — obrót jak nad horyzontem                       | `sky-library.skyOrientation` (kąt paralaktyczny)                              | podpięte — dla środka gwiazdozbioru; pod horyzontem ułożenie z najwyższego położenia tej nocy                                           |
+| „Podążaj za telefonem" (żyroskop)                                    | `expo-sensors` `DeviceMotion`, `useDeviceRoll`                                | podpięte w kodzie (decyzja 15 września) — moduł natywny, zadziała po nowym buildzie; kierunek obrotu do sprawdzenia na telefonie        |
 
-Po etapie usuwamy `app/legacy/settings.tsx` i `app/legacy/night.tsx`.
+Usunięte: `app/legacy/settings.tsx`, `app/legacy/night.tsx` i `app/legacy/index.tsx`. Nieużywane już
+komponenty (`night-cards`, `CloudCoverChart`, `EventCard`) sprząta etap 10. Test:
+`tests/sky-library.test.ts`.
 
 ### Etap 9 — Tryb czerwony
 
@@ -282,12 +287,12 @@ komponenty z `src/components`. `grep -rn "todo(" app src` ma zwrócić pusto.
 | 12  | ~~Wyciszanie pojedynczego zjawiska~~ — zrobione: `loadMutedEvents`, `reviewEvents({ muted })`        | 7    |
 | 13  | ~~Kategorie powiadomień~~ — zrobione: `notifyCategories`, `categoryOf`                               | 7    |
 | 14  | ~~Pora przeglądu zjawisk~~ — ta sama co odświeżanie prognozy                                         | 7    |
-| 15  | Lista prognoz w pamięci                                                                              | 8    |
-| 16  | Gwiazdozbiór i opis przy obiekcie głębokiego nieba                                                   | 8    |
-| 17  | Najlepszy miesiąc i górowanie jako funkcja domeny                                                    | 8    |
-| 18  | Prawdziwe kształty gwiazdozbiorów (`figure`)                                                         | 8    |
-| 19  | Kąt obrotu gwiazdozbioru nad horyzontem                                                              | 8    |
-| 20  | Żyroskop (`expo-sensors`)                                                                            | 8    |
+| 15  | ~~Lista prognoz w pamięci~~ — zrobione: `summarizeForecasts`                                         | 8    |
+| 16  | ~~Gwiazdozbiór przy obiekcie~~ z granic IAU; opis „po czym poznać" czeka na sprawdzone dane          | 8    |
+| 17  | ~~Najlepszy miesiąc i górowanie jako funkcja domeny~~ — zrobione: `sky-library`                      | 8    |
+| 18  | Prawdziwe kształty gwiazdozbiorów (`figure`) — decyzja: osobne zadanie                               | 8    |
+| 19  | ~~Kąt obrotu gwiazdozbioru nad horyzontem~~ — zrobione: `skyOrientation`                             | 8    |
+| 20  | Żyroskop (`expo-sensors`) — dodany; działa po nowym buildzie                                         | 8    |
 | 21  | Kontekst motywu dla trybu czerwonego                                                                 | 9    |
 | 22  | Jasność ekranu (`expo-brightness`)                                                                   | 9    |
 | 23  | Gest trzech palców                                                                                   | 9    |

@@ -2,8 +2,7 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { CONSTELLATIONS } from '@/data/constellations';
-import { FIGURES, SEASON_ORDER, foldForSearch } from '@/mock/constellation-figures';
+import { useConstellationLibrary } from '@/hooks/use-library';
 import { colors, fonts } from '@/theme';
 import { ConstellationFigure } from '@/ui/figure';
 import { Field, Label, Note, Screen, TitleBar } from '@/ui/kit';
@@ -14,28 +13,14 @@ import { Field, Label, Note, Screen, TitleBar } from '@/ui/kit';
  */
 export default function ConstellationLibraryScreen() {
   const [query, setQuery] = useState('');
-  const folded = foldForSearch(query.trim());
-
-  const groups = SEASON_ORDER.map(([label, ids]) => {
-    const all = ids.flatMap((id) => {
-      const entry = CONSTELLATIONS.find((c) => c.id === id);
-      return entry ? [entry] : [];
-    });
-    const items = folded
-      ? all.filter((c) => foldForSearch(`${c.name} ${c.latin} ${c.star}`).includes(folded))
-      : all;
-
-    return { label, total: all.length, items };
-  }).filter((group) => group.items.length > 0);
-
-  const shown = groups.reduce((sum, group) => sum + group.items.length, 0);
+  const library = useConstellationLibrary(query);
 
   return (
     <Screen>
       <TitleBar
         back
         title="Biblioteka gwiazdozbiorów"
-        subtitle={`${shown} z ${CONSTELLATIONS.length}`}
+        subtitle={`${library.shown} z ${library.total}`}
       />
       <Field
         value={query}
@@ -43,11 +28,13 @@ export default function ConstellationLibraryScreen() {
         placeholder="Szukaj po nazwie, łacinie albo gwieździe"
         autoCorrect={false}
       />
-      {groups.length === 0 ? <Note>{`Nic nie pasuje do „${query}".`}</Note> : null}
+      {library.groups.length === 0 ? <Note>{`Nic nie pasuje do „${query}".`}</Note> : null}
 
-      {groups.map((group) => (
+      {library.groups.map((group) => (
         <View key={group.label} style={styles.group}>
-          <Label right={folded ? `${group.items.length} z ${group.total}` : `${group.total}`}>
+          <Label
+            right={library.searching ? `${group.items.length} z ${group.total}` : `${group.total}`}
+          >
             {group.label}
           </Label>
           <View style={styles.grid}>
@@ -60,8 +47,8 @@ export default function ConstellationLibraryScreen() {
                 accessibilityRole="button"
                 style={styles.card}
               >
-                {FIGURES[c.id] ? (
-                  <ConstellationFigure figure={FIGURES[c.id]} rotation={0} size={80} compact />
+                {c.figure ? (
+                  <ConstellationFigure figure={c.figure} rotation={0} size={80} compact />
                 ) : null}
                 <Text style={styles.name} numberOfLines={1}>
                   {c.name}
@@ -76,8 +63,8 @@ export default function ConstellationLibraryScreen() {
       ))}
 
       <Note>
-        Nazwy, kotwice i podpowiedzi są z katalogu. Współrzędne kształtów są schematyczne — przy
-        wdrożeniu do zastąpienia rektascensją i deklinacją z katalogu jasnych gwiazd.
+        Nazwy, kotwice i podpowiedzi są z katalogu. Kształty są schematyczne — prawdziwe położenia
+        gwiazd z katalogu jasnych gwiazd czekają na osobne zadanie.
       </Note>
     </Screen>
   );

@@ -1,103 +1,108 @@
 import { router } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
-import { Label, MenuRow, Screen, TitleBar, todo } from '@/ui/kit';
+import { useMore } from '@/hooks/use-more';
+import { Label, MenuRow, Note, Screen, TitleBar } from '@/ui/kit';
 
-type Row = { title: string; subtitle?: string; value?: string; go: () => void };
+type Row = { title: string; subtitle?: string; value?: string; chevron?: string; go: () => void };
 
 /**
- * Więcej — kryterium, nie worek: trzy grupy według tego, czy rzecz zmienia
- * werdykt. Każdy wiersz niesie bieżącą wartość w drugiej linijce.
- *
- * Wiersze prowadzące do `/legacy/settings` to nastawy, które mają dziś tylko
- * stary ekran Ustawień — każda dostanie własną podstronę przy podpinaniu.
+ * Więcej — kryterium, nie worek: grupy według tego, czy rzecz zmienia werdykt.
+ * Każdy wiersz niesie bieżącą wartość w drugiej linijce.
  */
-const GROUPS: { label: string; rows: Row[] }[] = [
-  {
-    label: 'Co wpływa na werdykt',
-    rows: [
-      {
-        title: 'Sprzęt',
-        subtitle: 'Lornetka 15x70 · SCT 8″',
-        go: () => router.push('/legacy/settings'),
-      },
-      {
-        title: 'Progi warunków',
-        subtitle: 'chmury, wiatr, rosa, kara za dojazd',
-        go: () => router.push('/thresholds'),
-      },
-      {
-        title: 'Profil obserwatora',
-        subtitle: 'Jaworzno · 50 km/h · marsz do 30 min · sen',
-        go: () => router.push('/legacy/settings'),
-      },
-      {
-        title: 'Powiadomienia',
-        subtitle: 'wieczorem o 18:00, gdy noc wychodzi na „jedź"',
-        go: () => router.push('/notifications'),
-      },
-      {
-        title: 'Kalendarz Google',
-        subtitle: 'połączony · rezerwacje w „Obserwacje"',
-        go: () => router.push('/legacy/settings'),
-      },
-    ],
-  },
-  {
-    label: 'Poza decyzją',
-    rows: [
-      { title: 'Biblioteka celów', value: '108', go: () => router.push('/library/targets') },
-      {
-        title: 'Biblioteka gwiazdozbiorów',
-        value: '48',
-        go: () => router.push('/library/constellations'),
-      },
-      { title: 'Zdjęcie dnia NASA', go: () => router.push('/legacy/night') },
-    ],
-  },
-  {
-    label: 'Dane',
-    rows: [
-      {
-        title: 'Eksport dziennika',
-        subtitle: '14 nocy · JSON, ten sam co na dysku',
-        go: () => todo('Eksport dziennika'),
-      },
-      {
-        title: 'Prognozy w pamięci',
-        subtitle: '5 miejsc · ostatnia 14 h temu',
-        go: () => todo('Podgląd prognoz w pamięci'),
-      },
-      { title: 'Źródła danych i o aplikacji', go: () => todo('Ekran o aplikacji i źródłach') },
-    ],
-  },
-  {
-    label: 'Makieta',
-    rows: [
-      {
-        title: 'Stany makiety',
-        subtitle: 'brak prognozy, dane z zapisu, noc w trakcie',
-        go: () => router.push('/mock-states'),
-      },
-      {
-        title: 'Tryb nocny',
-        subtitle: 'arkusz z trybem czerwonym i jasnością',
-        go: () => router.push('/night-mode'),
-      },
-      {
-        title: 'Stare ekrany',
-        subtitle: 'Noc i Ustawienia sprzed przebudowy',
-        go: () => router.push('/legacy'),
-      },
-    ],
-  },
-];
-
 export default function MoreScreen() {
+  const more = useMore();
+
+  const groups: { label: string; rows: Row[] }[] = [
+    {
+      label: 'Co wpływa na werdykt',
+      rows: [
+        { title: 'Sprzęt', subtitle: more.equipment, go: () => router.push('/settings/equipment') },
+        {
+          title: 'Progi warunków',
+          subtitle: more.thresholds,
+          go: () => router.push('/thresholds'),
+        },
+        {
+          title: 'Profil obserwatora',
+          subtitle: more.observer,
+          go: () => router.push('/settings/observer'),
+        },
+        {
+          title: 'Lokalizacja',
+          subtitle: more.location,
+          go: () => router.push('/settings/location'),
+        },
+        {
+          title: 'Powiadomienia',
+          subtitle: more.notifications,
+          go: () => router.push('/notifications'),
+        },
+        {
+          title: 'Kalendarz Google',
+          subtitle: more.google,
+          go: () => router.push('/settings/google'),
+        },
+      ],
+    },
+    {
+      label: 'Poza decyzją',
+      rows: [
+        {
+          title: 'Biblioteka celów',
+          value: more.libraryTargets,
+          go: () => router.push('/library/targets'),
+        },
+        {
+          title: 'Biblioteka gwiazdozbiorów',
+          value: more.libraryConstellations,
+          go: () => router.push('/library/constellations'),
+        },
+        { title: 'Zdjęcie dnia NASA', go: () => router.push('/apod') },
+      ],
+    },
+    {
+      label: 'Dane',
+      rows: [
+        {
+          title: 'Eksport dziennika',
+          subtitle: more.journal,
+          chevron: '↓',
+          go: () => void more.exportJournal(),
+        },
+        {
+          title: 'Prognozy w pamięci',
+          subtitle: more.forecasts,
+          go: () => router.push('/forecasts'),
+        },
+        {
+          title: 'Źródła danych i o aplikacji',
+          subtitle: more.about,
+          go: () => router.push('/about'),
+        },
+      ],
+    },
+    {
+      label: 'Makieta',
+      rows: [
+        {
+          title: 'Stany makiety',
+          subtitle: 'noc w trakcie',
+          go: () => router.push('/mock-states'),
+        },
+        {
+          title: 'Tryb nocny',
+          subtitle: 'arkusz z trybem czerwonym i jasnością',
+          go: () => router.push('/night-mode'),
+        },
+      ],
+    },
+  ];
+
   return (
     <Screen>
       <TitleBar title="Więcej" />
-      {GROUPS.map((group) => (
+      {groups.map((group) => (
         <View key={group.label} style={styles.group}>
           <Label>{group.label}</Label>
           {group.rows.map((row) => (
@@ -106,9 +111,11 @@ export default function MoreScreen() {
               title={row.title}
               subtitle={row.subtitle}
               value={row.value}
+              chevron={row.chevron}
               onPress={row.go}
             />
           ))}
+          {group.label === 'Dane' && more.exported ? <Note>{more.exported}</Note> : null}
         </View>
       ))}
     </Screen>

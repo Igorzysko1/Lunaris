@@ -464,6 +464,44 @@ function reachOf(optics: Optics, bortle: number): Reach {
   };
 }
 
+/**
+ * Czy sprzęt pokaże obiekt pod tym niebem — sama optyka, bez wysokości i terenu.
+ * Wspólne dla listy celów i biblioteki: „w zasięgu" ma w obu znaczyć to samo.
+ */
+function equipmentVerdict(
+  base: Pick<TargetBase, 'magnitude' | 'sizeArcmin' | 'diffuse'>,
+  reach: Reach,
+): 'too-faint' | 'too-diffuse' | 'too-small' | null {
+  if (base.magnitude > reach.limitPoint) return 'too-faint';
+
+  if (
+    base.diffuse &&
+    base.sizeArcmin !== null &&
+    surfaceBrightness(base.magnitude, base.sizeArcmin) > reach.limitSurface
+  ) {
+    return 'too-diffuse';
+  }
+
+  if (base.sizeArcmin !== null && base.sizeArcmin < reach.minSize) return 'too-small';
+  return null;
+}
+
+/** Zasięg zestawu dla obiektu z katalogu — do biblioteki celów, bez nocy i miejsca. */
+export function libraryReach(
+  dso: DeepSkyObject,
+  optics: Optics,
+  bortle: number,
+): 'too-faint' | 'too-diffuse' | 'too-small' | null {
+  return equipmentVerdict(
+    {
+      magnitude: dso.magnitude,
+      sizeArcmin: dso.sizeArcmin,
+      diffuse: DIFFUSE_KINDS.includes(dso.kind),
+    },
+    reachOf(optics, bortle),
+  );
+}
+
 /** Nakłada zasięg konkretnego zestawu na policzone już położenie obiektu. */
 function applyReach(
   geometry: TargetGeometry,
@@ -494,16 +532,7 @@ function applyReach(
     // tylko jego światło rozkładało się korzystnie — a światła od rozlania na
     // większą powierzchnię nie przybywa. Przez tę lukę do listy wchodziły
     // galaktyki bez żadnych szans w lornetce.
-    if (base.magnitude > reach.limitPoint) return 'too-faint' as const;
-
-    if (base.diffuse && base.sizeArcmin !== null) {
-      if (surfaceBrightness(base.magnitude, base.sizeArcmin) > reach.limitSurface) {
-        return 'too-diffuse' as const;
-      }
-    }
-
-    if (base.sizeArcmin !== null && base.sizeArcmin < reach.minSize) return 'too-small' as const;
-    return null;
+    return equipmentVerdict(base, reach);
   })();
 
   // Zapas liczymy z tego progu, który dla tego obiektu jest ciaśniejszy.

@@ -53,7 +53,13 @@
       ],
       "expo-status-bar",
       "expo-web-browser",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-sensors",
+        {
+          "motionPermission": "Lunaris używa czujników ruchu, żeby obracać rysunek gwiazdozbioru tak, jak trzymasz telefon."
+        }
+      ]
     ],
     "extra": {
       "router": {},

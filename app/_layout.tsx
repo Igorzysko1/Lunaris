@@ -90,6 +90,13 @@ function AppStack() {
         <Stack.Screen name="library/targets" />
         <Stack.Screen name="library/constellations" />
         <Stack.Screen name="mock-states" />
+        <Stack.Screen name="settings/equipment" />
+        <Stack.Screen name="settings/observer" />
+        <Stack.Screen name="settings/google" />
+        <Stack.Screen name="settings/location" />
+        <Stack.Screen name="apod" />
+        <Stack.Screen name="about" />
+        <Stack.Screen name="forecasts" />
 
         {/* Arkusze z projektu. */}
         <Stack.Screen name="target/[id]" options={SHEET} />
@@ -99,11 +106,6 @@ function AppStack() {
         <Stack.Screen name="event/[id]" options={SHEET} />
         <Stack.Screen name="close-night" options={SHEET} />
         <Stack.Screen name="night-mode" options={{ ...SHEET, sheetAllowedDetents: [0.8] }} />
-
-        {/* Ekrany sprzed przebudowy — działają, dopóki nowe nie dostaną danych. */}
-        <Stack.Screen name="legacy/index" />
-        <Stack.Screen name="legacy/night" />
-        <Stack.Screen name="legacy/settings" />
       </Stack>
     </ForecastProvider>
   );

@@ -1,85 +1,45 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { DEEP_SKY_OBJECTS } from '@/data/deep-sky';
+import { useTargetProfile } from '@/hooks/use-library';
 import { colors, fonts, hexA } from '@/theme';
-import { Body, Button, Label, MenuRow, Note, Panel, Sheet, todo } from '@/ui/kit';
+import { Body, Button, Label, MenuRow, Note, Panel, Sheet } from '@/ui/kit';
 
-const MONTHS = [
-  'styczeń',
-  'luty',
-  'marzec',
-  'kwiecień',
-  'maj',
-  'czerwiec',
-  'lipiec',
-  'sierpień',
-  'wrzesień',
-  'październik',
-  'listopad',
-  'grudzień',
-];
-
-/** Pole widzenia lornetki 15x70 z profilu. W makiecie stała; docelowo z `optics.ts`. */
-const BINO_FOV_DEG = 4.4;
 const FOV_DIAMETER = 132;
-
-/** Werdykt zasięgu bez rachunku — przy podpinaniu wyniki wzorów z `optics.ts`. */
-const MOCK_REACH = [
-  { label: 'Lornetka 15x70', why: 'do policzenia: jasność graniczna, powierzchniowa i rozmiar' },
-  { label: 'SCT 8″', why: 'do policzenia: jasność graniczna, powierzchniowa i rozmiar' },
-];
-
-function num(value: number, digits: number) {
-  return value.toFixed(digits).replace('.', ',');
-}
-
-function sizeLabel(arcmin: number) {
-  return arcmin >= 60 ? `${num(arcmin / 60, 1)}°` : `${num(arcmin, 1)}′`;
-}
 
 /**
  * 12a: profil celu w bibliotece — „czym i kiedykolwiek", w odróżnieniu od
- * panelu celu w Nocy, który odpowiada „czy dziś i o której".
+ * panelu celu w Nocy, który odpowiada „czy dziś i o której". Bez opisu
+ * „po czym poznać": katalog go nie ma, a zmyślony byłby gorszy niż żaden.
  */
 export default function TargetProfileSheet() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const object = DEEP_SKY_OBJECTS.find((o) => o.id === id) ?? DEEP_SKY_OBJECTS[0];
+  const profile = useTargetProfile(id);
 
-  // Przybliżenia z projektu (tura 12): miesiąc górowania o północy z rektascensji
-  // i wysokość w górowaniu dla Zawoi. Dokładność rzędu tygodni — tylko do makiety.
-  const bestMonth = MONTHS[Math.floor((((object.raHours + 12) % 24) / 24) * 12 + 2.7) % 12];
-  const culmination = Math.round(Math.max(0, 90 - Math.abs(49.6 - object.dec)));
-  const fovShare = Math.min(1, object.sizeArcmin / 60 / BINO_FOV_DEG);
-  const distance =
-    object.distanceLy >= 1_000_000
-      ? `${num(object.distanceLy / 1_000_000, 2)} mln lat św.`
-      : `${Math.round(object.distanceLy)} lat św.`;
-
-  const facts: [string, string][] = [
-    ['jasność wizualna', `${num(object.magnitude, 1)} mag`],
-    ['rozmiar kątowy', sizeLabel(object.sizeArcmin)],
-    ['odległość', distance],
-    ['współrzędne J2000', `RA ${num(object.raHours, 3)} h · dec ${num(object.dec, 2)}°`],
-  ];
+  if (!profile.found) {
+    return (
+      <Sheet title="Cel">
+        <Note>Tego obiektu nie ma w katalogu.</Note>
+      </Sheet>
+    );
+  }
 
   return (
-    <Sheet
-      title={`${object.designation} ${object.name}`}
-      subtitle={`${object.kind} · ${num(object.magnitude, 1)} mag · ${sizeLabel(object.sizeArcmin)}`}
-    >
+    <Sheet title={profile.title} subtitle={profile.subtitle}>
       <Panel>
         <Label flush>Czy to zobaczysz</Label>
-        {MOCK_REACH.map((reach) => (
-          <View key={reach.label} style={styles.reach}>
-            <Text style={styles.reachMark}>?</Text>
+        {profile.reach.map((reach) => (
+          <View key={reach.id} style={styles.reach}>
+            <Text style={[styles.reachMark, reach.ok ? styles.ok : styles.no]}>
+              {reach.ok ? '✓' : '✕'}
+            </Text>
             <View style={styles.flex}>
               <Text style={styles.title}>{reach.label}</Text>
               <Text style={styles.subtitle}>{reach.why}</Text>
             </View>
           </View>
         ))}
-        <Note>Liczone dla nieba Bortle 4.</Note>
+        <Note>{profile.reachNote}</Note>
       </Panel>
 
       <Panel>
@@ -89,28 +49,25 @@ export default function TargetProfileSheet() {
             style={[
               styles.object,
               {
-                width: Math.max(4, FOV_DIAMETER * fovShare),
-                height: Math.max(4, FOV_DIAMETER * fovShare),
+                width: Math.max(4, FOV_DIAMETER * profile.field.share),
+                height: Math.max(4, FOV_DIAMETER * profile.field.share),
               },
             ]}
           />
         </View>
-        <Body>
-          {fovShare >= 1
-            ? `Nie mieści się w polu ${num(BINO_FOV_DEG, 1)}° lornetki.`
-            : `${Math.round(fovShare * 100)}% średnicy pola ${num(BINO_FOV_DEG, 1)}° (15x70).`}
-        </Body>
+        <Body>{profile.field.text}</Body>
       </Panel>
 
       <Panel>
         <Label flush>Kiedy i jak wysoko</Label>
-        <Body>Najlepszy miesiąc: {bestMonth} — wtedy góruje około północy.</Body>
-        <Body>W górowaniu {culmination}° nad horyzontem z Zawoi.</Body>
+        {profile.when.map((line) => (
+          <Body key={line}>{line}</Body>
+        ))}
       </Panel>
 
       <Panel>
         <Label flush>Z katalogu</Label>
-        {facts.map(([key, value]) => (
+        {profile.facts.map(([key, value]) => (
           <View key={key} style={styles.fact}>
             <Text style={styles.subtitle}>{key}</Text>
             <Text style={styles.factValue}>{value}</Text>
@@ -118,15 +75,27 @@ export default function TargetProfileSheet() {
         ))}
       </Panel>
 
+      {profile.constellation ? (
+        <MenuRow
+          title="Gwiazdozbiór"
+          value={profile.constellation.name}
+          onPress={() =>
+            router.push({
+              pathname: '/constellation/[id]',
+              params: { id: profile.constellation!.id },
+            })
+          }
+        />
+      ) : null}
       <MenuRow
         title="Historia zobaczeń"
-        value="3 razy · od 11 lipca"
-        onPress={() => todo('Historia zobaczeń celu z dziennika')}
+        value={profile.history}
+        onPress={() => router.push({ pathname: '/target/[id]', params: { id } })}
       />
       <Button
-        label="Dopisz do planu tej nocy"
+        label={profile.picked ? 'Zdejmij z planu tej nocy' : 'Dopisz do planu tej nocy'}
         variant="primary"
-        onPress={() => todo('Dopisanie celu do planu nocy')}
+        onPress={profile.togglePick}
       />
       <Button
         label="Pokaż w Niebie"
@@ -139,7 +108,9 @@ export default function TargetProfileSheet() {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   reach: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingVertical: 4 },
-  reachMark: { width: 16, fontFamily: fonts.monoSemiBold, fontSize: 14, color: colors.textMuted },
+  reachMark: { width: 16, fontFamily: fonts.monoSemiBold, fontSize: 14 },
+  ok: { color: colors.green },
+  no: { color: colors.textMuted },
   title: { fontFamily: fonts.sans, fontSize: 14.5, color: colors.textPrimary },
   subtitle: { fontFamily: fonts.mono, fontSize: 11.5, lineHeight: 16, color: colors.textMuted },
   fov: {

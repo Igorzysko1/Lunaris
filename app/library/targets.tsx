@@ -2,14 +2,11 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { DEEP_SKY_OBJECTS, type DeepSkyObject } from '@/data/deep-sky';
-import { foldForSearch } from '@/mock/constellation-figures';
+import { useTargetLibrary, type LibraryKind } from '@/hooks/use-library';
 import { colors, fonts } from '@/theme';
 import { Chip, ChipRow, Field, Note, Panel, Screen, TitleBar } from '@/ui/kit';
 
-type Kind = 'all' | DeepSkyObject['kind'];
-
-const KINDS: [Kind, string][] = [
+const KINDS: [LibraryKind, string][] = [
   ['all', 'wszystko'],
   ['galaktyka', 'galaktyki'],
   ['mgławica', 'mgławice'],
@@ -17,51 +14,24 @@ const KINDS: [Kind, string][] = [
   ['gromada kulista', 'gromady kuliste'],
 ];
 
-const KIND_SHORT: Record<DeepSkyObject['kind'], string> = {
-  galaktyka: 'galaktyka',
-  mgławica: 'mgławica',
-  'gromada otwarta': 'gr. otwarta',
-  'gromada kulista': 'gr. kulista',
-};
-
-/**
- * W makiecie „w zasięgu" to sam próg jasności. Docelowo: `limitingMagnitude`,
- * `surfaceBrightness` i `minimumAngularSize` z `optics.ts` dla obu zestawów.
- */
-const MOCK_REACH_MAGNITUDE = 9;
-
-function sizeLabel(arcmin: number) {
-  return arcmin >= 60
-    ? `${(arcmin / 60).toFixed(1).replace('.', ',')}°`
-    : `${arcmin.toFixed(1).replace('.', ',')}′`;
-}
-
 /** 12a: biblioteka celów — pełny katalog, filtr „tylko w zasięgu" jest wyborem, nie domyślnym. */
 export default function TargetLibraryScreen() {
   const [query, setQuery] = useState('');
-  const [kind, setKind] = useState<Kind>('all');
+  const [kind, setKind] = useState<LibraryKind>('all');
   const [onlyReach, setOnlyReach] = useState(false);
-  const folded = foldForSearch(query.trim());
-
-  const shown = DEEP_SKY_OBJECTS.filter(
-    (object) =>
-      (kind === 'all' || object.kind === kind) &&
-      (!onlyReach || object.magnitude <= MOCK_REACH_MAGNITUDE) &&
-      (!folded ||
-        foldForSearch(`${object.designation} ${object.name} ${object.kind}`).includes(folded)),
-  );
+  const library = useTargetLibrary(query, kind, onlyReach);
 
   return (
     <Screen>
       <TitleBar
         back
         title="Biblioteka celów"
-        subtitle={`${shown.length} z ${DEEP_SKY_OBJECTS.length}`}
+        subtitle={`${library.rows.length} z ${library.total}`}
       />
       <Field
         value={query}
         onChangeText={setQuery}
-        placeholder={`Szukaj w ${DEEP_SKY_OBJECTS.length} obiektach`}
+        placeholder={`Szukaj w ${library.total} obiektach`}
         autoCorrect={false}
       />
       <ChipRow>
@@ -79,37 +49,30 @@ export default function TargetLibraryScreen() {
           onPress={() => setOnlyReach((value) => !value)}
         />
       </ChipRow>
-      <Note>
-        Szukam po oznaczeniu, nazwie i typie. Kropka mówi o zasięgu sprzętu, nie o dzisiejszej nocy.
-      </Note>
-      {shown.length === 0 ? <Note>Nic nie pasuje do tych warunków.</Note> : null}
+      <Note>{library.note}</Note>
+      {library.rows.length === 0 ? <Note>Nic nie pasuje do tych warunków.</Note> : null}
 
-      {shown.map((object) => {
-        const reach = object.magnitude <= MOCK_REACH_MAGNITUDE;
-
-        return (
-          <Panel
-            key={object.id}
-            onPress={() =>
-              router.push({ pathname: '/library/target/[id]', params: { id: object.id } })
-            }
-            style={styles.row}
-          >
-            <View style={styles.designation}>
-              <Text style={styles.code}>{object.designation}</Text>
-              <Text style={[styles.reach, !reach && styles.outOfReach]}>{reach ? '●' : '○'}</Text>
-            </View>
-            <View style={styles.flex}>
-              <Text style={styles.name}>{object.name}</Text>
-              <Text style={styles.meta}>
-                {KIND_SHORT[object.kind]} · {object.magnitude.toFixed(1).replace('.', ',')} mag ·{' '}
-                {sizeLabel(object.sizeArcmin)}
-              </Text>
-            </View>
-            <Text style={styles.chevron}>›</Text>
-          </Panel>
-        );
-      })}
+      {library.rows.map((object) => (
+        <Panel
+          key={object.id}
+          onPress={() =>
+            router.push({ pathname: '/library/target/[id]', params: { id: object.id } })
+          }
+          style={styles.row}
+        >
+          <View style={styles.designation}>
+            <Text style={styles.code}>{object.designation}</Text>
+            <Text style={[styles.reach, !object.reach && styles.outOfReach]}>
+              {object.reach ? '●' : '○'}
+            </Text>
+          </View>
+          <View style={styles.flex}>
+            <Text style={styles.name}>{object.name}</Text>
+            <Text style={styles.meta}>{object.meta}</Text>
+          </View>
+          <Text style={styles.chevron}>›</Text>
+        </Panel>
+      ))}
     </Screen>
   );
 }

@@ -172,6 +172,51 @@ export async function pruneExpired(now: Date = new Date()): Promise<number> {
   }
 }
 
+export type StoredForecast = {
+  /** Czyja to prognoza: Nocy albo katalogu miejsc. */
+  scope: string;
+  coords: { lat: number; lon: number };
+  savedAt: Date;
+  stale: boolean;
+};
+
+/**
+ * Zapisane prognozy do przeglądu w Więcej — z kluczy zapisu, bez przeterminowanych,
+ * od najnowszej. Wydzielone z operacji na dysku, żeby dało się to sprawdzić testem.
+ */
+export function summarizeForecasts(
+  entries: readonly (readonly [string, string | null])[],
+  now: Date,
+): StoredForecast[] {
+  return entries
+    .flatMap(([key, raw]): StoredForecast[] => {
+      const match = /^lunaris\.forecast\.(.+)\.(-?\d+\.\d+),(-?\d+\.\d+)$/.exec(key);
+      if (!match) return [];
+
+      const hit = parse<unknown>(raw, now);
+      return hit
+        ? [
+            {
+              scope: match[1],
+              coords: { lat: Number(match[2]), lon: Number(match[3]) },
+              savedAt: hit.savedAt,
+              stale: hit.stale,
+            },
+          ]
+        : [];
+    })
+    .sort((a, b) => b.savedAt.getTime() - a.savedAt.getTime());
+}
+
+export async function listForecasts(now: Date = new Date()): Promise<StoredForecast[]> {
+  try {
+    const keys = (await AsyncStorage.getAllKeys()).filter((k) => k.startsWith(KEY_PREFIX));
+    return keys.length ? summarizeForecasts(await AsyncStorage.multiGet(keys), now) : [];
+  } catch {
+    return [];
+  }
+}
+
 /** Stan cyklu przeżywa restart aplikacji — inaczej każdy start byłby zaległy. */
 export async function saveCycleState(source: string, state: CycleState): Promise<void> {
   try {
