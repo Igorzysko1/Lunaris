@@ -5,23 +5,16 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useKnownTonight } from '@/hooks/use-known-tonight';
 import { useNightConditions } from '@/hooks/use-night-conditions';
+import { useNightSky, type SkyView } from '@/hooks/use-night-sky';
 import {
   useNightVerdicts,
   type NightCard,
   type NightMoment,
   type NightVerdicts,
 } from '@/hooks/use-night-verdicts';
+import { plural } from '@/lib/journal-text';
 import type { Narration } from '@/lib/session-text';
-import {
-  BOOKING_WARNING,
-  LIVE,
-  NEXT_EVENT,
-  OPTICS,
-  OUT_OF_REACH,
-  PLAN,
-  SKY_CONSTELLATIONS,
-  TARGETS,
-} from '@/mock/night';
+import { BOOKING_WARNING, LIVE, PLAN } from '@/mock/night';
 import { useMock } from '@/mock/state';
 import { colors, fonts, hexA } from '@/theme';
 import {
@@ -52,10 +45,6 @@ const SEGMENTS: readonly (readonly [Segment, string])[] = [
   ['plan', 'Plan'],
 ];
 
-function openTarget(id: string) {
-  router.push({ pathname: '/target/[id]', params: { id } });
-}
-
 type Live = NonNullable<NightMoment['live']>;
 
 /**
@@ -63,15 +52,15 @@ type Live = NonNullable<NightMoment['live']>;
  * selektor nocy zmienia cały widok zakładki. Warunki mówią, jaka będzie noc,
  * Niebo — co w niej widać, Plan — co to znaczy dla mnie.
  *
- * Etap 1: werdykt, selektor nocy, pasek danych z zapisu i brak prognozy
- * pochodzą z `useNightVerdicts`. Segmenty pod werdyktem są jeszcze makietą.
+ * Podpięte: werdykt i selektor nocy (etap 1), Warunki (etap 2), Niebo i cele
+ * Planu (etap 4). Reszta Planu jest jeszcze makietą (etap 5).
  */
 export default function NightScreen() {
   const params = useLocalSearchParams<{ segment?: string }>();
   const [segment, setSegment] = useState<Segment>(params.segment === 'sky' ? 'sky' : 'conditions');
   const [requested, setRequested] = useState(params.segment);
   const [night, setNight] = useState(0);
-  const { session } = useMock();
+  const [profileId, setProfileId] = useState<string | null>(null);
   const verdicts = useNightVerdicts();
 
   // Wejście z Dziennika („dziś lepiej niż wtedy") i z bibliotek prowadzi do Nieba —
@@ -83,12 +72,50 @@ export default function NightScreen() {
 
   if (verdicts.nights.length === 0) return <NoForecast verdicts={verdicts} />;
 
+  return (
+    <NightView
+      verdicts={verdicts}
+      segment={segment}
+      onSegment={setSegment}
+      night={night}
+      onNight={setNight}
+      profileId={profileId}
+      onProfile={setProfileId}
+    />
+  );
+}
+
+/** Zakładka z prognozą: werdykt wybranej nocy i segment pod nim. */
+function NightView({
+  verdicts,
+  segment,
+  onSegment,
+  night,
+  onNight,
+  profileId,
+  onProfile,
+}: {
+  verdicts: NightVerdicts;
+  segment: Segment;
+  onSegment: (segment: Segment) => void;
+  night: number;
+  onNight: (index: number) => void;
+  profileId: string | null;
+  onProfile: (id: string) => void;
+}) {
+  const { session } = useMock();
+  // Efemerydy celów liczą się przy pierwszym wejściu do Nieba albo Planu —
+  // otwarcie zakładki na Warunkach nie ma na nie czekać.
+  const [skyWanted, setSkyWanted] = useState(segment !== 'conditions');
+  if (segment !== 'conditions' && !skyWanted) setSkyWanted(true);
+
   // Nowa prognoza może przynieść mniej nocy — wybór nie może wskazywać w próżnię.
   const index = Math.min(night, verdicts.nights.length - 1);
   const card = verdicts.nights[index];
   const moment = verdicts.moments[index];
   const live = liveOf(card, moment, session === 'live' && index === 0);
   const best = verdicts.bestNight(index);
+  const sky = useNightSky(card, profileId, skyWanted);
 
   const variant: VerdictVariant = live
     ? 'live'
@@ -98,12 +125,20 @@ export default function NightScreen() {
         ? 'bar'
         : 'compact';
 
+  /** Panel celu dostaje noc, zestaw i okno — liczy ten sam cel, który stał na liście. */
+  function openTarget(id: string) {
+    router.push({
+      pathname: '/target/[id]',
+      params: { id, night: sky.nightId, profile: sky.profile.id, ...(sky.window ?? {}) },
+    });
+  }
+
   return (
     <Screen>
       <NightSwitcher
         nights={verdicts.nights}
         index={index}
-        onChange={setNight}
+        onChange={onNight}
         plan={segment === 'plan'}
         live={live !== null}
         place={verdicts.place}
@@ -116,14 +151,22 @@ export default function NightScreen() {
           card={card}
           best={best === null ? null : verdicts.nights[best]}
           onBest={() => {
-            if (best !== null) setNight(best);
+            if (best !== null) onNight(best);
           }}
         />
       )}
-      <Segments items={SEGMENTS} value={segment} onChange={setSegment} />
+      <Segments items={SEGMENTS} value={segment} onChange={onSegment} />
       {segment === 'conditions' ? <Conditions card={card} /> : null}
-      {segment === 'sky' ? <Sky /> : null}
-      {segment === 'plan' ? live ? <LivePlan /> : <Plan go={card.go} /> : null}
+      {segment === 'sky' ? (
+        <Sky sky={sky} onProfile={() => onProfile(sky.nextProfileId)} onTarget={openTarget} />
+      ) : null}
+      {segment === 'plan' ? (
+        live ? (
+          <LivePlan onTarget={openTarget} />
+        ) : (
+          <Plan go={card.go} sky={sky} onTarget={openTarget} />
+        )
+      ) : null}
     </Screen>
   );
 }
@@ -431,37 +474,55 @@ function Legend({ color, label }: { color: string; label: string }) {
   );
 }
 
-function Sky() {
-  const [optics, setOptics] = useState(0);
-  const set = OPTICS[optics];
+/** Niebo mówi, co w tej nocy widać — dla wybranego zestawu, w kolejności okna. */
+function Sky({
+  sky,
+  onProfile,
+  onTarget,
+}: {
+  sky: SkyView;
+  onProfile: () => void;
+  onTarget: (id: string) => void;
+}) {
+  const [showOut, setShowOut] = useState(false);
+  const switchable = sky.profiles.length > 1;
 
   return (
     <>
-      <Panel onPress={() => setOptics((i) => (i + 1) % OPTICS.length)} style={styles.rowPanel}>
+      <Panel onPress={switchable ? onProfile : undefined} style={styles.rowPanel}>
         <Text style={styles.inlineLabel}>ZESTAW</Text>
-        <Text style={[styles.rowTitleMono, styles.flex]}>{set.label}</Text>
-        <Text style={styles.rowSubtitle}>zmień</Text>
-        <Text style={styles.chevron}>›</Text>
+        <Text style={[styles.rowTitleMono, styles.flex]}>{sky.profile.label}</Text>
+        {switchable ? (
+          <>
+            <Text style={styles.rowSubtitle}>zmień</Text>
+            <Text style={styles.chevron}>›</Text>
+          </>
+        ) : null}
       </Panel>
 
-      <Panel
-        tone="teal"
-        onPress={() => router.navigate({ pathname: '/calendar', params: { segment: 'events' } })}
-        style={styles.rowPanel}
-      >
-        <View style={styles.flex}>
-          <Text style={[styles.inlineLabel, styles.teal]}>NASTĘPNY EVENT</Text>
-          <Text style={styles.rowTitle}>{NEXT_EVENT}</Text>
-        </View>
-        <Text style={[styles.chevron, styles.teal]}>›</Text>
-      </Panel>
+      {sky.nextEvent ? (
+        <Panel
+          tone="teal"
+          onPress={() => router.navigate({ pathname: '/calendar', params: { segment: 'events' } })}
+          style={styles.rowPanel}
+        >
+          <View style={styles.flex}>
+            <Text style={[styles.inlineLabel, styles.teal]}>NASTĘPNY EVENT</Text>
+            <Text style={styles.rowTitle}>{sky.nextEvent}</Text>
+          </View>
+          <Text style={[styles.chevron, styles.teal]}>›</Text>
+        </Panel>
+      ) : null}
 
-      <Label right={`${TARGETS.length} · okno i wys. maks.`}>Cele w zasięgu</Label>
-      {TARGETS.map((target) => (
+      <Label right={`${sky.targets.length} · okno i wys. maks.`}>Cele w zasięgu</Label>
+      {sky.targets.length === 0 ? (
+        <Note>Tej nocy żaden cel nie jest w zasięgu tego zestawu.</Note>
+      ) : null}
+      {sky.targets.map((target) => (
         <Panel
           key={target.id}
           tone={target.urgent ? 'warn' : undefined}
-          onPress={() => openTarget(target.id)}
+          onPress={() => onTarget(target.id)}
           style={[styles.rowPanel, target.urgent && styles.urgent]}
         >
           <View style={styles.flex}>
@@ -479,7 +540,7 @@ function Sky() {
                   style={[
                     styles.altitudeFill,
                     target.urgent && styles.urgentFill,
-                    { width: pct(target.altitude / 90) },
+                    { width: pct(Math.max(0, target.altitude) / 90) },
                   ]}
                 />
               </View>
@@ -489,34 +550,54 @@ function Sky() {
           <Text style={styles.chevron}>›</Text>
         </Panel>
       ))}
-      <MenuRow
-        dashed
-        title={`${OUT_OF_REACH} cele poza zasięgiem ${set.reach}`}
-        value="pokaż"
-        chevron="⌄"
-        onPress={() => todo('Lista celów poza zasięgiem zestawu')}
-      />
+      {sky.outOfReach.rows.length > 0 ? (
+        <MenuRow
+          dashed
+          title={sky.outOfReach.title}
+          value={showOut ? 'zwiń' : 'pokaż'}
+          chevron={showOut ? '⌃' : '⌄'}
+          onPress={() => setShowOut((open) => !open)}
+        />
+      ) : null}
+      {showOut
+        ? sky.outOfReach.rows.map((row) => (
+            <MenuRow
+              key={row.id}
+              title={row.name}
+              subtitle={row.why}
+              onPress={() => onTarget(row.id)}
+            />
+          ))
+        : null}
+      {showOut && sky.outOfReach.more > 0 ? (
+        <Note>{`…i jeszcze ${sky.outOfReach.more} — cały katalog jest w Bibliotece celów.`}</Note>
+      ) : null}
       <MenuRow
         title="Biblioteka celów"
-        value="108"
+        value={String(sky.libraryTargets)}
         onPress={() => router.push('/library/targets')}
       />
 
       <Panel>
-        <Label flush right="teraz nad horyzontem">
+        <Label flush right="najwyżej tej nocy">
           Gwiazdozbiory
         </Label>
         <ChipRow>
-          {SKY_CONSTELLATIONS.map((c) => (
+          {sky.constellations.map((c) => (
             <Chip
               key={c.id}
               label={`${c.label} ${c.altitude}°`}
-              onPress={() => router.push({ pathname: '/constellation/[id]', params: { id: c.id } })}
+              onPress={() =>
+                router.push({
+                  pathname: '/constellation/[id]',
+                  params: { id: c.id, night: sky.nightId },
+                })
+              }
             />
           ))}
         </ChipRow>
         <Note>
-          Wysokość nad horyzontem teraz; poniżej 20° pominięte, bo kształtu nie da się wtedy
+          Najwyższe położenie tej nocy; poniżej 20° pominięte, bo kształtu nie da się wtedy
           rozpoznać.
         </Note>
         <Pressable
@@ -525,7 +606,7 @@ function Sky() {
           style={styles.listRow}
         >
           <Text style={[styles.rowTitle, styles.flex]}>Biblioteka gwiazdozbiorów</Text>
-          <Text style={styles.rowSubtitle}>48</Text>
+          <Text style={styles.rowSubtitle}>{String(sky.libraryConstellations)}</Text>
           <Text style={styles.chevron}>›</Text>
         </Pressable>
       </Panel>
@@ -539,11 +620,20 @@ function blockColor(tone: Tone) {
   return 'rgba(255,255,255,0.08)';
 }
 
-function Plan({ go }: { go: boolean }) {
+function Plan({
+  go,
+  sky,
+  onTarget,
+}: {
+  go: boolean;
+  sky: SkyView;
+  onTarget: (id: string) => void;
+}) {
   const { googleConnected } = useMock();
   const [expanded, setExpanded] = useState(false);
   const [booked, setBooked] = useState(false);
-  const shown = expanded ? TARGETS : TARGETS.slice(0, 2);
+  const shown = expanded ? sky.targets : sky.targets.slice(0, 2);
+  const hidden = sky.targets.length - shown.length;
 
   return (
     <>
@@ -613,22 +703,26 @@ function Plan({ go }: { go: boolean }) {
         </Notice>
       ))}
 
-      <Label right="5 · kolejność z segmentu Niebo">Cele na tę noc</Label>
+      <Label right={`${sky.targets.length} · kolejność z segmentu Niebo`}>Cele na tę noc</Label>
       {shown.map((target) => (
-        <Panel key={target.id} onPress={() => openTarget(target.id)} style={styles.rowPanel}>
+        <Panel key={target.id} onPress={() => onTarget(target.id)} style={styles.rowPanel}>
           <Text style={[styles.rowTitle, styles.flex]}>{target.name}</Text>
-          <Text style={[styles.targetWindow, target.urgent && styles.warn]}>{target.window}</Text>
+          {target.seen ? (
+            <Text style={[styles.targetWindow, styles.go]}>{target.seen}</Text>
+          ) : (
+            <Text style={[styles.targetWindow, target.urgent && styles.warn]}>{target.window}</Text>
+          )}
         </Panel>
       ))}
-      {expanded ? null : (
+      {hidden > 0 ? (
         <MenuRow
           dashed
-          title="jeszcze trzy cele"
+          title={`jeszcze ${hidden} ${plural(hidden, ['cel', 'cele', 'celów'])}`}
           value="rozwiń"
           chevron="⌄"
           onPress={() => setExpanded(true)}
         />
-      )}
+      ) : null}
 
       {!googleConnected ? (
         <MenuRow
@@ -669,7 +763,7 @@ function Plan({ go }: { go: boolean }) {
 }
 
 /** 9b: noc w trakcie — lista odhaczeń z paneli celów i to, co jeszcze dziś czeka. */
-function LivePlan() {
+function LivePlan({ onTarget }: { onTarget: (id: string) => void }) {
   return (
     <>
       <Label tone="go" right={LIVE.checked}>
@@ -679,7 +773,7 @@ function LivePlan() {
         <Panel
           key={target.id}
           tone={target.seenAt ? 'go' : target.warning ? 'warn' : undefined}
-          onPress={() => openTarget(target.id)}
+          onPress={() => onTarget(target.id)}
           style={styles.rowPanel}
         >
           <CheckBox checked={Boolean(target.seenAt)} />

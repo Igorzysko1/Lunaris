@@ -60,6 +60,8 @@ const PLANETS: { body: Body; name: string }[] = [
   { body: Body.Neptune, name: 'Neptun' },
 ];
 
+const planetById = (id: string) => PLANETS.find((p) => `planet-${p.body}` === id);
+
 /**
  * Slot na obiekt katalogowy. Astronomy Engine daje osiem gwiazd użytkownika, ale
  * wystarczy jedna: definicja jest globalna, a rachunek dla obiektu kończy się,
@@ -104,7 +106,7 @@ export type UpSpan = {
  * a zapis sprzed roku ma się nadal czytać — choćby surowo.
  */
 export function targetLabel(id: string): string {
-  const planet = PLANETS.find((p) => `planet-${p.body}` === id);
+  const planet = planetById(id);
   if (planet) return planet.name;
 
   const dso = DEEP_SKY_OBJECTS.find((o) => o.id === id);
@@ -418,28 +420,35 @@ function nightGeometry(
 ): TargetGeometry[] {
   const observer = observerOf(coords);
 
-  const planets = PLANETS.map(({ body, name }) => {
-    const magnitude = Illumination(body, window.from).mag;
-    return geometryOf(
-      body,
-      {
-        id: `planet-${body}`,
-        name,
-        detail: `planeta, ${magnitude.toFixed(1)} mag`,
-        kind: 'planet',
-        magnitude,
-        sizeArcmin: null,
-        diffuse: false,
-      },
-      window,
-      observer,
-      horizon,
-    );
-  });
-
+  const planets = PLANETS.map((planet) => planetGeometry(planet, window, observer, horizon));
   const deepSky = DEEP_SKY_OBJECTS.map((dso) => dsoGeometry(dso, window, observer, horizon));
 
   return [...planets, ...deepSky];
+}
+
+function planetGeometry(
+  { body, name }: { body: Body; name: string },
+  window: NightWindow,
+  observer: Observer,
+  horizon: SiteHorizon,
+): TargetGeometry {
+  const magnitude = Illumination(body, window.from).mag;
+
+  return geometryOf(
+    body,
+    {
+      id: `planet-${body}`,
+      name,
+      detail: `planeta, ${magnitude.toFixed(1)} mag`,
+      kind: 'planet',
+      magnitude,
+      sizeArcmin: null,
+      diffuse: false,
+    },
+    window,
+    observer,
+    horizon,
+  );
 }
 
 /**
@@ -563,6 +572,62 @@ export function nightTargetsForProfiles(
       return geometry.map((g) => applyReach(g, reach, { id: profile.id, label }, horizon));
     })
     .sort((a, b) => b.maxAltitude - a.maxAltitude);
+}
+
+/**
+ * Jeden cel tej nocy, osobno dla każdego zestawu — tym samym rachunkiem co cała
+ * lista. Panel celu pyta o jeden obiekt i nie ma po co liczyć efemeryd całego
+ * katalogu. Pusta lista dla identyfikatora spoza katalogu.
+ */
+export function targetTonight(
+  id: string,
+  window: NightWindow,
+  coords: Coords,
+  profiles: OpticsProfile[],
+  bortle: number,
+  horizon: SiteHorizon = FLAT_HORIZON,
+): SkyTarget[] {
+  const observer = observerOf(coords);
+  const planet = planetById(id);
+  const dso = planet ? undefined : DEEP_SKY_OBJECTS.find((o) => o.id === id);
+
+  const geometry = planet
+    ? planetGeometry(planet, window, observer, horizon)
+    : dso
+      ? dsoGeometry(dso, window, observer, horizon)
+      : null;
+  if (!geometry) return [];
+
+  return profiles.map((profile) =>
+    applyReach(
+      geometry,
+      reachOf(profile.optics, bortle),
+      { id: profile.id, label: profileLabel(profile) },
+      horizon,
+    ),
+  );
+}
+
+/**
+ * Wysokość celu w podanych chwilach — słupki profilu wysokości w panelu celu.
+ * Te same efemerydy co lista, żeby słupki i „najwyżej 41°" nie mogły się
+ * rozjechać. `null` dla identyfikatora spoza katalogu.
+ */
+export function altitudesOf(id: string, times: Date[], coords: Coords): number[] | null {
+  const observer = observerOf(coords);
+  const planet = planetById(id);
+
+  let body: Body;
+  if (planet) {
+    body = planet.body;
+  } else {
+    const dso = DEEP_SKY_OBJECTS.find((o) => o.id === id);
+    if (!dso) return null;
+    DefineStar(STAR_SLOT, dso.raHours, dso.dec, dso.distanceLy);
+    body = STAR_SLOT;
+  }
+
+  return times.map((at) => positionOf(body, at, observer).altitude);
 }
 
 /** np. „za terenem na SW (214°), horyzont 18°" — powód inny niż „za nisko". */

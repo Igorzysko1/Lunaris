@@ -47,6 +47,11 @@ export type TargetObservation = {
    * Tylko przy `failed`; brak pola znaczy „nie podano", nie „bez powodu".
    */
   reason?: string;
+  /**
+   * Kiedy cel odhaczono w panelu celu, w ISO. Tylko przy `seen` i tylko wtedy,
+   * gdy odhaczenie padło w trakcie nocy — cel dopisany z pamięci godziny nie ma.
+   */
+  seenAt?: string;
 };
 
 /**
@@ -89,11 +94,13 @@ export type Journal = {
  * wartości domyślnych po nieudanym odczycie — właściwy dla konfiguracji —
  * kasowałby tu sezon obserwacji.
  */
-export const JOURNAL_VERSION = 2;
+export const JOURNAL_VERSION = 3;
 
 // Historia wersji:
 // 2 — powód nieudanego podejścia (`TargetObservation.reason`). Zapis v1 wczytuje
 //     się bez zmian: brak pola znaczy tylko, że powodu nie podano.
+// 3 — godzina odhaczenia celu (`TargetObservation.seenAt`). Starsze zapisy jej
+//     nie mają i nie muszą: brak znaczy „dopisane po nocy".
 
 export const EMPTY_JOURNAL: Journal = { version: JOURNAL_VERSION, logs: [] };
 
@@ -148,6 +155,65 @@ export function withTimeline(
       };
 
   return upsertLog(journal, log);
+}
+
+/**
+ * Odhaczenie celu w panelu celu (6a) — w trakcie nocy, zanim powstanie wpis.
+ *
+ * Dokłada obserwację do wpisu tej nocy albo zakłada szkic, który arkusz „Jak
+ * było?" potem uzupełnia. Wcześniejszą obserwację tego celu zastępuje, ale jej
+ * warunki zostają: to wciąż to samo podejście tej samej nocy.
+ */
+export function withSighting(
+  journal: Journal,
+  night: { id: string; nightFrom: string; siteId: string | null; siteName: string },
+  observation: TargetObservation,
+  savedAt: string,
+): Journal {
+  const existing = journal.logs.find((l) => l.id === night.id);
+  const log: NightLog = existing ?? {
+    ...night,
+    observations: [],
+    transparency: null,
+    seeing: null,
+    note: '',
+    savedAt,
+  };
+  const previous = log.observations.find((o) => o.targetId === observation.targetId);
+  const next = cleanObservation({
+    ...observation,
+    conditions: previous?.conditions ?? observation.conditions,
+  });
+
+  return upsertLog(journal, {
+    ...log,
+    observations: log.observations.filter((o) => o.targetId !== observation.targetId).concat(next),
+    savedAt,
+  });
+}
+
+/**
+ * Cofnięcie odhaczenia. Wpis, po którym nic nie zostało — bez celów, ocen,
+ * notatki i przebiegu — znika, zamiast wisieć w Dzienniku jako pusta noc.
+ */
+export function withoutSighting(journal: Journal, nightId: string, targetId: string): Journal {
+  const existing = journal.logs.find((l) => l.id === nightId);
+  if (!existing) return journal;
+
+  const log = {
+    ...existing,
+    observations: existing.observations.filter((o) => o.targetId !== targetId),
+  };
+  const empty =
+    log.observations.length === 0 &&
+    log.transparency === null &&
+    log.seeing === null &&
+    log.note.trim() === '' &&
+    !log.timeline;
+
+  return empty
+    ? { version: JOURNAL_VERSION, logs: journal.logs.filter((l) => l.id !== nightId) }
+    : upsertLog(journal, log);
 }
 
 /** Co dziennik wie o jednym obiekcie. */
@@ -371,13 +437,21 @@ export const OTHER_REASON = 'inne';
 /** Dłużej niż kilka słów to już notatka, a nie powód. */
 const REASON_MAX = 60;
 
-/** Powód zostaje tylko przy nieudanym podejściu i tylko jako niepusty tekst. */
+/**
+ * Powód zostaje tylko przy nieudanym podejściu i tylko jako niepusty tekst,
+ * godzina odhaczenia — tylko przy widzianym i tylko jako prawdziwa data.
+ */
 function cleanObservation(observation: TargetObservation): TargetObservation {
   if (typeof observation !== 'object' || observation === null) return observation;
 
-  const { reason, ...rest } = observation;
-  const text = typeof reason === 'string' ? reason.trim().slice(0, REASON_MAX) : '';
-  return observation.outcome === 'failed' && text ? { ...rest, reason: text } : rest;
+  const { reason, seenAt, ...rest } = observation;
+  if (observation.outcome === 'failed') {
+    const text = typeof reason === 'string' ? reason.trim().slice(0, REASON_MAX) : '';
+    return text ? { ...rest, reason: text } : rest;
+  }
+
+  const valid = typeof seenAt === 'string' && !Number.isNaN(Date.parse(seenAt));
+  return valid ? { ...rest, seenAt } : rest;
 }
 
 /** Wieczór nocy z identyfikatora `RRRR-MM-DD`, w południe; `null` dla daty, której nie ma. */

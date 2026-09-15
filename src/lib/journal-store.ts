@@ -88,6 +88,26 @@ export async function saveTimeline(
   }
 }
 
+/**
+ * Dowolna zmiana dziennika — odhaczenie celu w panelu i jego cofnięcie. Ta sama
+ * odmowa co przy zapisie nocy: nieczytelnego dziennika nie nadpisujemy.
+ */
+export async function updateJournal(
+  change: (journal: Journal) => Journal,
+): Promise<Journal | null> {
+  const { journal, readable } = await loadJournal();
+  if (!readable) return null;
+
+  const updated = change(journal);
+
+  try {
+    await AsyncStorage.setItem(JOURNAL_KEY, JSON.stringify(updated));
+    return updated;
+  } catch {
+    return null;
+  }
+}
+
 /** Nazwa pliku z datą — eksporty z różnych dni nie mają się nadpisywać. */
 function exportName(now: Date): string {
   const stamp = now.toISOString().slice(0, 10);

@@ -139,7 +139,13 @@ export default function EntryScreen() {
               <Text style={styles.targetName}>
                 {targetLabel(observation.targetId).replace(' — ', ' ')}
               </Text>
-              {seen ? null : (
+              {seen ? (
+                observation.seenAt ? (
+                  <Text style={styles.why}>
+                    {`odhaczony o ${formatTime(new Date(observation.seenAt))}`}
+                  </Text>
+                ) : null
+              ) : (
                 <Text style={styles.why}>
                   {failureWhy(observation.conditions, observation.reason)}
                 </Text>

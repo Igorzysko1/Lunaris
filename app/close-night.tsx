@@ -153,6 +153,8 @@ export default function CloseNightSheet() {
         if (!conditions) return [];
 
         const reason = outcome === 'failed' ? next.reasons[targetId] : undefined;
+        // Godzina z panelu celu zostaje, dopóki cel jest widziany.
+        const seenAt = outcome === 'seen' ? previous?.seenAt : undefined;
         return [
           {
             targetId,
@@ -160,6 +162,7 @@ export default function CloseNightSheet() {
             conditions,
             profileId: previous?.profileId ?? item?.target.profileId ?? 'default',
             ...(reason ? { reason } : {}),
+            ...(seenAt ? { seenAt } : {}),
           },
         ];
       },
@@ -234,6 +237,12 @@ export default function CloseNightSheet() {
     const saved = await saveLog(buildLog(draft));
     if (saved) router.back();
     else setFailedSave(true);
+  }
+
+  /** Godzina przy celu: odhaczenie z panelu, a bez niego najlepszy moment nocy. */
+  function timeOf(targetId: string, best: Date | null): string {
+    const seenAt = existing?.observations.find((o) => o.targetId === targetId)?.seenAt;
+    return seenAt ? formatTime(new Date(seenAt)) : best ? formatTime(best) : '—';
   }
 
   function renderTarget(targetId: string, name: string, time: string, firstTime: boolean) {
@@ -342,12 +351,12 @@ export default function CloseNightSheet() {
         renderTarget(
           item.target.id,
           shortName(item.target.name),
-          formatTime(item.target.bestAt),
+          timeOf(item.target.id, item.target.bestAt),
           item.target.kind === 'dso' && (item.history?.seenCount ?? 0) === 0,
         ),
       )}
       {orphans.map((targetId) =>
-        renderTarget(targetId, shortName(targetLabel(targetId)), '—', false),
+        renderTarget(targetId, shortName(targetLabel(targetId)), timeOf(targetId, null), false),
       )}
 
       {more.length > 0 ? (

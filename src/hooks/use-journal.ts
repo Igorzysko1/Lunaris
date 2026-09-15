@@ -2,7 +2,7 @@ import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 
 import { EMPTY_JOURNAL, type Journal, type NightLog } from '@/lib/journal';
-import { loadJournal, saveNightLog, saveTimeline } from '@/lib/journal-store';
+import { loadJournal, saveNightLog, saveTimeline, updateJournal } from '@/lib/journal-store';
 import type { SessionTimeline } from '@/lib/session-timeline';
 
 type JournalState = { journal: Journal; readable: boolean; loaded: boolean };
@@ -31,6 +31,15 @@ export async function saveEntryTimeline(
   timeline: SessionTimeline,
 ): Promise<Journal | null> {
   const updated = await saveTimeline(night, timeline);
+  if (updated) publish(updated);
+  return updated;
+}
+
+/** Zmiana spoza arkusza — odhaczenie celu w panelu i jego cofnięcie. */
+export async function changeJournal(
+  change: (journal: Journal) => Journal,
+): Promise<Journal | null> {
+  const updated = await updateJournal(change);
   if (updated) publish(updated);
   return updated;
 }

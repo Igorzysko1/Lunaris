@@ -3,8 +3,8 @@ import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { CONSTELLATIONS } from '@/data/constellations';
+import { useConstellationTonight } from '@/hooks/use-constellation-tonight';
 import { FIGURES, FIGURE_TARGETS } from '@/mock/constellation-figures';
-import { SKY_CONSTELLATIONS } from '@/mock/night';
 import { colors, fonts } from '@/theme';
 import { ConstellationFigure } from '@/ui/figure';
 import { Body, Button, Label, Note, Panel, Sheet } from '@/ui/kit';
@@ -20,14 +20,15 @@ const STEP = 15;
 
 /**
  * 7a/8a: panel gwiazdozbioru. Nazwy, kotwica, podpowiedź i łatwość pochodzą
- * z `src/data/constellations.ts`; kształt z makiety pola `figure`.
+ * z `src/data/constellations.ts`, „gdzie szukać" — z efemeryd nocy wybranej
+ * w Niebie (bez niej: nocy bieżącej); kształt z makiety pola `figure`.
  */
 export default function ConstellationSheet() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, night } = useLocalSearchParams<{ id: string; night?: string }>();
   const meta = CONSTELLATIONS.find((c) => c.id === id) ?? CONSTELLATIONS[0];
+  const where = useConstellationTonight(meta, night);
   const figure = FIGURES[meta.id];
   const targets = FIGURE_TARGETS[meta.id] ?? [];
-  const tonight = SKY_CONSTELLATIONS.find((c) => c.id === meta.id);
   const [rotation, setRotation] = useState(0);
   const [gyro, setGyro] = useState(false);
 
@@ -49,11 +50,7 @@ export default function ConstellationSheet() {
     <Sheet title={meta.name} subtitle={`${meta.latin} · kotwica: ${meta.star}`}>
       <Panel>
         <Label flush>Gdzie szukać</Label>
-        <Text style={styles.where}>
-          {tonight
-            ? `Teraz ${tonight.altitude}° nad horyzontem.`
-            : 'Tej nocy nisko albo pod horyzontem.'}
-        </Text>
+        <Text style={styles.where}>{where}</Text>
         <Body>{meta.hint}</Body>
         <Text style={[styles.ease, meta.ease === 3 && styles.easeHard]}>● {EASE[meta.ease]}</Text>
       </Panel>

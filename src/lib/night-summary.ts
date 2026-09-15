@@ -210,8 +210,14 @@ export type NightBar = {
   sunset: string;
 };
 
-/** Geometria paska nocy dla karty werdyktu: ułamki szerokości i podpisy osi. */
-export function nightBar(summary: NightSummary, window: NightWindow): NightBar {
+/**
+ * Geometria paska nocy: ułamki szerokości i podpisy osi. Karta werdyktu podaje
+ * okno sesji, panel celu — odcinek, w którym cel stoi nad horyzontem.
+ */
+export function nightBar(
+  summary: Pick<NightSummary, 'axis' | 'dark' | 'moon'>,
+  window: NightWindow,
+): NightBar {
   const { axis, dark, moon } = summary;
   const at = (date: Date) =>
     Math.min(1, Math.max(0, positionOnAxis(axis, date) ?? (date < axis.from ? 0 : 1)));

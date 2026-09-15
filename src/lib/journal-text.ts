@@ -7,12 +7,13 @@
  * Importy względne (nie alias @/), żeby moduł dało się uruchomić poza Metro.
  */
 
-import { formatNightSpan } from './date.ts';
+import { formatNightSpan, formatTime } from './date.ts';
 import {
   PACKED_UP,
   packedUp,
   parseNightId,
   type AttemptConditions,
+  type Journal,
   type NightLog,
 } from './journal.ts';
 import { monthLabel } from './monthly-report.ts';
@@ -133,4 +134,47 @@ export function logsByMonth(logs: NightLog[]): { heading: string; logs: NightLog
     const label = monthLabel(month);
     return { heading: label.charAt(0).toUpperCase() + label.slice(1), logs: entries };
   });
+}
+
+export type Sighting = {
+  logId: string;
+  /** „14/15 września 2026" */
+  date: string;
+  place: string;
+  /** Pierwsza linijka notatki albo oceny; przy nieudanym — powód z warunkami. */
+  detail: string;
+  /** „✓ 23:04", „✓" albo „✕". */
+  mark: string;
+  seen: boolean;
+};
+
+/**
+ * Podejścia do jednego celu, od najnowszego — historia w panelu celu. Nieudane
+ * zostają na liście: bez nich „widziane 2×" chowałoby, że próbowało się pięć razy.
+ */
+export function sightingsOf(journal: Journal, targetId: string): Sighting[] {
+  return [...journal.logs]
+    .sort((a, b) => b.id.localeCompare(a.id))
+    .flatMap((log) => {
+      const observation = log.observations.find((o) => o.targetId === targetId);
+      if (!observation) return [];
+
+      const seen = observation.outcome === 'seen';
+      return [
+        {
+          logId: log.id,
+          date: `${nightSpanOfLog(log)} ${log.id.slice(0, 4)}`,
+          place: log.siteName,
+          detail: seen
+            ? log.note.split('\n')[0].trim() || ratingsLabel(log)
+            : failureWhy(observation.conditions, observation.reason),
+          mark: seen
+            ? observation.seenAt
+              ? `✓ ${formatTime(new Date(observation.seenAt))}`
+              : '✓'
+            : '✕',
+          seen,
+        },
+      ];
+    });
 }

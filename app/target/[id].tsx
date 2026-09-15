@@ -1,8 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { HOUR_AXIS, targetDetail } from '@/mock/night';
+import { useTargetPanel, type TargetPanelParams } from '@/hooks/use-target-panel';
 import { useMock } from '@/mock/state';
 import { colors, fonts } from '@/theme';
 import {
@@ -18,92 +17,114 @@ import {
   Panel,
   Sheet,
   Strong,
-  todo,
 } from '@/ui/kit';
 import { HourBars, WindowBar } from '@/ui/night';
 
 /**
- * Panel celu — „czy dziś i o której". Jeden panel w dwóch stanach danych:
- * 6a — sesja trwa, odhaczenie stoi na samej górze, bo to jedyna rzecz, którą
- * się tu robi; 6b — poza sesją panel nie udaje, że można coś odhaczyć.
- * „Nie wyszło" zbiera się dopiero w arkuszu zamknięcia nocy, z powodem.
+ * Panel celu — „czy dziś i o której". Jeden panel w dwóch stanach:
+ * 6a — noc trwa, odhaczenie stoi na samej górze, bo to jedyna rzecz, którą się
+ * tu robi, i od razu trafia do dziennika z godziną; 6b — przed nocą panel nie
+ * udaje, że można coś odhaczyć. „Nie wyszło" zbiera się dopiero w arkuszu
+ * zamknięcia nocy, z powodem.
  */
 export default function TargetSheet() {
-  const { id } = useLocalSearchParams<{ id: string }>();
-  const target = targetDetail(id);
+  const params = useLocalSearchParams<TargetPanelParams>();
+  const panel = useTargetPanel(params);
   const { session } = useMock();
-  const live = session === 'live';
-  const [seenAt, setSeenAt] = useState<string | null>(live ? target.seenAt : null);
+
+  if (!panel.found) {
+    return (
+      <Sheet title={panel.name}>
+        <Note>
+          Tego celu nie ma w katalogu — zapis może pochodzić ze starszej wersji aplikacji.
+        </Note>
+      </Sheet>
+    );
+  }
+
+  // Przełącznik makiety „noc w trakcie" otwiera odhaczanie także za dnia — tylko
+  // dla nocy bieżącej, bo tylko do niej trafiłoby odhaczenie.
+  const live = panel.checkOffOpen || (session === 'live' && panel.currentNight);
 
   return (
-    <Sheet title={target.name} subtitle={target.meta}>
-      {target.firstTime ? (
+    <Sheet title={panel.name} subtitle={panel.meta}>
+      {panel.firstTime || panel.picked ? (
         <ChipRow>
-          <Chip label="1. RAZ" tone="warn" />
+          {panel.firstTime ? <Chip label="1. RAZ" tone="warn" /> : null}
+          {panel.picked ? <Chip label="w planie tej nocy" tone="accent" /> : null}
         </ChipRow>
       ) : null}
 
       {live ? (
         <Panel tone="accent" style={styles.row}>
           <CheckBox
-            checked={seenAt !== null}
+            checked={panel.seen !== null}
             tone="accent"
-            onPress={() => setSeenAt((value) => (value ? null : '23:04'))}
+            onPress={panel.seen ? panel.unmark : panel.mark}
           />
           <View style={styles.flex}>
-            <Text style={styles.title}>
-              {seenAt ? `Widziałem — ${seenAt}` : 'Odhacz, gdy zobaczysz'}
+            <Text style={styles.title}>{panel.seen ?? 'Odhacz, gdy zobaczysz'}</Text>
+            <Text style={styles.subtitle}>
+              {panel.failed ?? `trafi do zapisu nocy ${panel.nightSpan}`}
             </Text>
-            <Text style={styles.subtitle}>trafi do zapisu nocy 14/15 września</Text>
           </View>
-          {seenAt ? (
-            <Pressable onPress={() => setSeenAt(null)} hitSlop={12} accessibilityRole="button">
+          {panel.seen ? (
+            <Pressable onPress={panel.unmark} hitSlop={12} accessibilityRole="button">
               <Text style={styles.link}>cofnij</Text>
             </Pressable>
           ) : null}
         </Panel>
       ) : null}
+      {!panel.readable ? (
+        <Notice tone="bad">
+          Zapisanego dziennika nie da się odczytać — odhaczenie nie zapisze się, żeby go nie
+          nadpisać.
+        </Notice>
+      ) : panel.saveFailed ? (
+        <Notice tone="bad">Nie udało się zapisać — dziennik jest nietknięty.</Notice>
+      ) : null}
+      {panel.outOfReach ? <Notice>{panel.outOfReach}</Notice> : null}
 
       <Panel>
-        <Label flush right={`${target.visibility} w oknie`}>
+        <Label flush right={panel.visibility}>
           Widoczność tej nocy
         </Label>
-        <WindowBar {...target.bar} now={live ? target.bar.now : undefined} />
-        {target.overlapWarning ? <Notice>{target.overlapWarning}</Notice> : null}
-        {target.altitude.length ? (
+        <WindowBar {...panel.bar} now={live ? panel.nowOnBar : undefined} />
+        {panel.overlapWarning ? <Notice>{panel.overlapWarning}</Notice> : null}
+        {panel.altitude ? (
           <>
             <HourBars
-              values={target.altitude}
+              values={panel.altitude.values}
               max={90}
-              highlight={[2, 6]}
-              axis={HOUR_AXIS}
+              highlight={panel.altitude.highlight}
+              axis={panel.altitude.axis}
               height={56}
             />
             <View style={styles.between}>
               <Text style={styles.subtitle}>
-                wysokość · najwyżej <Strong>{target.highest}</Strong> o{' '}
-                <Strong>{target.highestAt}</Strong>
+                wysokość · najwyżej <Strong>{panel.altitude.highest}</Strong> o{' '}
+                <Strong>{panel.altitude.highestAt}</Strong>
               </Text>
-              <Text style={styles.subtitle}>azymut {target.azimuth}</Text>
+              <Text style={styles.subtitle}>{panel.altitude.azimuth}</Text>
             </View>
           </>
         ) : null}
       </Panel>
 
-      <Label right={target.sightingsSummary}>Historia zobaczeń</Label>
-      {target.sightings.length ? (
-        target.sightings.map((sighting) => (
+      <Label right={panel.historySummary}>Historia zobaczeń</Label>
+      {panel.sightings.length ? (
+        panel.sightings.map((sighting) => (
           <Panel
-            key={sighting.date}
-            onPress={() => router.push({ pathname: '/entry/[id]', params: { id: '2026-09-14' } })}
+            key={sighting.logId}
+            onPress={() => router.push({ pathname: '/entry/[id]', params: { id: sighting.logId } })}
             style={styles.row}
           >
             <View style={styles.flex}>
               <Text style={styles.title}>{sighting.date}</Text>
               <Text style={styles.subtitle}>{sighting.place}</Text>
-              <Text style={styles.subtitle}>{sighting.note}</Text>
+              <Text style={styles.subtitle}>{sighting.detail}</Text>
             </View>
-            <Text style={styles.rate}>{sighting.rate}</Text>
+            <Text style={[styles.rate, !sighting.seen && styles.failed]}>{sighting.mark}</Text>
             <Text style={styles.chevron}>›</Text>
           </Panel>
         ))
@@ -113,12 +134,12 @@ export default function TargetSheet() {
         </Panel>
       )}
 
-      {!live && target.optics ? (
+      {!live && panel.optics ? (
         <>
           <Label>W tym zestawie</Label>
           <Panel>
-            <Text style={styles.title}>{target.optics.label}</Text>
-            <Text style={styles.subtitle}>{target.optics.detail}</Text>
+            <Text style={styles.title}>{panel.optics.label}</Text>
+            <Text style={styles.subtitle}>{panel.optics.detail}</Text>
           </Panel>
         </>
       ) : null}
@@ -126,18 +147,18 @@ export default function TargetSheet() {
       {live ? (
         <MenuRow
           dashed
-          title="Dopisz do planu tej nocy"
-          chevron="+"
-          onPress={() => todo('Dopisanie celu do planu nocy')}
+          title={panel.picked ? 'Zdejmij z planu tej nocy' : 'Dopisz do planu tej nocy'}
+          chevron={panel.picked ? '−' : '+'}
+          onPress={panel.togglePick}
         />
       ) : (
         <>
           <Button
-            label="dopisz do planu tej nocy"
+            label={panel.picked ? 'zdejmij z planu tej nocy' : 'dopisz do planu tej nocy'}
             tone="accent"
-            onPress={() => todo('Dopisanie celu do planu nocy')}
+            onPress={panel.togglePick}
           />
-          <Note>Odhaczenie pojawia się po rozpoczęciu sesji.</Note>
+          <Note>Odhaczenie pojawia się od zachodu Słońca tej nocy.</Note>
         </>
       )}
     </Sheet>
@@ -156,6 +177,7 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   link: { fontFamily: fonts.sans, fontSize: 13, color: colors.purple },
-  rate: { fontFamily: fonts.monoMedium, fontSize: 13, color: colors.textPrimary },
+  rate: { fontFamily: fonts.monoMedium, fontSize: 13, color: colors.green },
+  failed: { color: colors.amber },
   chevron: { fontFamily: fonts.mono, fontSize: 16, color: colors.purple },
 });

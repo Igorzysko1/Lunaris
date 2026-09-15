@@ -27,6 +27,7 @@ const PLATFORM_MODULES = new Set([
   'settings-storage.ts',
   'notice-store.ts',
   'journal-store.ts',
+  'night-picks-store.ts',
   'notification-store.ts',
   'google-oauth.ts',
   'google-account.ts',
