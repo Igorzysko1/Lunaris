@@ -60,6 +60,11 @@ export default function MoreScreen() {
           go: () => router.push('/library/constellations'),
         },
         { title: 'Zdjęcie dnia NASA', go: () => router.push('/apod') },
+        {
+          title: 'Tryb nocny',
+          subtitle: more.nightMode,
+          go: () => router.push('/night-mode'),
+        },
       ],
     },
     {
@@ -80,21 +85,6 @@ export default function MoreScreen() {
           title: 'Źródła danych i o aplikacji',
           subtitle: more.about,
           go: () => router.push('/about'),
-        },
-      ],
-    },
-    {
-      label: 'Makieta',
-      rows: [
-        {
-          title: 'Stany makiety',
-          subtitle: 'noc w trakcie',
-          go: () => router.push('/mock-states'),
-        },
-        {
-          title: 'Tryb nocny',
-          subtitle: 'arkusz z trybem czerwonym i jasnością',
-          go: () => router.push('/night-mode'),
         },
       ],
     },

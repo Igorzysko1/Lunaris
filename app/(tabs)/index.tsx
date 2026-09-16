@@ -18,7 +18,6 @@ import { useSessionTimeline } from '@/hooks/use-session-timeline';
 import { plural } from '@/lib/journal-text';
 import { STALE_BOOKING } from '@/lib/plan-text';
 import type { Narration } from '@/lib/session-text';
-import { useMock } from '@/mock/state';
 import { colors, fonts, hexA } from '@/theme';
 import {
   Body,
@@ -106,7 +105,6 @@ function NightView({
   profileId: string | null;
   onProfile: (id: string) => void;
 }) {
-  const { session } = useMock();
   // Efemerydy celów liczą się przy pierwszym wejściu do Nieba albo Planu —
   // otwarcie zakładki na Warunkach nie ma na nie czekać.
   const [skyWanted, setSkyWanted] = useState(segment !== 'conditions');
@@ -116,7 +114,7 @@ function NightView({
   const index = Math.min(night, verdicts.nights.length - 1);
   const card = verdicts.nights[index];
   const moment = verdicts.moments[index];
-  const live = liveOf(card, moment, session === 'live' && index === 0);
+  const live = moment.live;
   const best = verdicts.bestNight(index);
   const sky = useNightSky(card, profileId, skyWanted);
 
@@ -177,16 +175,6 @@ function NightView({
       ) : null}
     </Screen>
   );
-}
-
-/**
- * Noc w trakcie. Przełącznik makiety „noc w trakcie" zostaje dla Planu
- * (etap 5) — gdy sesja nie trwa naprawdę, licznik stoi na starcie okna.
- */
-function liveOf(card: NightCard, moment: NightMoment, forced: boolean): Live | null {
-  if (moment.live) return moment.live;
-  if (!forced || !card.go || !card.window) return null;
-  return { now: card.window.from, remaining: `zostało ${card.window.duration}`, progress: 0 };
 }
 
 function NightSwitcher({

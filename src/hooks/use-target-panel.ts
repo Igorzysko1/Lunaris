@@ -176,8 +176,6 @@ export function useTargetPanel(params: TargetPanelParams) {
         : null,
     /** Od zachodu do wschodu Słońca tej nocy. */
     checkOffOpen: checkOffOpen(axis, now),
-    /** Czy to noc, która trwa albo zaraz się zacznie — dla przełącznika makiety. */
-    currentNight: logId === nightLogId(currentNightWindow(now, { lat, lon }).from),
     seen: observation?.outcome === 'seen' ? seenTitle(observation.seenAt) : null,
     failed:
       observation?.outcome === 'failed'

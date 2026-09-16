@@ -11,7 +11,6 @@ import {
   IBMPlexMono_600SemiBold,
 } from '@expo-google-fonts/ibm-plex-mono';
 
-import { MockProvider } from '@/mock/state';
 import { ForecastProvider } from '@/store/forecast';
 import { GoogleProvider } from '@/store/google';
 import { SettingsProvider, useSettings } from '@/store/settings';
@@ -43,9 +42,7 @@ export default function RootLayout() {
         {/* Nad cyklem i ekranami: stan konta czytają karty sesji, przegląd
             i Ustawienia, a odłączenie wykryte gdziekolwiek ma dotrzeć wszędzie. */}
         <GoogleProvider>
-          <MockProvider>
-            <AppStack />
-          </MockProvider>
+          <AppStack />
         </GoogleProvider>
       </ThemeProvider>
     </SettingsProvider>
@@ -126,7 +123,6 @@ function AppStack() {
           <Stack.Screen name="notifications" />
           <Stack.Screen name="library/targets" />
           <Stack.Screen name="library/constellations" />
-          <Stack.Screen name="mock-states" />
           <Stack.Screen name="settings/equipment" />
           <Stack.Screen name="settings/observer" />
           <Stack.Screen name="settings/google" />

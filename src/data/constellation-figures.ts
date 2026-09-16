@@ -1,10 +1,11 @@
 /**
- * Kształty gwiazdozbiorów z projektu (`constellation-figures.js`) — makieta
- * pola `figure`, którego `src/data/constellations.ts` dziś nie ma.
+ * Kształty gwiazdozbiorów: które gwiazdy rysują figurę i którędy biegną linie.
  *
  * Nazwy własne i litery Bayera są prawdziwe. WSPÓŁRZĘDNE SĄ SCHEMATYCZNE:
- * jednostki −1..1 kadru dobrane tak, by kształt był rozpoznawalny. Przy
- * wdrożeniu do zastąpienia rektascensją i deklinacją z katalogu jasnych gwiazd.
+ * jednostki −1..1 kadru dobrane tak, by kształt był rozpoznawalny. Prawdziwe
+ * rektascensje i deklinacje z katalogu jasnych gwiazd to osobne zadanie — do
+ * tego czasu figura pokazuje układ, a nie pomiar, i obrót nad horyzontem liczy
+ * się ze środka gwiazdozbioru, nie z tych punktów.
  *
  * s: [x, y, litera Bayera, nazwa własna?]   l: [[indeksy wzdłuż linii], ...]
  */

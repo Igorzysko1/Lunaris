@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import Svg, { Circle, Polyline, Text as SvgText } from 'react-native-svg';
 
-import type { Figure } from '@/mock/constellation-figures';
+import type { Figure } from '@/data/constellation-figures';
 import { colors, fonts, hexA } from '@/theme';
 
 /** Kadr rysunku: 220×220, środek w 110. */

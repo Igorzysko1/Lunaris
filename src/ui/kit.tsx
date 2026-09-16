@@ -2,7 +2,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import type { ComponentProps, ReactNode } from 'react';
 import {
-  Alert,
   Pressable,
   ScrollView,
   Text,
@@ -18,10 +17,11 @@ import { HAIRLINE, colors, fonts, hexA, radius, type Palette } from '@/theme';
 import { themedStyles } from '@/ui/theme';
 
 /**
- * Klocki nowego frontendu z projektów „Lunaris IA" i „Lunaris Noc — werdykt".
+ * Klocki interfejsu z projektów „Lunaris IA" i „Lunaris Noc — werdykt".
  *
- * Ekrany makiety składają się wyłącznie z tych elementów i danych z `src/mock`,
- * żeby podpinanie logiki podmieniało dane, a nie wygląd.
+ * Ekrany składają się wyłącznie z tych elementów, więc zmiana wyglądu jest
+ * zmianą w jednym pliku, a nie w trzydziestu — i dotyczy też trybu czerwonego,
+ * bo to stąd bierze się kolor każdego stanu (`toneColor`) i jego znak (`toneMark`).
  */
 
 export type Tone = 'neutral' | 'go' | 'teal' | 'warn' | 'bad' | 'accent';
@@ -61,14 +61,6 @@ export function toneMark(tone: Tone | undefined): string | null {
 }
 
 type IconName = ComponentProps<typeof Ionicons>['name'];
-
-/**
- * Przycisk bez podpiętej logiki. Makieta mówi to wprost, zamiast udawać,
- * że coś się stało — każde wywołanie to pozycja w planie podpinania.
- */
-export function todo(what: string) {
-  Alert.alert('Do zrobienia', `${what} — w makiecie nic tu jeszcze nie jest podpięte.`);
-}
 
 export function Screen({ children }: { children: ReactNode }) {
   const insets = useSafeAreaInsets();

@@ -5,7 +5,7 @@ import { Text, View } from 'react-native';
 import { CONSTELLATIONS } from '@/data/constellations';
 import { useConstellationView } from '@/hooks/use-constellation-tonight';
 import { useDeviceRoll } from '@/hooks/use-device-roll';
-import { FIGURES } from '@/mock/constellation-figures';
+import { FIGURES } from '@/data/constellation-figures';
 import { colors, fonts } from '@/theme';
 import { ConstellationFigure } from '@/ui/figure';
 import { Body, Button, Label, Note, Panel, Sheet } from '@/ui/kit';

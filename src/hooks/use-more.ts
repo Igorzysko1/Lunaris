@@ -48,7 +48,7 @@ function useStoredForecasts(): StoredForecast[] | null {
  * ustawione, bez wchodzenia na podstronę.
  */
 export function useMore() {
-  const { config, active, autoLocation, notifications, leadTime } = useSettings();
+  const { config, active, autoLocation, notifications, leadTime, theme } = useSettings();
   const google = useGoogle();
   const { journal } = useJournal();
   const { cycle } = useForecast();
@@ -98,6 +98,12 @@ export function useMore() {
         : forecasts.length === 0
           ? 'pusto'
           : `${forecasts.length} ${plural(forecasts.length, ['zapis', 'zapisy', 'zapisów'])} · ostatni ${formatAge(forecasts[0].savedAt, now)}`,
+    nightMode:
+      theme.mode === 'red'
+        ? `czerwony · jasność ${theme.brightness}%`
+        : theme.auto
+          ? 'zwykły ciemny · czerwony sam po zmierzchu'
+          : 'zwykły ciemny',
     about: cycle.lastSuccessAt
       ? `ostatnie pobranie ${formatAge(cycle.lastSuccessAt, now)}`
       : 'źródła, wersja, stan pobierania',

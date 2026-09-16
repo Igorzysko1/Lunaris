@@ -22,7 +22,7 @@ import {
 } from '@/lib/sky-library';
 import { describeSize } from '@/lib/sky-text';
 import { libraryReach, libraryReachLevel, type ReachLevel } from '@/lib/sky-targets';
-import { FIGURES, SEASON_ORDER } from '@/mock/constellation-figures';
+import { FIGURES, SEASON_ORDER } from '@/data/constellation-figures';
 import { useSettings } from '@/store/settings';
 
 export type LibraryKind = 'all' | DeepSkyObject['kind'];

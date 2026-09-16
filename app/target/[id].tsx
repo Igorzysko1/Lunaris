@@ -2,7 +2,6 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Pressable, Text, View } from 'react-native';
 
 import { useTargetPanel, type TargetPanelParams } from '@/hooks/use-target-panel';
-import { useMock } from '@/mock/state';
 import { colors, fonts } from '@/theme';
 import {
   Body,
@@ -31,7 +30,6 @@ import { themedStyles } from '@/ui/theme';
 export default function TargetSheet() {
   const params = useLocalSearchParams<TargetPanelParams>();
   const panel = useTargetPanel(params);
-  const { session } = useMock();
 
   if (!panel.found) {
     return (
@@ -43,9 +41,9 @@ export default function TargetSheet() {
     );
   }
 
-  // Przełącznik makiety „noc w trakcie" otwiera odhaczanie także za dnia — tylko
-  // dla nocy bieżącej, bo tylko do niej trafiłoby odhaczenie.
-  const live = panel.checkOffOpen || (session === 'live' && panel.currentNight);
+  // Odhaczanie stoi otworem od zachodu do wschodu Słońca tej nocy — poza tym
+  // oknem nie ma czego odhaczać, bo nikt wtedy nie patrzy w niebo.
+  const live = panel.checkOffOpen;
 
   return (
     <Sheet title={panel.name} subtitle={panel.meta}>

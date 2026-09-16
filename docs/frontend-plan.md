@@ -266,8 +266,19 @@ komponenty (`night-cards`, `CloudCoverChart`, `EventCard`) sprząta etap 10. Tes
 
 ### Etap 10 — Sprzątanie
 
-Usunąć `src/mock/`, `app/mock-states.tsx`, `app/legacy/`, wiersze „Makieta" w Więcej, nieużywane
-komponenty z `src/components`. `grep -rn "todo(" app src` ma zwrócić pusto.
+Zrobione (etap 10). Usunięte: `src/mock/` (cały katalog), `app/mock-states.tsx` z wpisem w nawigacji,
+grupa „Makieta" w Więcej, przełącznik `useMock`/`MockProvider` wraz z wymuszaniem nocy w trakcie
+w Nocy i w panelu celu, `kit.todo()` oraz nieużywane komponenty `CloudCoverChart`, `EventCard`
+i `night-cards`. `app/legacy/` zniknęło już w etapie 8.
+
+Dwie rzeczy zostały świadomie. Figury gwiazdozbiorów przeniosły się do `src/data/constellation-figures.ts`
+— są danymi, nie makietą; schematyczne współrzędne to osobne zadanie (wiersz 18 niżej), a nie pozostałość
+po makiecie. `src/components/primitives.tsx` zostaje, bo używają go Lokalizacja i karta APOD.
+
+Noc w trakcie rozstrzyga teraz wyłącznie zegar: `moment.live` w Nocy i `checkOffOpen` w panelu celu.
+Odpadło z tym pole `currentNight` z `use-target-panel`, istniejące tylko dla przełącznika makiety.
+
+`grep -rn "todo(" app src` i `grep -rin "makiet\|mock" app src` zwracają pusto.
 
 ## Zbiorczo: czego brakuje poza widokiem
 
