@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { Text, TextInput, View } from 'react-native';
 
 import { HAIRLINE, colors, fonts, radius } from '@/theme';
+import { themedStyles } from '@/ui/theme';
 
 /**
  * Wiersz z liczbą edytowaną ręcznie.
@@ -78,7 +79,7 @@ export function NumberRow({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -116,4 +117,4 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     minWidth: 26,
   },
-});
+}));

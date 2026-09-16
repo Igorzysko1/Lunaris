@@ -1,9 +1,10 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { Alert, StyleSheet, View } from 'react-native';
+import { Alert, View } from 'react-native';
 
 import { useEventDetail } from '@/hooks/use-events';
 import { STALE_BOOKING } from '@/lib/plan-text';
 import { Body, Button, Chip, ChipRow, Label, MenuRow, Note, Notice, Panel, Sheet } from '@/ui/kit';
+import { themedStyles } from '@/ui/theme';
 
 /** 15b: zjawisko — co to znaczy stąd, kiedy się odezwie i rezerwacja jego nocy. */
 export default function EventSheet() {
@@ -118,7 +119,7 @@ export default function EventSheet() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   flex: { flex: 1 },
   row: { flexDirection: 'row', gap: 8 },
-});
+}));

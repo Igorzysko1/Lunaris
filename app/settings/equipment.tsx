@@ -1,10 +1,11 @@
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { Alert, Text, View } from 'react-native';
 
 import { NumberRow } from '@/components/NumberRow';
 import { OPTICS_LIMITS, describeOptics, exitPupil } from '@/lib/optics';
 import { useSettings } from '@/store/settings';
 import { colors, fonts } from '@/theme';
 import { Button, Chip, ChipRow, Field, Label, Note, Panel, Screen, TitleBar } from '@/ui/kit';
+import { themedStyles } from '@/ui/theme';
 
 /**
  * Więcej › Sprzęt: zestawy optyki. Nazwa jest wyłącznie etykietą — nie wchodzi
@@ -95,7 +96,7 @@ export default function EquipmentScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   group: { gap: 8 },
   summary: { fontFamily: fonts.mono, fontSize: 12, color: colors.textSecondary },
-});
+}));

@@ -5,7 +5,6 @@ import {
   Alert,
   Pressable,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   View,
@@ -15,7 +14,8 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { HAIRLINE, colors, fonts, hexA, radius } from '@/theme';
+import { HAIRLINE, colors, fonts, hexA, radius, type Palette } from '@/theme';
+import { themedStyles } from '@/ui/theme';
 
 /**
  * Klocki nowego frontendu z projektów „Lunaris IA" i „Lunaris Noc — werdykt".
@@ -26,19 +26,41 @@ import { HAIRLINE, colors, fonts, hexA, radius } from '@/theme';
 
 export type Tone = 'neutral' | 'go' | 'teal' | 'warn' | 'bad' | 'accent';
 
-export const toneColor: Record<Tone, string> = {
-  neutral: colors.textSecondary,
-  go: colors.green,
-  teal: colors.teal,
-  warn: colors.amber,
-  bad: colors.coral,
-  accent: colors.purple,
+/** Którym kolorem palety pada dany ton. */
+const TONE_COLOR: Record<Tone, keyof Palette> = {
+  neutral: 'textSecondary',
+  go: 'green',
+  teal: 'teal',
+  warn: 'amber',
+  bad: 'coral',
+  accent: 'purple',
 };
 
-type IconName = ComponentProps<typeof Ionicons>['name'];
+/**
+ * Kolor tonu w palecie obowiązującej w tej chwili. Podstawienie zamiast stałej,
+ * bo w trybie czerwonym wszystkie tony schodzą do jednej barwy, a `toneColor[tone]`
+ * czyta kilkanaście miejsc w klockach i w ekranach.
+ */
+export const toneColor: Record<Tone, string> = new Proxy({} as Record<Tone, string>, {
+  get: (_target, tone) => colors[TONE_COLOR[tone as Tone]],
+});
 
-/** Obrys przerywany: zapowiedź, propozycja, rzecz do dopisania. */
-const DASH = 'rgba(255,255,255,0.16)';
+/**
+ * Znak niosący ten sam stan co kolor: dobrze ✓, uwaga !, odpuść ×.
+ *
+ * W trybie czerwonym barwy znaczeniowe zlewają się w jedną, więc bez znaku
+ * „w zasięgu" i „poza zasięgiem" wyglądałyby identycznie. W ciemnej palecie
+ * znak zostaje mimo to — nierozróżnianie czerwieni od zieleni nie zaczyna się
+ * po zmierzchu, a stan nie ma wisieć na samym kolorze o żadnej porze.
+ */
+export function toneMark(tone: Tone | undefined): string | null {
+  if (tone === 'go') return '✓';
+  if (tone === 'warn') return '!';
+  if (tone === 'bad') return '×';
+  return null;
+}
+
+type IconName = ComponentProps<typeof Ionicons>['name'];
 
 /**
  * Przycisk bez podpiętej logiki. Makieta mówi to wprost, zamiast udawać,
@@ -207,7 +229,7 @@ export function Panel({
         : raised
           ? colors.surfaceRaised
           : colors.surface,
-    borderColor: accent ? hexA(accent, 0.5) : dashed ? DASH : colors.border,
+    borderColor: accent ? hexA(accent, 0.5) : dashed ? colors.borderDashed : colors.border,
     borderStyle: dashed ? 'dashed' : 'solid',
   };
 
@@ -263,19 +285,20 @@ export function Chip({
 }) {
   const color = toneColor[tone];
   const neutral = tone === 'neutral';
+  const mark = toneMark(tone);
   const body = (
     <View
       style={[
         styles.chip,
         {
-          backgroundColor: neutral ? 'rgba(255,255,255,0.04)' : hexA(color, 0.14),
+          backgroundColor: neutral ? colors.fillSoft : hexA(color, 0.14),
           borderColor: neutral ? colors.border : hexA(color, 0.4),
           borderStyle: dashed ? 'dashed' : 'solid',
         },
       ]}
     >
       <Text style={[styles.chipLabel, { color: neutral ? colors.textSecondary : color }]}>
-        {label}
+        {mark ? `${mark} ${label}` : label}
       </Text>
     </View>
   );
@@ -475,7 +498,7 @@ export function Field({ style, multiline, ...props }: TextInputProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   flex: { flex: 1 },
   screen: { flex: 1, backgroundColor: colors.bg },
   content: { paddingHorizontal: 16, gap: 12 },
@@ -586,4 +609,4 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
   },
   fieldMultiline: { minHeight: 88, paddingTop: 12, textAlignVertical: 'top' },
-});
+}));

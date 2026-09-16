@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Toggle } from '@/components/Toggle';
@@ -7,6 +7,7 @@ import { useCalendarChoices } from '@/hooks/use-more';
 import { useGoogle } from '@/store/google';
 import { colors, fonts } from '@/theme';
 import { Button, Label, Note, Notice, Panel, Screen, TitleBar } from '@/ui/kit';
+import { themedStyles } from '@/ui/theme';
 
 /**
  * Więcej › Kalendarz Google. Mówi wprost, co połączenie zmienia, bo z zewnątrz
@@ -146,7 +147,7 @@ export default function GoogleSettingsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   flex: { flex: 1 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 48 },
   choice: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 48 },
@@ -158,4 +159,4 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     marginTop: 2,
   },
-});
+}));

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Animated, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Animated, Pressable, Text, View, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Card, Divider, SectionLabel } from '@/components/primitives';
@@ -11,6 +11,7 @@ import { describeSeeing, type Seeing } from '@/lib/seeing';
 import { describeOutOfReach, rankedTargets, type SkyTarget } from '@/lib/sky-targets';
 import type { NightData } from '@/hooks/use-night-data';
 import { HAIRLINE, colors, fonts, radius } from '@/theme';
+import { themedStyles } from '@/ui/theme';
 
 export function NightRatingCard({
   data,
@@ -422,7 +423,7 @@ export function NightSkeleton() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   ratingTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -709,4 +710,4 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: radius.lg,
   },
-});
+}));

@@ -16,11 +16,12 @@ import {
   describeCulmination,
   describeFieldShare,
   describeLibraryReach,
+  describeMarginalReach,
   fieldShare,
   foldForSearch,
 } from '@/lib/sky-library';
 import { describeSize } from '@/lib/sky-text';
-import { libraryReach } from '@/lib/sky-targets';
+import { libraryReach, libraryReachLevel, type ReachLevel } from '@/lib/sky-targets';
 import { FIGURES, SEASON_ORDER } from '@/mock/constellation-figures';
 import { useSettings } from '@/store/settings';
 
@@ -38,16 +39,24 @@ const decimal = (value: number, digits = 1) => value.toFixed(digits).replace('.'
 /** Gwiazdozbiór każdego obiektu — z granic IAU, liczony raz na uruchomienie. */
 const CONSTELLATION_OF = new Map(DEEP_SKY_OBJECTS.map((o) => [o.id, constellationOf(o)]));
 
-/** Obiekty w zasięgu któregokolwiek zestawu pod niebem aktywnego miejsca. */
-function useReachable(): Set<string> {
+/** Od najlepszego: obiekt widać tym zestawem, który sięga najdalej. */
+const BEST_FIRST: ReachLevel[] = ['in', 'marginal', 'out'];
+
+/** Zasięg każdego obiektu pod niebem aktywnego miejsca — najlepszy z zestawów. */
+function useReachLevels(): Map<string, ReachLevel> {
   const { active, config } = useSettings();
 
   return useMemo(
     () =>
-      new Set(
-        DEEP_SKY_OBJECTS.filter((o) =>
-          config.opticsProfiles.some((p) => libraryReach(o, p.optics, active.bortle) === null),
-        ).map((o) => o.id),
+      new Map(
+        DEEP_SKY_OBJECTS.map((object) => [
+          object.id,
+          BEST_FIRST.find((level) =>
+            config.opticsProfiles.some(
+              (p) => libraryReachLevel(object, p.optics, active.bortle) === level,
+            ),
+          ) ?? 'out',
+        ]),
       ),
     [config.opticsProfiles, active.bortle],
   );
@@ -56,7 +65,7 @@ function useReachable(): Set<string> {
 /** 12a: biblioteka celów — pełny katalog; „tylko w zasięgu" jest wyborem, nie domyślnym. */
 export function useTargetLibrary(query: string, kind: LibraryKind, onlyReach: boolean) {
   const { active } = useSettings();
-  const reachable = useReachable();
+  const levels = useReachLevels();
   const folded = foldForSearch(query.trim());
 
   const rows = DEEP_SKY_OBJECTS.flatMap((object) => {
@@ -64,10 +73,12 @@ export function useTargetLibrary(query: string, kind: LibraryKind, onlyReach: bo
     const text = foldForSearch(
       `${object.designation} ${object.name} ${object.kind} ${constellation?.name ?? ''}`,
     );
-    const reach = reachable.has(object.id);
+    const level = levels.get(object.id) ?? 'out';
 
     if (kind !== 'all' && object.kind !== kind) return [];
-    if (onlyReach && !reach) return [];
+    // „Tylko w zasięgu" zostawia też graniczne: to cele, które się zobaczy —
+    // po prostu bez zapasu, więc odsianie ich byłoby ostrzejsze niż prawda.
+    if (onlyReach && level === 'out') return [];
     if (folded && !text.includes(folded)) return [];
 
     return [
@@ -83,7 +94,7 @@ export function useTargetLibrary(query: string, kind: LibraryKind, onlyReach: bo
         ]
           .filter(Boolean)
           .join(' · '),
-        reach,
+        level,
       },
     ];
   });
@@ -91,7 +102,7 @@ export function useTargetLibrary(query: string, kind: LibraryKind, onlyReach: bo
   return {
     rows,
     total: DEEP_SKY_OBJECTS.length,
-    note: `Szukam po oznaczeniu, nazwie, typie i gwiazdozbiorze. Kropka: w zasięgu któregoś zestawu pod niebem Bortle ${active.bortle} — nie mówi o dzisiejszej nocy.`,
+    note: `Szukam po oznaczeniu, nazwie, typie i gwiazdozbiorze. Znak: ● w zasięgu, ◐ na styk, ○ poza — dla najlepszego z zestawów pod niebem Bortle ${active.bortle}, nie o dzisiejszej nocy.`,
   };
 }
 
@@ -130,11 +141,15 @@ export function useTargetProfile(id: string) {
     ].join(' · '),
     reach: profiles.map((profile) => {
       const verdict = libraryReach(object, profile.optics, active.bortle);
+      const level = libraryReachLevel(object, profile.optics, active.bortle);
       return {
         id: profile.id,
         label: profileLabel(profile),
-        ok: verdict === null,
-        why: describeLibraryReach(verdict, profile.optics, active.bortle),
+        level,
+        why:
+          level === 'marginal'
+            ? describeMarginalReach(profile.optics, active.bortle)
+            : describeLibraryReach(verdict, profile.optics, active.bortle),
       };
     }),
     reachNote: `Liczone dla nieba Bortle ${active.bortle} — ${active.label}.`,

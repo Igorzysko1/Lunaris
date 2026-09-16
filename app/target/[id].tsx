@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
 import { useTargetPanel, type TargetPanelParams } from '@/hooks/use-target-panel';
 import { useMock } from '@/mock/state';
@@ -19,6 +19,7 @@ import {
   Strong,
 } from '@/ui/kit';
 import { HourBars, WindowBar } from '@/ui/night';
+import { themedStyles } from '@/ui/theme';
 
 /**
  * Panel celu — „czy dziś i o której". Jeden panel w dwóch stanach:
@@ -165,7 +166,7 @@ export default function TargetSheet() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   flex: { flex: 1 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   between: { flexDirection: 'row', justifyContent: 'space-between', gap: 8 },
@@ -180,4 +181,4 @@ const styles = StyleSheet.create({
   rate: { fontFamily: fonts.monoMedium, fontSize: 13, color: colors.green },
   failed: { color: colors.amber },
   chevron: { fontFamily: fonts.mono, fontSize: 16, color: colors.purple },
-});
+}));

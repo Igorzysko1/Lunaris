@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, Text, View } from 'react-native';
 
 import {
   useCalendarTab,
@@ -24,6 +24,7 @@ import {
   Segments,
   TitleBar,
 } from '@/ui/kit';
+import { themedStyles } from '@/ui/theme';
 
 type Segment = 'month' | 'events';
 
@@ -382,7 +383,7 @@ function SkyEventCard({ event, dashed }: { event: EventRow; dashed?: boolean }) 
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   flex: { flex: 1 },
   row: { flexDirection: 'row', gap: 8 },
   hairline: { height: 1, backgroundColor: colors.border },
@@ -420,7 +421,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'transparent',
   },
-  cellInMonth: { backgroundColor: 'rgba(255,255,255,0.02)' },
+  cellInMonth: { backgroundColor: colors.fillSoft },
   cellSelected: { backgroundColor: hexA(colors.purple, 0.18), borderColor: colors.purple },
   cellDay: { fontFamily: fonts.mono, fontSize: 13, color: colors.textPrimary },
   cellOutside: { color: colors.textMuted },
@@ -482,4 +483,4 @@ const styles = StyleSheet.create({
   otherTitle: { flex: 1, fontFamily: fonts.sans, fontSize: 14, color: colors.textSecondary },
   eventHead: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
   quiet: { opacity: 0.6 },
-});
+}));

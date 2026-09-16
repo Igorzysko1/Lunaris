@@ -1,8 +1,9 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { useForecastsInMemory } from '@/hooks/use-more';
 import { colors, fonts } from '@/theme';
 import { Button, Chip, Label, Note, Panel, Screen, TitleBar } from '@/ui/kit';
+import { themedStyles } from '@/ui/theme';
 
 /**
  * Więcej › Prognozy w pamięci. Cykl, który po cichu przestał działać, jest gorszy
@@ -55,7 +56,7 @@ export default function ForecastsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -66,4 +67,4 @@ const styles = StyleSheet.create({
   title: { flex: 1, fontFamily: fonts.sans, fontSize: 14.5, color: colors.textPrimary },
   mono: { fontFamily: fonts.mono, fontSize: 13, color: colors.textSecondary },
   detail: { fontFamily: fonts.mono, fontSize: 11.5, lineHeight: 16, color: colors.textMuted },
-});
+}));

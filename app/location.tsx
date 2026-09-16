@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { FlatList, Pressable, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -11,6 +11,7 @@ import { CITIES, GMINY, type Place } from '@/data/places';
 import { bortleMeta, distanceKm, formatDistance } from '@/lib/astro';
 import { useSettings, type ActiveLocation } from '@/store/settings';
 import { HAIRLINE, colors, fonts, touchSlop } from '@/theme';
+import { themedStyles } from '@/ui/theme';
 
 type PickerTab = 'sites' | 'cities' | 'gminy';
 
@@ -226,7 +227,7 @@ function PlaceRow({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   safe: {
     flex: 1,
     backgroundColor: colors.bg,
@@ -345,4 +346,4 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: colors.textMuted,
   },
-});
+}));

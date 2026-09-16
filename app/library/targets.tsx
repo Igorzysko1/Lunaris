@@ -1,10 +1,15 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { useTargetLibrary, type LibraryKind } from '@/hooks/use-library';
+import type { ReachLevel } from '@/lib/sky-targets';
 import { colors, fonts } from '@/theme';
 import { Chip, ChipRow, Field, Note, Panel, Screen, TitleBar } from '@/ui/kit';
+import { themedStyles } from '@/ui/theme';
+
+/** Stan zasięgu niesie kształt znaku, nie sam kolor — w trybie czerwonym tylko on zostaje. */
+const REACH_MARK: Record<ReachLevel, string> = { in: '●', marginal: '◐', out: '○' };
 
 const KINDS: [LibraryKind, string][] = [
   ['all', 'wszystko'],
@@ -62,9 +67,7 @@ export default function TargetLibraryScreen() {
         >
           <View style={styles.designation}>
             <Text style={styles.code}>{object.designation}</Text>
-            <Text style={[styles.reach, !object.reach && styles.outOfReach]}>
-              {object.reach ? '●' : '○'}
-            </Text>
+            <Text style={[styles.reach, styles[object.level]]}>{REACH_MARK[object.level]}</Text>
           </View>
           <View style={styles.flex}>
             <Text style={styles.name}>{object.name}</Text>
@@ -77,14 +80,16 @@ export default function TargetLibraryScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   flex: { flex: 1 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   designation: { width: 64, gap: 2 },
   code: { fontFamily: fonts.monoMedium, fontSize: 13, color: colors.textPrimary },
-  reach: { fontSize: 10, color: colors.purple },
-  outOfReach: { color: colors.textMuted },
+  reach: { fontSize: 10 },
+  in: { color: colors.purple },
+  marginal: { color: colors.amber },
+  out: { color: colors.textMuted },
   name: { fontFamily: fonts.sans, fontSize: 14, color: colors.textPrimary },
   meta: { fontFamily: fonts.mono, fontSize: 11.5, color: colors.textMuted, marginTop: 2 },
   chevron: { fontFamily: fonts.mono, fontSize: 16, color: colors.purple },
-});
+}));

@@ -176,7 +176,7 @@ i należą do etapów w nawiasach.
 | (4) „W tym zestawie: pow. 81× okularem 25 mm · pole 36′"                                   | `sky-text.describeOpticsReach`                                                  | podpięte bez okularu (etap 4) — profil zna powiększenie i pole, nie okular; **DO ZROBIENIA** w etapie 8, jeśli okular ma być widoczny |
 | (4) Pusta historia: „Jeszcze nie widziany. Po zapisaniu nocy pojawi się tu pierwszy wpis." | `journal-text.sightingsOf`                                                      | podpięte (etap 4)                                                                                                                     |
 | (5) „Ta noc nie przechodzi już progów, a jej rezerwacja wciąż jest w kalendarzu."          | `fetchBooking` + `bookingFor` → `null`                                          | podpięte (etap 5) — wykrycie było już w `BookingButtons`                                                                              |
-| (9) Zasięg trzystanowy w trybie czerwonym: w zasięgu / graniczny / poza                    | `optics.ts` zwraca tak/nie                                                      | **DO ZROBIENIA**: próg „graniczny" w rachunku zasięgu                                                                                 |
+| (9) Zasięg trzystanowy w trybie czerwonym: w zasięgu / graniczny / poza                    | `sky-targets.libraryReachLevel`, próg `MARGINAL_MAG`                            | podpięte (etap 9) — „poza" znaczy to samo co werdykt dwustanowy, doróbką jest środek: zapas mniejszy niż 0,5 mag                      |
 
 Rozstrzygnięcie projektu: Dziennik bez segmentów (tura 14) zastępuje „Dziennik › Ta noc / Miesiąc /
 Historia" z tury 4c; zapisany wpis czyta się jako Wpis nocy (14b).
@@ -254,15 +254,15 @@ komponenty (`night-cards`, `CloudCoverChart`, `EventCard`) sprząta etap 10. Tes
 
 ### Etap 9 — Tryb czerwony
 
-| Element                                                | Źródło                                              | Status                                                                                      |
-| ------------------------------------------------------ | --------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| Paleta czerwona                                        | `theme.redColors` (dodana z projektu)               | jest                                                                                        |
-| Przełączanie palety w całej aplikacji                  | `colors` to stała importowana w każdym `StyleSheet` | **DO ZROBIENIA**: kontekst motywu (`useTheme`) i przepięcie stylów — największa praca etapu |
-| Drugi nośnik znaczenia: ✓ ! × · zamiast koloru         | `src/ui/kit` ma znaki w części klocków              | **UI**: dokończyć we wszystkich stanach                                                     |
-| Jasność ekranu w arkuszu                               | brak `expo-brightness`                              | **DO ZROBIENIA**: zależność                                                                 |
-| Trzy palce otwierają arkusz z każdego ekranu           | brak obsługi gestów wielodotyku                     | **DO ZROBIENIA**: `react-native-gesture-handler` albo własny responder na korzeniu          |
-| „Włączaj sam po zmierzchu"                             | `night-window` daje zmierzch                        | **DO ZROBIENIA**: pole w ustawieniach                                                       |
-| Zdjęcia wyłączone w trybie czerwonym (APOD, miniatury) | —                                                   | **UI**                                                                                      |
+| Element                                                | Źródło                                                   | Status                                                                                                                       |
+| ------------------------------------------------------ | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Paleta czerwona                                        | `PALETTES.red` w `theme.ts`                              | podpięte (etap 9) — pełna paleta, nie trzy kolory: tony znaczeniowe schodzą w niej do jednej barwy                           |
+| Przełączanie palety w całej aplikacji                  | `ThemeProvider` i `themedStyles` (`src/ui/theme.tsx`)    | podpięte (etap 9) — `colors` czyta paletę bieżącą, arkusz powstaje leniwie, a drzewo ekranów montuje się od nowa             |
+| Drugi nośnik znaczenia: ✓ ! × · zamiast koloru         | `kit.toneMark`, znaki zasięgu w bibliotece               | podpięte (etap 9) — żeton z tonem niesie znak w obu paletach, nie tylko w czerwonej                                          |
+| Jasność ekranu w arkuszu                               | `expo-brightness` → `lib/screen-brightness.ts`           | podpięte (etap 9) — **wymaga nowego builda deweloperskiego**; bez niego tryb działa bez sterowania jasnością                 |
+| Trzy palce otwierają arkusz z każdego ekranu           | responder przechwytujący na korzeniu (`app/_layout.tsx`) | podpięte (etap 9) — bez biblioteki gestów; `false` znaczy „nie przejmuję", więc gest nie odbiera dotknięć niczemu pod spodem |
+| „Włączaj sam po zmierzchu"                             | `currentNightWindow` + `theme.auto` w ustawieniach (v4)  | podpięte (etap 9) — ręczne wskazanie trybu wyłącza automat                                                                   |
+| Zdjęcia wyłączone w trybie czerwonym (APOD, miniatury) | `useTheme().red` w `ApodCard`                            | podpięte (etap 9) — APOD jest jedynym zdjęciem w aplikacji                                                                   |
 
 ### Etap 10 — Sprzątanie
 
@@ -293,10 +293,10 @@ komponenty z `src/components`. `grep -rn "todo(" app src` ma zwrócić pusto.
 | 18  | Prawdziwe kształty gwiazdozbiorów (`figure`) — decyzja: osobne zadanie                               | 8    |
 | 19  | ~~Kąt obrotu gwiazdozbioru nad horyzontem~~ — zrobione: `skyOrientation`                             | 8    |
 | 20  | Żyroskop (`expo-sensors`) — dodany; działa po nowym buildzie                                         | 8    |
-| 21  | Kontekst motywu dla trybu czerwonego                                                                 | 9    |
-| 22  | Jasność ekranu (`expo-brightness`)                                                                   | 9    |
-| 23  | Gest trzech palców                                                                                   | 9    |
-| 24  | Automatyczny tryb czerwony po zmierzchu                                                              | 9    |
+| 21  | ~~Kontekst motywu dla trybu czerwonego~~ — zrobione: `ThemeProvider`, `themedStyles`                 | 9    |
+| 22  | ~~Jasność ekranu (`expo-brightness`)~~ — dodana; działa po nowym buildzie                            | 9    |
+| 23  | ~~Gest trzech palców~~ — zrobione: responder przechwytujący na korzeniu                              | 9    |
+| 24  | ~~Automatyczny tryb czerwony po zmierzchu~~ — zrobione: `theme.auto` + okno nocy                     | 9    |
 
 ## Otwarte pytania z projektu
 

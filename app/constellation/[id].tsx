@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { CONSTELLATIONS } from '@/data/constellations';
 import { useConstellationView } from '@/hooks/use-constellation-tonight';
@@ -9,6 +9,7 @@ import { FIGURES } from '@/mock/constellation-figures';
 import { colors, fonts } from '@/theme';
 import { ConstellationFigure } from '@/ui/figure';
 import { Body, Button, Label, Note, Panel, Sheet } from '@/ui/kit';
+import { themedStyles } from '@/ui/theme';
 
 const EASE: Record<1 | 2 | 3, string> = {
   1: 'nie do pomylenia',
@@ -136,7 +137,7 @@ export default function ConstellationSheet() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   flex: { flex: 1 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   where: { fontFamily: fonts.sansMedium, fontSize: 15, color: colors.textPrimary },
@@ -157,4 +158,4 @@ const styles = StyleSheet.create({
   reach: { width: 14, fontSize: 10, color: colors.purple },
   outOfReach: { color: colors.textMuted },
   chevron: { fontFamily: fonts.mono, fontSize: 16, color: colors.purple },
-});
+}));

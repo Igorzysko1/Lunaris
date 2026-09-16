@@ -3,6 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import Svg, { Defs, Line, Pattern, Rect } from 'react-native-svg';
 
 import { colors, fonts, hexA } from '@/theme';
+import { themedStyles } from '@/ui/theme';
 
 /** Ułamek szerokości jako procent w stylu React Native. */
 export function pct(fraction: number): `${number}%` {
@@ -13,7 +14,7 @@ export function pct(fraction: number): `${number}%` {
 function Hatch({
   from,
   to,
-  color = 'rgba(255,255,255,0.16)',
+  color = colors.borderDashed,
 }: {
   from: number;
   to: number;
@@ -173,7 +174,7 @@ export function HourBars({
                 styles.bar,
                 {
                   height: Math.max(3, (value / max) * height),
-                  backgroundColor: inWindow ? hexA(colors.green, 0.6) : 'rgba(255,255,255,0.12)',
+                  backgroundColor: inWindow ? hexA(colors.green, 0.6) : colors.fill,
                 },
               ]}
             />
@@ -205,13 +206,13 @@ export function HourBars({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   wrap: { gap: 6 },
   track: {
     height: 26,
     borderRadius: 5,
     overflow: 'hidden',
-    backgroundColor: 'rgba(255,255,255,0.03)',
+    backgroundColor: colors.fillSoft,
   },
   layer: { position: 'absolute', top: 0, bottom: 0 },
   window: {
@@ -257,4 +258,4 @@ const styles = StyleSheet.create({
     borderStyle: 'dashed',
     borderColor: hexA(colors.coral, 0.6),
   },
-});
+}));

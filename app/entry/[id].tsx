@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
 import { saveEntryTimeline, useJournal } from '@/hooks/use-journal';
 import { formatTime } from '@/lib/date';
@@ -14,6 +14,7 @@ import {
 import { targetLabel } from '@/lib/sky-targets';
 import { colors, fonts } from '@/theme';
 import { Body, Field, Label, Note, Notice, Panel, Screen, Stat, TitleBar } from '@/ui/kit';
+import { themedStyles } from '@/ui/theme';
 
 type Times = Record<TimelineStep, string>;
 
@@ -211,7 +212,7 @@ export default function EntryScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   flex: { flex: 1 },
   row: { flexDirection: 'row', gap: 8 },
   between: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
@@ -247,4 +248,4 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.textMuted,
   },
-});
+}));

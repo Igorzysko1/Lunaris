@@ -1,6 +1,6 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
 import {
   WEEKDAYS_SHORT,
@@ -14,6 +14,7 @@ import { useSettings } from '@/store/settings';
 import { colors, fonts, hexA } from '@/theme';
 import { Label, Note, Panel, Screen, Stat, TitleBar } from '@/ui/kit';
 import { pct } from '@/ui/night';
+import { themedStyles } from '@/ui/theme';
 
 const lowerFirst = (text: string) => text.charAt(0).toLowerCase() + text.slice(1);
 
@@ -193,7 +194,7 @@ function DayDetail({ day }: { day: MoonDay }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   flex: { flex: 1 },
   monthNav: { flexDirection: 'row', alignItems: 'center' },
   arrow: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
@@ -241,8 +242,8 @@ const styles = StyleSheet.create({
   track: {
     height: 6,
     borderRadius: 3,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: colors.fill,
     overflow: 'hidden',
   },
   fill: { position: 'absolute', top: 0, bottom: 0, borderRadius: 3, backgroundColor: colors.amber },
-});
+}));

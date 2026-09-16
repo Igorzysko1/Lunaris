@@ -1,9 +1,10 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { Badge } from '@/components/primitives';
 import { TYPE_META, type AstroEvent } from '@/data/events';
 import { formatTime } from '@/lib/date';
 import { HAIRLINE, colors, fonts, radius } from '@/theme';
+import { themedStyles } from '@/ui/theme';
 
 type Props = {
   event: AstroEvent;
@@ -42,7 +43,7 @@ export function EventCard({ event, timeLabel, clampDescription }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   card: {
     flexDirection: 'row',
     backgroundColor: colors.surface,
@@ -94,4 +95,4 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 4,
   },
-});
+}));

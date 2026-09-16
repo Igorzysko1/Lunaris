@@ -7,12 +7,15 @@ import { FALLBACK_POSITION, findPlaceById, nearestPlace, type Coords } from '@/d
 import { DEFAULT_CONFIG, clampConfig, type LunarisConfig } from '@/lib/config';
 import { defaultProfile, type OpticsProfile } from '@/lib/optics';
 import {
+  DEFAULT_THEME,
   LEAD_TIMES,
   loadSettings,
   saveSettings,
   type LeadTime,
   type PersistedSettings,
+  type ThemeSettings,
 } from '@/lib/settings-storage';
+import type { PaletteMode } from '@/theme';
 import { DEFAULT_NOTIFY_CATEGORIES, type NotifyCategory } from '@/lib/event-review';
 import { useDeviceLocation, type LocationStatus } from '@/hooks/use-device-location';
 
@@ -53,6 +56,8 @@ type Settings = {
   notifications: boolean;
   leadTime: LeadTime;
   notifyCategories: NotifyCategory[];
+  /** Paleta, automat po zmierzchu i jasność ekranu — patrz src/ui/theme.tsx. */
+  theme: ThemeSettings;
   /** Jedno źródło prawdy dla progów, profilu obserwatora i parametrów sprzętu. */
   config: LunarisConfig;
   /** Czy wczytaliśmy już zapisane ustawienia — do czasu tego UI nie ma czego pokazywać. */
@@ -66,6 +71,13 @@ type Settings = {
   setLeadTime: (value: LeadTime) => void;
   /** Włącza albo wyłącza jedną kategorię powiadomień o zjawiskach. */
   toggleNotifyCategory: (id: NotifyCategory) => void;
+  /**
+   * Ręczny wybór palety. Wyłącza przy okazji automat — skoro użytkownik właśnie
+   * wskazał tryb, to jego wybór, a nie zegar, ma obowiązywać do odwołania.
+   */
+  setThemeMode: (mode: PaletteMode) => void;
+  toggleAutoTheme: () => void;
+  setBrightness: (percent: number) => void;
   /**
    * Zmiana wybranych pól jednej sekcji konfiguracji; reszta zostaje bez zmian.
    * Wynik przechodzi przez walidację, więc UI nie musi pilnować zakresów.
@@ -114,13 +126,14 @@ function defaultSettings(): PersistedSettings {
     notifications: true,
     leadTime: '2h',
     notifyCategories: [...DEFAULT_NOTIFY_CATEGORIES],
+    theme: DEFAULT_THEME,
     config: DEFAULT_CONFIG,
   };
 }
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
   const [
-    { placeId, autoLocation, notifications, leadTime, notifyCategories, config },
+    { placeId, autoLocation, notifications, leadTime, notifyCategories, theme, config },
     setPersisted,
   ] = useState<PersistedSettings>(defaultSettings);
   const [hydrated, setHydrated] = useState(false);
@@ -146,8 +159,16 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   // Zapisujemy dopiero po wczytaniu, żeby nie nadpisać dysku wartościami domyślnymi.
   useEffect(() => {
     if (!hydrated) return;
-    void saveSettings({ placeId, autoLocation, notifications, leadTime, notifyCategories, config });
-  }, [hydrated, placeId, autoLocation, notifications, leadTime, notifyCategories, config]);
+    void saveSettings({
+      placeId,
+      autoLocation,
+      notifications,
+      leadTime,
+      notifyCategories,
+      theme,
+      config,
+    });
+  }, [hydrated, placeId, autoLocation, notifications, leadTime, notifyCategories, theme, config]);
 
   // Jedna instancja na całą aplikację — inaczej każdy ekran pytałby o uprawnienia osobno.
   const device = useDeviceLocation(autoLocation);
@@ -205,6 +226,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       notifications,
       leadTime,
       notifyCategories,
+      theme,
       config,
       hydrated,
       active,
@@ -219,6 +241,15 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
           notifyCategories: s.notifyCategories.includes(id)
             ? s.notifyCategories.filter((c) => c !== id)
             : [...s.notifyCategories, id],
+        })),
+      setThemeMode: (mode) =>
+        setPersisted((s) => ({ ...s, theme: { ...s.theme, mode, auto: false } })),
+      toggleAutoTheme: () =>
+        setPersisted((s) => ({ ...s, theme: { ...s.theme, auto: !s.theme.auto } })),
+      setBrightness: (percent) =>
+        setPersisted((s) => ({
+          ...s,
+          theme: { ...s.theme, brightness: Math.min(100, Math.max(1, Math.round(percent))) },
         })),
       updateConfig: (section, patch) =>
         setPersisted((s) => ({
@@ -347,6 +378,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       notifications,
       leadTime,
       notifyCategories,
+      theme,
       config,
       hydrated,
       active,

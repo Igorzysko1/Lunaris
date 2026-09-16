@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Pressable, StyleSheet } from 'react-native';
+import { Animated, Easing, Pressable } from 'react-native';
 
 import { colors } from '@/theme';
+import { themedStyles } from '@/ui/theme';
 
 /** Droga gałki: od 3 do 21 pt wewnątrz toru. */
 const KNOB_TRAVEL = 18;
@@ -132,7 +133,7 @@ export function Toggle({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   track: {
     width: 44,
     height: 26,
@@ -169,6 +170,6 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     borderRadius: 9,
-    backgroundColor: '#fff',
+    backgroundColor: colors.textPrimary,
   },
-});
+}));

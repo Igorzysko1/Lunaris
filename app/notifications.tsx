@@ -1,9 +1,10 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
 import { Toggle } from '@/components/Toggle';
 import { useNotificationsView } from '@/hooks/use-events';
 import { colors, fonts } from '@/theme';
 import { Chip, Label, MenuRow, Note, Notice, Panel, Screen, TitleBar } from '@/ui/kit';
+import { themedStyles } from '@/ui/theme';
 
 /**
  * 15c: ekran powiadomień pokazuje decyzje, nie tylko przełączniki — co się
@@ -108,7 +109,7 @@ export default function NotificationsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   flex: { flex: 1 },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
   title: { flex: 1, fontFamily: fonts.sans, fontSize: 15, color: colors.textPrimary },
@@ -128,4 +129,4 @@ const styles = StyleSheet.create({
   },
   stepSign: { fontFamily: fonts.mono, fontSize: 18, color: colors.purple },
   hour: { fontFamily: fonts.monoSemiBold, fontSize: 16, color: colors.textPrimary },
-});
+}));

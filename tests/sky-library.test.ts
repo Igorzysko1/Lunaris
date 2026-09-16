@@ -27,7 +27,12 @@ import {
   objectsInConstellation,
   skyOrientation,
 } from '../src/lib/sky-library.ts';
-import { libraryReach, nightTargetsForProfiles } from '../src/lib/sky-targets.ts';
+import {
+  libraryReach,
+  libraryReachLevel,
+  nightTargetsForProfiles,
+  type ReachLevel,
+} from '../src/lib/sky-targets.ts';
 
 const dso = (id: string) => DEEP_SKY_OBJECTS.find((o) => o.id === id)!;
 
@@ -71,6 +76,44 @@ describe('zasięg zestawu', () => {
       describeLibraryReach('too-small', DEFAULT_OPTICS, 4),
       /^za mały przy powiększeniu 15×/,
     );
+  });
+});
+
+describe('zasięg trzystanowy', () => {
+  const WORSE: Record<ReachLevel, number> = { in: 0, marginal: 1, out: 2 };
+
+  it('„poza" znaczy dokładnie to, co werdykt dwustanowy', () => {
+    // Trzeci stan jest doróbką w środku, a nie nową granicą: gdyby przesuwał
+    // brzeg, biblioteka i lista celów przestałyby mówić o sprzęcie jedno.
+    for (const object of DEEP_SKY_OBJECTS) {
+      assert.equal(
+        libraryReachLevel(object, DEFAULT_OPTICS, 5) === 'out',
+        libraryReach(object, DEFAULT_OPTICS, 5) !== null,
+        object.id,
+      );
+    }
+  });
+
+  it('pogorszenie nieba nigdy nie poprawia zasięgu', () => {
+    for (const object of DEEP_SKY_OBJECTS) {
+      let worst = 0;
+
+      for (let bortle = 1; bortle <= 9; bortle++) {
+        const level = WORSE[libraryReachLevel(object, DEFAULT_OPTICS, bortle)];
+        assert.ok(level >= worst, `${object.id} pod Bortle ${bortle}`);
+        worst = level;
+      }
+    }
+  });
+
+  it('stan graniczny w ogóle występuje', () => {
+    // Bez tego próg mógłby być tak ciasny albo tak szeroki, że trzeci stan
+    // byłby martwy, a oba testy wyżej i tak by przeszły.
+    const marginal = DEEP_SKY_OBJECTS.filter((o) =>
+      [4, 5, 6].some((bortle) => libraryReachLevel(o, DEFAULT_OPTICS, bortle) === 'marginal'),
+    );
+
+    assert.ok(marginal.length > 0);
   });
 });
 

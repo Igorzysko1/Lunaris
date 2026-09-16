@@ -22,6 +22,7 @@ import { CONSTELLATIONS, type Constellation } from '../data/constellations.ts';
 import { DEEP_SKY_OBJECTS, type DeepSkyObject } from '../data/deep-sky.ts';
 import type { Coords } from '../data/places.ts';
 import {
+  MARGINAL_MAG,
   limitingMagnitude,
   minimumAngularSize,
   surfaceBrightnessLimit,
@@ -73,6 +74,15 @@ export function describeLibraryReach(reach: LibraryReach, optics: Optics, bortle
     case 'too-small':
       return `za mały przy powiększeniu ${optics.magnification}× (od ${decimal(minimumAngularSize(optics))}′)`;
   }
+}
+
+/**
+ * Powód dla celu „na styk". Nie mówimy, która granica wiąże — dla punktowych
+ * jasność całkowita, dla rozmytych powierzchniowa — bo to zależy od obiektu,
+ * a zdanie ma nieść jedno: zapasu nie ma i byle mgiełka go zabierze.
+ */
+export function describeMarginalReach(optics: Optics, bortle: number): string {
+  return `w zasięgu na styk — mniej niż ${decimal(MARGINAL_MAG)} mag zapasu do granicy ${decimal(limitingMagnitude(optics, bortle))} mag`;
 }
 
 /**

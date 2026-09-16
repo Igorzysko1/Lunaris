@@ -1,80 +1,88 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
 import { Toggle } from '@/components/Toggle';
-import { colors, fonts, hexA, redColors } from '@/theme';
-import { Button, Chip, ChipRow, Label, Note, Panel, Sheet, todo } from '@/ui/kit';
+import { BRIGHTNESS_STEPS } from '@/lib/settings-storage';
+import { PALETTES, colors, fonts, hexA } from '@/theme';
+import { Button, Chip, ChipRow, Label, Note, Panel, Sheet } from '@/ui/kit';
 import { pct } from '@/ui/night';
+import { themedStyles, useTheme } from '@/ui/theme';
 
-type Mode = 'red' | 'dark';
-
-/** Trzy poziomy jasności trybu czerwonego i ich kontrast na tle #0A0303. */
+/**
+ * Trzy poziomy jasności trybu czerwonego i ich zmierzony kontrast na tle #0A0303.
+ * Progi pilnuje tests/theme.test.ts — liczby stoją tutaj po to, żeby było widać,
+ * że podział na trzy stopnie jest pomiarem, a nie wrażeniem.
+ */
 const RED_LEVELS = [
-  { color: redColors.textPrimary, label: 'treść, na której się działa', ratio: '7,9:1' },
-  { color: redColors.textSecondary, label: 'liczby towarzyszące', ratio: '6,0:1' },
-  { color: redColors.textMuted, label: 'etykiety i tło rozmowy', ratio: '4,8:1' },
+  { color: PALETTES.red.textPrimary, label: 'treść, na której się działa', ratio: '7,5:1' },
+  { color: PALETTES.red.textSecondary, label: 'liczby towarzyszące', ratio: '5,7:1' },
+  { color: PALETTES.red.textMuted, label: 'etykiety i tło rozmowy', ratio: '4,6:1' },
 ];
 
 /**
  * 16c: arkusz trybu nocnego. W terenie przełącznik musi być bez schodzenia
  * z werdyktu, dlatego arkusz, a nie podstrona. Jasność siedzi obok koloru,
  * bo jej zjazd robi więcej dla adaptacji wzroku niż sam kolor.
+ *
+ * Wybór palety przebudowuje drzewo ekranów, więc arkusz zamyka się sam — i dlatego
+ * jest zestawem rzeczy działających od razu, a nie formularzem z „Zastosuj".
  */
 export default function NightModeSheet() {
-  const [mode, setMode] = useState<Mode>('red');
-  const [brightness, setBrightness] = useState(8);
-  const [auto, setAuto] = useState(true);
+  const theme = useTheme();
 
   return (
     <Sheet
       title="Tryb nocny"
       subtitle="Trzy palce na ekranie otwierają ten arkusz z każdego miejsca aplikacji."
     >
+      {/* Kropki przy wyborze biorą kolor wprost z palety, którą nazywają, a nie
+          z bieżącej — to dwie próbki stojące obok siebie, więc każda ma
+          wyglądać tak, jak wygląda jej tryb. */}
       <ModeOption
-        selected={mode === 'red'}
-        dot={redColors.textPrimary}
+        selected={theme.mode === 'red'}
+        dot={PALETTES.red.textPrimary}
         title="Czerwony"
         subtitle="jedna barwa · zdjęcia wyłączone"
-        onPress={() => setMode('red')}
+        onPress={() => theme.setMode('red')}
       />
       <ModeOption
-        selected={mode === 'dark'}
-        dot={colors.purple}
+        selected={theme.mode === 'dark'}
+        dot={PALETTES.dark.purple}
         title="Zwykły ciemny"
         subtitle="pełna paleta"
-        onPress={() => setMode('dark')}
+        onPress={() => theme.setMode('dark')}
       />
 
       <View style={styles.between}>
         <Text style={styles.title}>Jasność ekranu</Text>
-        <Text style={styles.mono}>{brightness}%</Text>
+        <Text style={styles.mono}>{theme.brightness}%</Text>
       </View>
       <View style={styles.track}>
-        <View style={[styles.fill, { width: pct(brightness / 100) }]} />
+        <View style={[styles.fill, { width: pct(theme.brightness / 100) }]} />
       </View>
       <ChipRow>
-        {[2, 8, 20, 50].map((value) => (
+        {BRIGHTNESS_STEPS.map((value) => (
           <Chip
             key={value}
             label={`${value}%`}
-            tone={brightness === value ? 'accent' : 'neutral'}
-            onPress={() => setBrightness(value)}
+            tone={theme.brightness === value ? 'accent' : 'neutral'}
+            onPress={() => theme.setBrightness(value)}
           />
         ))}
       </ChipRow>
       <Note>
         Zjazd jasności robi więcej dla adaptacji niż sam kolor, dlatego siedzi w tym samym arkuszu.
+        Obowiązuje w trybie czerwonym; po wyjściu z niego ekran wraca pod sterowanie systemu.
       </Note>
 
       <Panel style={styles.row}>
         <Text style={[styles.title, styles.flex]}>Włączaj sam po zmierzchu</Text>
-        <Toggle
-          value={auto}
-          onPress={() => setAuto((value) => !value)}
-          label="Włączaj sam po zmierzchu"
-        />
+        <Toggle value={theme.auto} onPress={theme.toggleAuto} label="Włączaj sam po zmierzchu" />
       </Panel>
+      <Note>
+        Automat idzie za oknem nocy dla wybranego miejsca — od zmierzchu do świtu. Wskazanie trybu
+        ręcznie wyłącza go, bo wtedy obowiązuje wybór, a nie zegar.
+      </Note>
 
       <Label>Trzy poziomy, zmierzone</Label>
       <View style={styles.preview}>
@@ -84,19 +92,12 @@ export default function NightModeSheet() {
             <Text style={[styles.mono, { color: level.color }]}>{level.ratio}</Text>
           </View>
         ))}
-        <Text style={[styles.previewNote, { color: redColors.textMuted }]}>
+        <Text style={[styles.previewNote, { color: PALETTES.red.textMuted }]}>
           dobrze ✓ · uwaga ! · odpuść × · obojętne ·
         </Text>
       </View>
 
-      <Button
-        label="Zastosuj"
-        variant="primary"
-        onPress={() => {
-          router.back();
-          todo('Przełączenie całej aplikacji w tryb czerwony i sterowanie jasnością');
-        }}
-      />
+      <Button label="Gotowe" variant="primary" onPress={() => router.back()} />
     </Sheet>
   );
 }
@@ -131,7 +132,7 @@ function ModeOption({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   flex: { flex: 1 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   between: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
@@ -153,19 +154,19 @@ const styles = StyleSheet.create({
   track: {
     height: 6,
     borderRadius: 3,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: colors.fill,
     overflow: 'hidden',
   },
-  fill: { height: 6, backgroundColor: redColors.textPrimary },
+  fill: { height: 6, backgroundColor: PALETTES.red.textPrimary },
   preview: {
     gap: 10,
     padding: 14,
     borderRadius: 12,
-    backgroundColor: redColors.bg,
+    backgroundColor: PALETTES.red.bg,
     borderWidth: 1,
-    borderColor: redColors.border,
+    borderColor: PALETTES.red.border,
   },
   level: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
   levelLabel: { flex: 1, fontFamily: fonts.sans, fontSize: 13.5 },
   previewNote: { fontFamily: fonts.mono, fontSize: 11.5 },
-});
+}));

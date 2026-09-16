@@ -1,16 +1,9 @@
-import {
-  Linking,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-  type StyleProp,
-  type ViewStyle,
-} from 'react-native';
+import { Linking, Pressable, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { lightPollutionMapUrl } from '@/lib/light-pollution';
 import { HAIRLINE, colors, fonts, radius } from '@/theme';
+import { themedStyles } from '@/ui/theme';
 
 type Props = {
   lat: number;
@@ -49,7 +42,7 @@ export function LightPollutionLink({ lat, lon, subtitle, style }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -82,4 +75,4 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     marginTop: 2,
   },
-});
+}));

@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
 import { saveLog, useJournal } from '@/hooks/use-journal';
 import { MAX_DAYS_BACK, useNightLog } from '@/hooks/use-night-log';
@@ -33,6 +33,7 @@ import {
   Panel,
   Sheet,
 } from '@/ui/kit';
+import { themedStyles } from '@/ui/theme';
 
 type Draft = {
   outcomes: Record<string, Outcome>;
@@ -453,7 +454,7 @@ function Scale({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   group: { gap: 8 },
   between: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
   switcher: {
@@ -489,4 +490,4 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   boxFilled: { backgroundColor: hexA(colors.purple, 0.22), borderColor: colors.purple },
-});
+}));

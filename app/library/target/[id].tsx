@@ -1,11 +1,16 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { useTargetProfile } from '@/hooks/use-library';
+import type { ReachLevel } from '@/lib/sky-targets';
 import { colors, fonts, hexA } from '@/theme';
 import { Body, Button, Label, MenuRow, Note, Panel, Sheet } from '@/ui/kit';
+import { themedStyles } from '@/ui/theme';
 
 const FOV_DIAMETER = 132;
+
+/** Werdykt niesie znak, nie kolor: zobaczysz ✓, na styk !, nie zobaczysz ×. */
+const REACH_MARK: Record<ReachLevel, string> = { in: '✓', marginal: '!', out: '×' };
 
 /**
  * 12a: profil celu w bibliotece — „czym i kiedykolwiek", w odróżnieniu od
@@ -30,9 +35,7 @@ export default function TargetProfileSheet() {
         <Label flush>Czy to zobaczysz</Label>
         {profile.reach.map((reach) => (
           <View key={reach.id} style={styles.reach}>
-            <Text style={[styles.reachMark, reach.ok ? styles.ok : styles.no]}>
-              {reach.ok ? '✓' : '✕'}
-            </Text>
+            <Text style={[styles.reachMark, styles[reach.level]]}>{REACH_MARK[reach.level]}</Text>
             <View style={styles.flex}>
               <Text style={styles.title}>{reach.label}</Text>
               <Text style={styles.subtitle}>{reach.why}</Text>
@@ -105,12 +108,13 @@ export default function TargetProfileSheet() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   flex: { flex: 1 },
   reach: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingVertical: 4 },
   reachMark: { width: 16, fontFamily: fonts.monoSemiBold, fontSize: 14 },
-  ok: { color: colors.green },
-  no: { color: colors.textMuted },
+  in: { color: colors.green },
+  marginal: { color: colors.amber },
+  out: { color: colors.textMuted },
   title: { fontFamily: fonts.sans, fontSize: 14.5, color: colors.textPrimary },
   subtitle: { fontFamily: fonts.mono, fontSize: 11.5, lineHeight: 16, color: colors.textMuted },
   fov: {
@@ -134,4 +138,4 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
   },
   factValue: { flexShrink: 1, fontFamily: fonts.mono, fontSize: 12.5, color: colors.textPrimary },
-});
+}));

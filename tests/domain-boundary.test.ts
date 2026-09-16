@@ -32,6 +32,7 @@ const PLATFORM_MODULES = new Set([
   'google-oauth.ts',
   'google-account.ts',
   'calendar-store.ts',
+  'screen-brightness.ts',
 ]);
 
 function domainFiles(): { path: string; name: string; source: string }[] {

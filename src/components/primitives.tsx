@@ -1,6 +1,7 @@
-import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Pressable, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { HAIRLINE, colors, fonts, hexA, radius } from '@/theme';
+import { themedStyles } from '@/ui/theme';
 
 type CardProps = {
   children: React.ReactNode;
@@ -82,7 +83,7 @@ export function Badge({ label, color }: { label: string; color: string }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   card: {
     backgroundColor: colors.surface,
     borderWidth: HAIRLINE,
@@ -128,4 +129,4 @@ const styles = StyleSheet.create({
     fontSize: 10,
     letterSpacing: 1,
   },
-});
+}));

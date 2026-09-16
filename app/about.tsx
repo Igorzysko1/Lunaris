@@ -1,9 +1,10 @@
 import Constants from 'expo-constants';
 import { router } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { colors, fonts } from '@/theme';
 import { Label, MenuRow, Note, Panel, Screen, TitleBar } from '@/ui/kit';
+import { themedStyles } from '@/ui/theme';
 
 /**
  * Źródła danych, na których stoi każdy werdykt.
@@ -56,7 +57,7 @@ export default function AboutScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -73,4 +74,4 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
   },
   mono: { fontFamily: fonts.mono, fontSize: 13, color: colors.textSecondary },
-});
+}));

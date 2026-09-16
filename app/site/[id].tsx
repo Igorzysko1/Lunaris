@@ -1,10 +1,11 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, Text, View } from 'react-native';
 
 import { useSiteDetail } from '@/hooks/use-where';
 import { colors, fonts } from '@/theme';
 import { Body, Button, Field, Label, Note, Panel, Sheet, toneColor } from '@/ui/kit';
+import { themedStyles } from '@/ui/theme';
 
 /**
  * 11b: szczegół miejscówki — arkusz z rankingu albo katalogu. Werdykt dla nocy
@@ -175,7 +176,7 @@ export default function SiteSheet() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   flex: { flex: 1 },
   row: { flexDirection: 'row', gap: 8 },
   between: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
@@ -187,4 +188,4 @@ const styles = StyleSheet.create({
   remove: { fontFamily: fonts.mono, fontSize: 12, color: colors.textMuted },
   form: { flexDirection: 'row', gap: 6 },
   add: { width: 52, paddingHorizontal: 0 },
-});
+}));

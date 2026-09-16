@@ -12,14 +12,16 @@
  */
 
 import { useState } from 'react';
-import { Image, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Linking, Pressable, Text, View } from 'react-native';
 
 import { Card, SectionLabel } from '@/components/primitives';
 import type { Apod } from '@/lib/apod';
 import { HAIRLINE, colors, fonts, radius } from '@/theme';
+import { themedStyles, useTheme } from '@/ui/theme';
 
 export function ApodCard({ apod }: { apod: Apod }) {
   const [expanded, setExpanded] = useState(false);
+  const { red } = useTheme();
 
   // Dla wideo `url` prowadzi do osadzenia YouTube'a, nie do obrazu — podgląd
   // przychodzi wtedy osobnym polem.
@@ -29,7 +31,13 @@ export function ApodCard({ apod }: { apod: Apod }) {
     <Card>
       <SectionLabel style={styles.label}>Zdjęcie dnia NASA</SectionLabel>
 
-      {image && (
+      {/* Tryb czerwony: zdjęcia nie ma wcale. Jasny kadr na pół ekranu kasuje
+          adaptację wzroku tak samo skutecznie jak białe tło, a ta karta jest
+          jedyną, która nie odpowiada na pytanie „czy jechać" — więc to ona
+          ustępuje, a nie wzrok. */}
+      {red && <Text style={styles.hidden}>Zdjęcie ukryte w trybie czerwonym.</Text>}
+
+      {image && !red && (
         <Image
           source={{ uri: image }}
           style={styles.image}
@@ -84,7 +92,7 @@ export function ApodCard({ apod }: { apod: Apod }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   label: {
     marginBottom: 10,
   },
@@ -97,6 +105,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceRaised,
     borderWidth: HAIRLINE,
     borderColor: colors.border,
+  },
+  hidden: {
+    fontFamily: fonts.mono,
+    fontSize: 11.5,
+    color: colors.textMuted,
   },
   title: {
     fontFamily: fonts.sansMedium,
@@ -143,4 +156,4 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.purple,
   },
-});
+}));

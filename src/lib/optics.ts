@@ -153,6 +153,17 @@ export function surfaceBrightnessLimit(optics: Optics, bortle: number): number {
 }
 
 /**
+ * Zapas w magnitudo, poniżej którego cel jest „w zasięgu, ale na styk".
+ *
+ * Werdykt dwustanowy kłamie dokładnie przy progu: obiekt słabszy od granicy
+ * o setną magnitudo dostaje „w zasięgu" tak samo stanowczo jak ten jaśniejszy
+ * o trzy — a cały rachunek jest przybliżeniem rzędu właśnie takiego ułamka.
+ * Pół magnitudo to mniej więcej różnica między nocą bezksiężycową a dobą przed
+ * pierwszą kwadrą, czyli różnica, która faktycznie decyduje, czy się zobaczy.
+ */
+export const MARGINAL_MAG = 0.5;
+
+/**
  * Najmniejszy rozmiar kątowy, jaki przy danym powiększeniu widać jako obiekt,
  * a nie jako punkt.
  *

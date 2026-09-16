@@ -1,11 +1,12 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
 import { useConstellationLibrary } from '@/hooks/use-library';
 import { colors, fonts } from '@/theme';
 import { ConstellationFigure } from '@/ui/figure';
 import { Field, Label, Note, Screen, TitleBar } from '@/ui/kit';
+import { themedStyles } from '@/ui/theme';
 
 /**
  * 8a: biblioteka gwiazdozbiorów (Więcej › Poza decyzją). Galeria dłuższa niż
@@ -70,7 +71,7 @@ export default function ConstellationLibraryScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   group: { gap: 8 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   card: {
@@ -85,4 +86,4 @@ const styles = StyleSheet.create({
   },
   name: { fontFamily: fonts.sans, fontSize: 12, color: colors.textPrimary },
   latin: { fontFamily: fonts.mono, fontSize: 10, color: colors.textMuted },
-});
+}));

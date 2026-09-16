@@ -1,8 +1,9 @@
 import { router } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 
 import { useMore } from '@/hooks/use-more';
 import { Label, MenuRow, Note, Screen, TitleBar } from '@/ui/kit';
+import { themedStyles } from '@/ui/theme';
 
 type Row = { title: string; subtitle?: string; value?: string; chevron?: string; go: () => void };
 
@@ -122,6 +123,6 @@ export default function MoreScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   group: { gap: 8 },
-});
+}));

@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
 import { useRanking, useSiteCatalog, type RankRow, type RankingView } from '@/hooks/use-where';
 import { colors, fonts } from '@/theme';
@@ -18,6 +18,7 @@ import {
   Segments,
   TitleBar,
 } from '@/ui/kit';
+import { themedStyles } from '@/ui/theme';
 
 type Segment = 'ranking' | 'catalog';
 
@@ -262,7 +263,7 @@ function Catalog() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   head: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   rank: { fontFamily: fonts.mono, fontSize: 12, color: colors.textMuted },
   name: { flex: 1, fontFamily: fonts.sansMedium, fontSize: 16, color: colors.textPrimary },
@@ -294,4 +295,4 @@ const styles = StyleSheet.create({
   },
   rowTitle: { flexShrink: 1, fontFamily: fonts.sans, fontSize: 14, color: colors.textPrimary },
   coords: { fontFamily: fonts.monoMedium, fontSize: 16, color: colors.textPrimary },
-});
+}));

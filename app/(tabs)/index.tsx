@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Fragment, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, Text, View } from 'react-native';
 
 import { useBooking, type BookingView } from '@/hooks/use-booking';
 import { useKnownTonight } from '@/hooks/use-known-tonight';
@@ -38,6 +38,7 @@ import {
   type Tone,
 } from '@/ui/kit';
 import { BlockedBar, HourBars, ProgressBar, WindowBar, pct } from '@/ui/night';
+import { themedStyles } from '@/ui/theme';
 
 type Segment = 'conditions' | 'sky' | 'plan';
 
@@ -406,7 +407,7 @@ function Conditions({ card }: { card: NightCard }) {
               <Legend color={hexA(colors.green, 0.6)} label="w oknie" />
             ) : null}
             <Legend
-              color="rgba(255,255,255,0.12)"
+              color={colors.fill}
               label={view.clouds.highlight ? 'poza oknem' : 'noc bez okna'}
             />
             <Legend color={hexA(colors.coral, 0.6)} label={`próg ${view.clouds.threshold}%`} />
@@ -624,7 +625,7 @@ function Sky({
 function blockColor(tone: Tone) {
   if (tone === 'go') return hexA(colors.green, 0.4);
   if (tone === 'accent') return hexA(colors.purple, 0.22);
-  return 'rgba(255,255,255,0.08)';
+  return colors.fill;
 }
 
 /**
@@ -1061,7 +1062,7 @@ function NoForecast({ verdicts }: { verdicts: NightVerdicts }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   flex: { flex: 1 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   between: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
@@ -1117,7 +1118,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 3,
     borderRadius: 2,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: colors.fill,
     overflow: 'hidden',
   },
   altitudeFill: { height: 3, backgroundColor: colors.textSecondary },
@@ -1179,4 +1180,4 @@ const styles = StyleSheet.create({
   teal: { color: colors.teal },
   urgent: { backgroundColor: colors.surface },
   urgentFill: { backgroundColor: colors.amber },
-});
+}));

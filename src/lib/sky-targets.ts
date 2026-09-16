@@ -26,6 +26,7 @@ import type { Coords } from '../data/places.ts';
 import { DEFAULT_HORIZON, compassLabel, type HorizonPoint } from './horizon.ts';
 import { sampleNight, type NightWindow } from './night-window.ts';
 import {
+  MARGINAL_MAG,
   limitingMagnitude,
   minimumAngularSize,
   profileLabel,
@@ -500,6 +501,32 @@ export function libraryReach(
     },
     reachOf(optics, bortle),
   );
+}
+
+export type ReachLevel = 'in' | 'marginal' | 'out';
+
+/**
+ * Zasięg trzystanowy: w zasięgu / graniczny / poza.
+ *
+ * Nadbudowa nad `libraryReach`, a nie zamiast niego — „poza" znaczy tu dokładnie
+ * to samo, co tam, więc lista celów i biblioteka dalej mówią o sprzęcie jedno.
+ * Doróbką jest środek: cel, który mieści się w granicy z zapasem mniejszym niż
+ * `MARGINAL_MAG`. W trybie czerwonym to jedyny stopień, który da się pokazać
+ * bez koloru, bo barwy znaczeniowe zlewają się tam w jedną.
+ */
+export function libraryReachLevel(dso: DeepSkyObject, optics: Optics, bortle: number): ReachLevel {
+  if (libraryReach(dso, optics, bortle) !== null) return 'out';
+
+  const reach = reachOf(optics, bortle);
+  const margins = [reach.limitPoint - dso.magnitude];
+
+  // Dla obiektów rozmytych o widoczności decyduje jasność powierzchniowa, więc
+  // i zapas liczy się względem tamtej granicy — bierzemy ciaśniejszy z dwóch.
+  if (DIFFUSE_KINDS.includes(dso.kind)) {
+    margins.push(reach.limitSurface - surfaceBrightness(dso.magnitude, dso.sizeArcmin));
+  }
+
+  return Math.min(...margins) < MARGINAL_MAG ? 'marginal' : 'in';
 }
 
 /** Nakłada zasięg konkretnego zestawu na policzone już położenie obiektu. */

@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { useJournal } from '@/hooks/use-journal';
 import { useRetryTonight } from '@/hooks/use-retry-tonight';
@@ -26,6 +26,7 @@ import {
   Stat,
   TitleBar,
 } from '@/ui/kit';
+import { themedStyles } from '@/ui/theme';
 
 /**
  * Dziennik — „co widziałem?". Bez segmentów: jedna historia z podsumowaniem
@@ -136,7 +137,7 @@ export default function LogScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   flex: { flex: 1 },
   stats: { flexDirection: 'row', gap: 8 },
   group: { gap: 10 },
@@ -145,4 +146,4 @@ const styles = StyleSheet.create({
   meta: { fontFamily: fonts.mono, fontSize: 12, color: colors.textSecondary },
   chevron: { fontFamily: fonts.mono, fontSize: 16, color: colors.purple },
   note: { fontFamily: fonts.sans, fontSize: 13.5, lineHeight: 20, color: colors.textPrimary },
-});
+}));

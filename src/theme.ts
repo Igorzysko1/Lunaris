@@ -9,7 +9,36 @@
  * tests/theme.test.ts — bo kolor dobrany „na oko" na monitorze w dzień zawsze
  * wychodzi za ciemny na telefonie w polu.
  */
-export const colors = {
+export type PaletteMode = 'dark' | 'red';
+
+export type Palette = {
+  purple: string;
+  teal: string;
+  green: string;
+  amber: string;
+  coral: string;
+
+  bg: string;
+  surface: string;
+  surfaceRaised: string;
+
+  textPrimary: string;
+  textSecondary: string;
+  textMuted: string;
+
+  border: string;
+  borderStrong: string;
+  /** Obrys przerywany: zapowiedź, propozycja, rzecz do dopisania. */
+  borderDashed: string;
+  /** Tło toru, słupka i innych rzeczy, na których coś się odkłada. */
+  fill: string;
+  /** To samo, ale ledwo widoczne: wyróżnienie komórki, tło obojętnego znacznika. */
+  fillSoft: string;
+  grid: string;
+  skeleton: string;
+};
+
+const darkPalette: Palette = {
   purple: '#7F77DD',
   teal: '#1D9E75',
   green: '#639922',
@@ -37,26 +66,81 @@ export const colors = {
    * po nim, więc obowiązuje go próg 3:1 dla elementów nietekstowych.
    */
   borderStrong: 'rgba(255,255,255,0.35)',
+  borderDashed: 'rgba(255,255,255,0.16)',
+  fill: 'rgba(255,255,255,0.10)',
+  fillSoft: 'rgba(255,255,255,0.03)',
   grid: 'rgba(255,255,255,0.06)',
   skeleton: 'rgba(255,255,255,0.06)',
-} as const;
+};
 
 /**
  * Paleta trybu czerwonego z projektu „Lunaris tryb czerwony": trzy poziomy
- * jasności jednej barwy na tle #0A0303 (7,9:1 · 6,0:1 · 4,8:1). Kolory
- * znaczeniowe znikają, więc stan niesie wypełnienie, obrys i znak przed treścią.
- * Na razie tylko podgląd w arkuszu trybu nocnego — przełączanie całej aplikacji
- * to osobny krok planu.
+ * jasności jednej barwy na tle #0A0303 (7,9:1 · 6,0:1 · 4,6:1).
+ *
+ * Kolory znaczeniowe zlewają się tu w jeden — i tak ma być. Czerwone światło
+ * o tej jasności wzrok rozróżnia po jasności, nie po barwie, więc „zielony"
+ * i „bursztynowy" byłyby tą samą plamą udającą dwie różne. Stan niesie zamiast
+ * nich wypełnienie, obrys i znak przed treścią (✓ ! ×) — patrz `toneMark`
+ * w src/ui/kit.tsx.
  */
-export const redColors = {
+const redPalette: Palette = {
+  purple: '#FF7A5E',
+  teal: '#FF7A5E',
+  green: '#FF7A5E',
+  amber: '#FF7A5E',
+  coral: '#FF7A5E',
+
   bg: '#0A0303',
   surface: '#160606',
   surfaceRaised: '#1C0808',
+
   textPrimary: '#FF7A5E',
   textSecondary: '#E8604A',
   textMuted: '#CE5540',
-  border: 'rgba(255,122,94,0.12)',
-} as const;
+
+  border: 'rgba(255,122,94,0.16)',
+  // Mocniej niż w ciemnej (0,35): pod czerwonym tłem ta sama przezroczystość
+  // dawała 2,4:1, czyli obrys wyłączonego przełącznika znikał.
+  borderStrong: 'rgba(255,122,94,0.6)',
+  borderDashed: 'rgba(255,122,94,0.3)',
+  fill: 'rgba(255,122,94,0.14)',
+  fillSoft: 'rgba(255,122,94,0.06)',
+  grid: 'rgba(255,122,94,0.12)',
+  skeleton: 'rgba(255,122,94,0.12)',
+};
+
+export const PALETTES: Record<PaletteMode, Palette> = { dark: darkPalette, red: redPalette };
+
+let activeMode: PaletteMode = 'dark';
+let active: Palette = darkPalette;
+
+export function paletteMode(): PaletteMode {
+  return activeMode;
+}
+
+/**
+ * Przełącza paletę dla całej aplikacji.
+ *
+ * Kolor odczytany wcześniej już się nie zmieni — arkusze stylów powstają raz,
+ * przy wczytaniu modułu. Dlatego przebudową stylów zajmuje się `themedStyles`
+ * z src/ui/theme.tsx, a tu zostaje sam wybór palety.
+ */
+export function setPaletteMode(mode: PaletteMode): void {
+  activeMode = mode;
+  active = PALETTES[mode];
+}
+
+/**
+ * Bieżąca paleta widziana jako zwykły obiekt kolorów.
+ *
+ * Podstawienie zamiast stałej, bo `colors.textPrimary` czyta kilkadziesiąt
+ * miejsc — w stylach, w atrybutach ikon, w module rachunku (`astro.ts`).
+ * Gdyby to była stała, tryb czerwony wymagałby przepisania każdego z nich
+ * na hook; tak wystarczy, że odczyt trafia do palety wybranej w tej chwili.
+ */
+export const colors: Palette = new Proxy(darkPalette, {
+  get: (_target, key) => active[key as keyof Palette],
+});
 
 export const fonts = {
   sans: 'IBMPlexSans_400Regular',
