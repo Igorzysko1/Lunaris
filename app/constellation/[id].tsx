@@ -6,6 +6,7 @@ import { CONSTELLATIONS } from '@/data/constellations';
 import { useConstellationView } from '@/hooks/use-constellation-tonight';
 import { useDeviceRoll } from '@/hooks/use-device-roll';
 import { FIGURES } from '@/data/constellation-figures';
+import { starLabel } from '@/lib/sky-library';
 import { colors, fonts } from '@/theme';
 import { ConstellationFigure } from '@/ui/figure';
 import { Body, Button, Label, Note, Panel, Sheet } from '@/ui/kit';
@@ -68,7 +69,12 @@ export default function ConstellationSheet() {
         </Label>
         <View style={styles.figure}>
           {figure ? (
-            <ConstellationFigure figure={figure} rotation={rotation} size={280} />
+            <ConstellationFigure
+              figure={figure}
+              genitive={meta.genitive}
+              rotation={rotation}
+              size={280}
+            />
           ) : (
             <Note>Brak rysunku w danych.</Note>
           )}
@@ -101,11 +107,11 @@ export default function ConstellationSheet() {
       {figure ? (
         <>
           <Label right="kształt schematyczny">Gwiazdy rysunku</Label>
-          {figure.s.map(([, , bayer, name]) => (
-            <Panel key={`${bayer}-${name ?? ''}`} style={styles.row}>
-              <Text style={styles.bayer}>{bayer}</Text>
-              <Text style={[styles.title, styles.flex]}>{name ?? 'nazwy nie ma w danych'}</Text>
-              {name === meta.star ? <Text style={styles.anchor}>KOTWICA</Text> : null}
+          {figure.s.map((star) => (
+            <Panel key={`${star[2]}-${star[3] ?? ''}`} style={styles.row}>
+              <Text style={styles.bayer}>{star[2]}</Text>
+              <Text style={[styles.title, styles.flex]}>{starLabel(star, meta.genitive)}</Text>
+              {star[3] === meta.star ? <Text style={styles.anchor}>KOTWICA</Text> : null}
             </Panel>
           ))}
         </>

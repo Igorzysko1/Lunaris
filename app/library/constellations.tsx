@@ -49,7 +49,13 @@ export default function ConstellationLibraryScreen() {
                 style={styles.card}
               >
                 {c.figure ? (
-                  <ConstellationFigure figure={c.figure} rotation={0} size={80} compact />
+                  <ConstellationFigure
+                    figure={c.figure}
+                    genitive={c.genitive}
+                    rotation={0}
+                    size={80}
+                    compact
+                  />
                 ) : null}
                 <Text style={styles.name} numberOfLines={1}>
                   {c.name}

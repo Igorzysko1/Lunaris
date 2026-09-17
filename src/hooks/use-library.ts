@@ -194,6 +194,7 @@ export function useConstellationLibrary(query: string) {
         id: c.id,
         name: c.name,
         latin: c.latin,
+        genitive: c.genitive,
         figure: FIGURES[c.id] ?? null,
       })),
     };

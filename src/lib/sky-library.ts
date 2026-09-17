@@ -18,6 +18,7 @@ import {
   SiderealTime,
 } from 'astronomy-engine';
 
+import type { FigureStar } from '../data/constellation-figures.ts';
 import { CONSTELLATIONS, type Constellation } from '../data/constellations.ts';
 import { DEEP_SKY_OBJECTS, type DeepSkyObject } from '../data/deep-sky.ts';
 import type { Coords } from '../data/places.ts';
@@ -58,6 +59,18 @@ export function objectsInConstellation(id: string): DeepSkyObject[] {
   return DEEP_SKY_OBJECTS.filter((o) => constellationOf(o)?.id === id).sort(
     (a, b) => a.magnitude - b.magnitude,
   );
+}
+
+/**
+ * Podpis gwiazdy rysunku.
+ *
+ * Nazwę własną ma mniej niż dwie trzecie z nich i nie jest to brak w danych:
+ * większość gwiazd nigdy takiej nie dostała. W atlasach występują jako litera
+ * Bayera z dopełniaczem gwiazdozbioru — „η Ursae Minoris" — i to **jest** ich
+ * nazwa. Dlatego podpis zawsze coś mówi, zamiast tłumaczyć się z pustego pola.
+ */
+export function starLabel(star: FigureStar, genitive: string): string {
+  return star[3] ?? `${star[2]} ${genitive}`;
 }
 
 export type LibraryReach = 'too-faint' | 'too-diffuse' | 'too-small' | null;

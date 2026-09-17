@@ -11,6 +11,8 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
+import { CONSTELLATIONS } from '../src/data/constellations.ts';
+import { FIGURES } from '../src/data/constellation-figures.ts';
 import { DEEP_SKY_OBJECTS } from '../src/data/deep-sky.ts';
 import { serialize, summarizeForecasts } from '../src/lib/forecast-cache.ts';
 import { DEFAULT_OPTICS } from '../src/lib/optics.ts';
@@ -26,6 +28,7 @@ import {
   foldForSearch,
   objectsInConstellation,
   skyOrientation,
+  starLabel,
 } from '../src/lib/sky-library.ts';
 import {
   libraryReach,
@@ -114,6 +117,33 @@ describe('zasięg trzystanowy', () => {
     );
 
     assert.ok(marginal.length > 0);
+  });
+});
+
+describe('podpisy gwiazd rysunku', () => {
+  it('nazwa własna, gdy gwiazda ją ma', () => {
+    const polaris = FIGURES.umi.s.find((s) => s[2] === 'α')!;
+    assert.equal(starLabel(polaris, 'Ursae Minoris'), 'Polaris');
+  });
+
+  it('bez nazwy własnej — oznaczenie Bayera, nie komunikat o braku', () => {
+    const eta = FIGURES.umi.s.find((s) => s[2] === 'η')!;
+    assert.equal(starLabel(eta, 'Ursae Minoris'), 'η Ursae Minoris');
+  });
+
+  it('każda gwiazda każdej figury ma czym się podpisać', () => {
+    // Brak dopełniacza albo literówka w identyfikatorze dałyby podpis „η undefined"
+    // — widoczny dopiero po dotknięciu gwiazdy w jednym z 48 gwiazdozbiorów.
+    for (const [id, figure] of Object.entries(FIGURES)) {
+      const constellation = CONSTELLATIONS.find((c) => c.id === id);
+      assert.ok(constellation, `figura bez gwiazdozbioru: ${id}`);
+
+      for (const star of figure.s) {
+        const label = starLabel(star, constellation.genitive);
+        assert.match(label, /^[^ ]+( [A-Za-zÀ-ÿ]+)*$/, `${id} ${star[2]}: „${label}"`);
+        assert.doesNotMatch(label, /undefined/, `${id} ${star[2]}`);
+      }
+    }
   });
 });
 

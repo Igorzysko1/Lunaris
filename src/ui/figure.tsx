@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import Svg, { Circle, Polyline, Text as SvgText } from 'react-native-svg';
 
 import type { Figure } from '@/data/constellation-figures';
+import { starLabel } from '@/lib/sky-library';
 import { colors, fonts, hexA } from '@/theme';
 
 /** Kadr rysunku: 220×220, środek w 110. */
@@ -16,11 +17,14 @@ const LABEL_MS = 2600;
  */
 export function ConstellationFigure({
   figure,
+  genitive,
   rotation,
   size,
   compact = false,
 }: {
   figure: Figure;
+  /** Dopełniacz łaciński gwiazdozbioru — do podpisu gwiazd bez nazwy własnej. */
+  genitive: string;
   rotation: number;
   size: number;
   compact?: boolean;
@@ -37,12 +41,17 @@ export function ConstellationFigure({
   const rad = (rotation * Math.PI) / 180;
   const cos = Math.cos(rad);
   const sin = Math.sin(rad);
-  const points = figure.s.map(([x, y, bayer, name]) => ({
-    x: CENTER + (x * cos - y * sin) * scale,
-    y: CENTER - (x * sin + y * cos) * scale,
-    bayer,
-    name,
-  }));
+  const points = figure.s.map((star) => {
+    const [x, y, bayer, name] = star;
+
+    return {
+      x: CENTER + (x * cos - y * sin) * scale,
+      y: CENTER - (x * sin + y * cos) * scale,
+      bayer,
+      name,
+      label: starLabel(star, genitive),
+    };
+  });
   const active = tapped === null ? null : points[tapped];
 
   return (
@@ -118,9 +127,7 @@ export function ConstellationFigure({
           fill={colors.textPrimary}
           textAnchor="middle"
         >
-          {active.name
-            ? `${active.name} · ${active.bayer}`
-            : `gwiazda ${active.bayer} — nazwy nie ma w danych`}
+          {active.name ? `${active.name} · ${active.bayer}` : active.label}
         </SvgText>
       ) : null}
     </Svg>
