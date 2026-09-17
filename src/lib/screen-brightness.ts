@@ -6,9 +6,13 @@
  * Zmieniamy jasność okna aplikacji, nie systemową — po wyjściu z Lunarisa
  * telefon ma świecić tak, jak świecił. `restoreSystemBrightnessAsync` oddaje
  * sterowanie systemowi, gdy tryb czerwony gaśnie.
+ *
+ * Moduł wczytujemy dopiero przy użyciu, tak samo jak czujniki w `use-device-roll`.
+ * `expo-brightness` sięga po moduł natywny już przy imporcie, więc w buildzie bez
+ * niego import wywróciłby całą aplikację przy starcie — ten plik wisi pod
+ * `src/ui/theme.tsx`, czyli pod korzeniem. Opakowanie samych wywołań w `try`
+ * niczego nie ratuje, bo do wywołania nigdy by nie doszło.
  */
-
-import * as Brightness from 'expo-brightness';
 
 /** Ekran nie gaśnie do zera: 1% to najniższa jasność, przy której coś widać. */
 const MIN_PERCENT = 1;
@@ -16,6 +20,8 @@ const MIN_PERCENT = 1;
 /** Ustawia jasność na podany procent; `null` oddaje sterowanie systemowi. */
 export async function applyBrightness(percent: number | null): Promise<void> {
   try {
+    const Brightness = await import('expo-brightness');
+
     if (percent === null) {
       await Brightness.restoreSystemBrightnessAsync();
       return;
@@ -23,8 +29,7 @@ export async function applyBrightness(percent: number | null): Promise<void> {
 
     await Brightness.setBrightnessAsync(Math.min(100, Math.max(MIN_PERCENT, percent)) / 100);
   } catch {
-    // Moduł natywny wchodzi dopiero z nowym buildem deweloperskim, a przed nim
-    // każde wywołanie rzuca. Tryb czerwony ma wtedy działać bez sterowania
-    // jasnością, a nie wywracać ekran.
+    // Build bez modułu natywnego (albo starszy klient deweloperski): tryb
+    // czerwony ma wtedy działać bez sterowania jasnością, a nie wywracać ekran.
   }
 }
