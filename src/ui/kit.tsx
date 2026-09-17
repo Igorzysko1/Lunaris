@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import type { ComponentProps, ReactNode } from 'react';
+import { useRef, useState, type ComponentProps, type ReactNode } from 'react';
 import {
   Pressable,
   ScrollView,
@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { HAIRLINE, colors, fonts, hexA, radius, type Palette } from '@/theme';
+import { HAIRLINE, MIN_TOUCH, colors, fonts, hexA, radius, type Palette } from '@/theme';
 import { themedStyles } from '@/ui/theme';
 
 /**
@@ -79,7 +79,16 @@ export function Screen({ children }: { children: ReactNode }) {
   );
 }
 
-/** Treść arkusza od dołu: nagłówek z krzyżykiem i przewijana zawartość. */
+/**
+ * Treść arkusza od dołu: nagłówek z krzyżykiem i przewijana zawartość.
+ *
+ * Przycisk powrotu na górę pojawia się po przewinięciu, bo inaczej jedyną drogą
+ * w górę jest gest — a ten po dojściu do początku treści przechodzi w ciągnięcie
+ * arkusza i zamyka go w tym samym ruchu. Systemowego przekazania gestu nie da
+ * się stąd zmienić, więc dajemy drogę, która go omija.
+ */
+const TO_TOP_AFTER = 240;
+
 export function Sheet({
   title,
   subtitle,
@@ -90,30 +99,47 @@ export function Sheet({
   children: ReactNode;
 }) {
   const insets = useSafeAreaInsets();
+  const scroll = useRef<ScrollView>(null);
+  const [scrolled, setScrolled] = useState(false);
 
   return (
-    <ScrollView
-      style={styles.sheet}
-      contentContainerStyle={[styles.sheetContent, { paddingBottom: insets.bottom + 24 }]}
-      keyboardShouldPersistTaps="handled"
-    >
-      <View style={styles.sheetHeader}>
-        <View style={styles.flex}>
-          <Text style={styles.sheetTitle}>{title}</Text>
-          {subtitle ? <Text style={styles.sheetSubtitle}>{subtitle}</Text> : null}
+    <View style={styles.flex}>
+      <ScrollView
+        ref={scroll}
+        onScroll={(event) => setScrolled(event.nativeEvent.contentOffset.y > TO_TOP_AFTER)}
+        scrollEventThrottle={64}
+        style={styles.sheet}
+        contentContainerStyle={[styles.sheetContent, { paddingBottom: insets.bottom + 24 }]}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.sheetHeader}>
+          <View style={styles.flex}>
+            <Text style={styles.sheetTitle}>{title}</Text>
+            {subtitle ? <Text style={styles.sheetSubtitle}>{subtitle}</Text> : null}
+          </View>
+          <Pressable
+            onPress={() => router.back()}
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel="Zamknij"
+            style={styles.close}
+          >
+            <Ionicons name="close" size={22} color={colors.textSecondary} />
+          </Pressable>
         </View>
+        {children}
+      </ScrollView>
+      {scrolled ? (
         <Pressable
-          onPress={() => router.back()}
-          hitSlop={12}
+          onPress={() => scroll.current?.scrollTo({ y: 0, animated: true })}
           accessibilityRole="button"
-          accessibilityLabel="Zamknij"
-          style={styles.close}
+          accessibilityLabel="Wróć na górę"
+          style={[styles.toTop, { bottom: insets.bottom + 16 }]}
         >
-          <Ionicons name="close" size={22} color={colors.textSecondary} />
+          <Ionicons name="arrow-up" size={20} color={colors.textPrimary} />
         </Pressable>
-      </View>
-      {children}
-    </ScrollView>
+      ) : null}
+    </View>
   );
 }
 
@@ -506,6 +532,18 @@ const styles = themedStyles(() => ({
     marginTop: 4,
   },
   close: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
+  toTop: {
+    position: 'absolute',
+    right: 16,
+    width: MIN_TOUCH,
+    height: MIN_TOUCH,
+    borderRadius: MIN_TOUCH / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surfaceRaised,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+  },
   titleBar: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 48 },
   back: { width: 32, height: 44, justifyContent: 'center' },
   title: { fontFamily: fonts.sansMedium, fontSize: 24, color: colors.textPrimary },
