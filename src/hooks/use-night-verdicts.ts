@@ -18,7 +18,6 @@ import {
 import {
   formatDuration,
   narrateVerdict,
-  nightHeading,
   nightRelative,
   rejectionLabels,
   verdictChips,
@@ -41,9 +40,6 @@ export type NightCard = {
   title: string;
   /** „dziś · Zawoja · Bortle 4" */
   subtitle: string;
-  /** „Dziś w nocy" — nagłówek nad Planem. */
-  planTitle: string;
-  planSubtitle: string;
   /** „dziś", „jutro", „czwartek" — także do żetonu najbliższej dobrej nocy. */
   relative: string;
   go: boolean;
@@ -139,8 +135,6 @@ export function useNightVerdicts(): NightVerdicts {
           key: verdict.night.from.toISOString(),
           title: `noc ${span}`,
           subtitle: `${relative} · ${place}${session.uncertain ? ' · orientacyjnie' : ''}`,
-          planTitle: nightHeading(verdict.night, now),
-          planSubtitle: `${span} · ${place}`,
           relative,
           go: verdict.status === 'go' && observing !== null,
           score: ratingScore(session.rating),

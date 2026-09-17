@@ -117,10 +117,6 @@ const DAY_MS = 86_400_000;
 // prettier-ignore
 const WEEKDAYS = ['niedziela', 'poniedziałek', 'wtorek', 'środa', 'czwartek', 'piątek', 'sobota'];
 
-/** Biernik: „w środę", „w sobotę" — pozostałe dni brzmią jak w mianowniku. */
-// prettier-ignore
-const WEEKDAYS_ACCUSATIVE = ['niedzielę', 'poniedziałek', 'wtorek', 'środę', 'czwartek', 'piątek', 'sobotę'];
-
 /** Doby kalendarzowe, nie milisekundy — doba zmiany czasu ma 23 albo 25 godzin. */
 function daysFromToday(date: Date, now: Date): number {
   const day = Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
@@ -142,16 +138,6 @@ export function nightRelative(night: { from: Date; to: Date }, now: Date): strin
   if (days === 1) return 'jutro';
   if (days === 2) return 'pojutrze';
   return WEEKDAYS[night.from.getDay()];
-}
-
-/** Nagłówek nocy nad Planem: „Dziś w nocy", „W czwartek w nocy". */
-export function nightHeading(night: { from: Date; to: Date }, now: Date): string {
-  const days = daysFromToday(night.from, now);
-  if (days < 0) return now < night.to ? 'Ta noc' : 'Miniona noc';
-  if (days === 0) return 'Dziś w nocy';
-  if (days === 1) return 'Jutro w nocy';
-  if (days === 2) return 'Pojutrze w nocy';
-  return `W ${WEEKDAYS_ACCUSATIVE[night.from.getDay()]} w nocy`;
 }
 
 /**

@@ -140,7 +140,6 @@ function NightView({
         nights={verdicts.nights}
         index={index}
         onChange={onNight}
-        plan={segment === 'plan'}
         live={live !== null}
         place={verdicts.place}
       />
@@ -181,14 +180,12 @@ function NightSwitcher({
   nights,
   index,
   onChange,
-  plan,
   live,
   place,
 }: {
   nights: NightCard[];
   index: number;
   onChange: (index: number) => void;
-  plan: boolean;
   live: boolean;
   place: string;
 }) {
@@ -214,9 +211,9 @@ function NightSwitcher({
         accessibilityHint="Zmienia miejsce. Przytrzymaj, żeby otworzyć tryb nocny."
         style={styles.switcherCenter}
       >
-        <Text style={styles.switcherTitle}>{plan ? current.planTitle : current.title}</Text>
+        <Text style={styles.switcherTitle}>{current.title}</Text>
         <Text style={styles.switcherSubtitle}>
-          {live ? `sesja trwa · ${place}` : plan ? current.planSubtitle : current.subtitle}
+          {live ? `sesja trwa · ${place}` : current.subtitle}
         </Text>
       </Pressable>
       <Pressable

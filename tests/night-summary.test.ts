@@ -18,7 +18,6 @@ import { nightBar, positionOnAxis, summarizeNight } from '../src/lib/night-summa
 import {
   describeRejection,
   narrateVerdict,
-  nightHeading,
   nightRelative,
   rejectionLabels,
   verdictChips,
@@ -172,8 +171,6 @@ describe('nazwy nocy', () => {
     assert.equal(nightRelative(nightOn(17), NOW), 'jutro');
     assert.equal(nightRelative(nightOn(18), NOW), 'pojutrze');
     assert.equal(nightRelative(nightOn(19), NOW), 'poniedziałek');
-    assert.equal(nightHeading(nightOn(16), NOW), 'Dziś w nocy');
-    assert.equal(nightHeading(nightOn(21), NOW), 'W środę w nocy');
   });
 
   it('po północy trwająca noc nie jest „dziś"', () => {
