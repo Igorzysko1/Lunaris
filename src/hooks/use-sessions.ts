@@ -5,6 +5,7 @@ import { nextDayWith } from '@/lib/calendar';
 import type { LunarisConfig } from '@/lib/config';
 import { upcomingEvents } from '@/lib/events';
 import { planNights, type PlannedNight } from '@/lib/night-plan';
+import type { NightSlice } from '@/lib/weather';
 import { assumedNextDay } from '@/lib/session-engine';
 import { useCalendarDays } from '@/hooks/use-calendar-days';
 import { useForecast } from '@/store/forecast';
@@ -29,6 +30,12 @@ export function useSessions(
   bortle: number,
   config: LunarisConfig,
   walkMinutes = 0,
+  /**
+   * Noce innego miejsca niż to z cyklu dobowego. Zakładka Noc liczy werdykt dla
+   * **miejsca nocy**, które bywa miejscówką z katalogu, a nie punktem, w którym
+   * stoisz — a prognozy miejscówek przynosi przegląd, nie ten cykl.
+   */
+  nights: NightSlice[] | null = null,
 ) {
   const { bundle, status, savedAt, refresh, refreshing } = useForecast();
 
@@ -44,14 +51,15 @@ export function useSessions(
     [lat, lon, bundle],
   );
 
-  const mornings = useMemo(() => bundle?.nights.map((slice) => slice.night.to) ?? [], [bundle]);
+  const slices = nights ?? bundle?.nights ?? null;
+  const mornings = useMemo(() => slices?.map((slice) => slice.night.to) ?? [], [slices]);
   const calendar = useCalendarDays(mornings, config.calendar.calendarIds);
 
   const sessions = useMemo<Session[]>(() => {
-    if (!bundle) return [];
+    if (!slices) return [];
 
     return planNights({
-      nights: bundle.nights,
+      nights: slices,
       target: { lat, lon },
       home,
       config,
@@ -65,7 +73,7 @@ export function useSessions(
     // `home` rozbite na współrzędne, bo obiekt dostaje nową tożsamość przy każdym
     // renderze store'u, a liczy się sama pozycja.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bundle, events, lat, lon, bortle, config, home?.lat, home?.lon, walkMinutes, calendar]);
+  }, [slices, events, lat, lon, bortle, config, home?.lat, home?.lon, walkMinutes, calendar]);
 
   return {
     status,

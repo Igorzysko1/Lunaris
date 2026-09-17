@@ -14,13 +14,13 @@ const STORAGE_KEY = 'lunaris.settings';
 
 /**
  * v2 dołożyła optykę, v3 przeniosła ją do pełnej konfiguracji użytkownika,
- * v4 dołożyła motyw. Starsze zapisy przechodzą przez migrację, nie przez reset —
+ * v4 dołożyła motyw, v5 przypięcie miejsca nocy. Starsze zapisy przechodzą przez migrację, nie przez reset —
  * wybór miejscowości ma przeżyć aktualizację aplikacji.
  */
-const CURRENT_VERSION = 4;
+const CURRENT_VERSION = 5;
 
 /** Wersje, z których umiemy odczytać dane. Wszystko inne to reset do domyślnych. */
-const READABLE_VERSIONS = [1, 2, 3, 4];
+const READABLE_VERSIONS = [1, 2, 3, 4, 5];
 
 export type LeadTime = '1h' | '2h' | '6h' | '12h';
 
@@ -62,6 +62,15 @@ export type PersistedSettings = {
   /** Kategorie powiadomień o zjawiskach — patrz `event-review.categoryOf`. */
   notifyCategories: NotifyCategory[];
   theme: ThemeSettings;
+  /**
+   * Miejsce, o którym mówi zakładka Noc, gdy wybrano je ręcznie.
+   *
+   * `null` znaczy „idź za rankingiem" i jest domyślne: bez tego aplikacja
+   * odpowiadałaby na pytanie „czy jechać" patrząc w jeden punkt, choć obok
+   * bywa noc przechodząca progi. Przypięcie zostaje do odwołania, bo powody
+   * wyboru gorszego miejsca bywają pozaastronomiczne — znajomi, nocleg, droga.
+   */
+  nightPlaceId: string | null;
   /** Konfiguracja obserwatora: profil, optyka, tryb sesji, progi. Patrz src/lib/config.ts. */
   config: LunarisConfig;
 };
@@ -125,6 +134,7 @@ function migrate(raw: unknown, defaults: PersistedSettings): PersistedSettings {
         )
       : defaults.notifyCategories,
     theme: migrateTheme(stored.theme, defaults.theme),
+    nightPlaceId: typeof stored.nightPlaceId === 'string' ? stored.nightPlaceId : null,
     config: mergeConfig(configSource),
   };
 }

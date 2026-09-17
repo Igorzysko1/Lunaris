@@ -21,6 +21,7 @@ import {
   outOfReachTitle,
 } from '@/lib/sky-text';
 import { describeOutOfReach, nightTargetsForProfiles } from '@/lib/sky-targets';
+import { useNightPlace } from '@/store/night-place';
 import { useSettings } from '@/store/settings';
 
 /** Ile gwiazdozbiorów w żetonach — dalej to już lista, a ta jest w bibliotece. */
@@ -81,12 +82,15 @@ export type SkyView = {
  * pierwszego wejścia w Niebo albo Plan.
  */
 export function useNightSky(card: NightCard, profileId: string | null, enabled: boolean): SkyView {
-  const { active, config } = useSettings();
+  const { config } = useSettings();
+  // Cele liczą się dla miejsca nocy: jego nieba, jego horyzontu. Werdykt
+  // o Złotym Potoku z listą celów widzianych z Jaworzna byłby sklejką.
+  const { place } = useNightPlace();
   const { journal } = useJournal();
   const picks = useNightPicks();
   const [opened] = useState(() => new Date());
   const now = useNow();
-  const { lat, lon } = active.coords;
+  const { lat, lon } = place.coords;
 
   const session = card.session.verdict.window;
   const dark = card.summary.dark;
@@ -101,8 +105,8 @@ export function useNightSky(card: NightCard, profileId: string | null, enabled: 
             { from: new Date(from), to: new Date(to) },
             { lat, lon },
             config.opticsProfiles,
-            active.bortle,
-            horizonOf(active.horizonMask, active.horizonOverrides),
+            place.bortle,
+            horizonOf(place.horizonMask, place.horizonOverrides),
           )
         : [],
     [
@@ -112,9 +116,9 @@ export function useNightSky(card: NightCard, profileId: string | null, enabled: 
       lat,
       lon,
       config.opticsProfiles,
-      active.bortle,
-      active.horizonMask,
-      active.horizonOverrides,
+      place.bortle,
+      place.horizonMask,
+      place.horizonOverrides,
     ],
   );
 

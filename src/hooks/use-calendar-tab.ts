@@ -17,6 +17,7 @@ import { deleteBooking, patchObservation, upsertBooking } from '@/lib/google-cal
 import { bookingFor, bookingId } from '@/lib/session-booking';
 import { rankedTargets } from '@/lib/sky-targets';
 import { useGoogle } from '@/store/google';
+import { useNightPlace } from '@/store/night-place';
 import { useSettings } from '@/store/settings';
 
 /** Ile celów wymieniamy w opisie rezerwacji — tyle samo co przy karcie nocy. */
@@ -42,7 +43,16 @@ export function useCalendarTab() {
   const google = useGoogle();
   const { active, config } = useSettings();
   const site = useBookingSite();
-  const { sessions } = useSessions(active.coords, active.bortle, config, active.walkMinutes);
+  const { place } = useNightPlace();
+  // Ta sama noc co w zakładce Noc: sesja i rezerwacja muszą mówić o jednym
+  // miejscu, inaczej wpis w kalendarzu wiezie gdzie indziej niż werdykt.
+  const { sessions } = useSessions(
+    place.coords,
+    place.bortle,
+    config,
+    place.walkMinutes,
+    place.nights,
+  );
 
   const [today] = useState(() => new Date());
   const [cursor, setCursor] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));

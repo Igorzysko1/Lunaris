@@ -29,6 +29,7 @@ import type { NightSlice } from '@/lib/weather';
 import { useNow } from '@/hooks/use-now';
 import { useSessions, type Session } from '@/hooks/use-sessions';
 import { useForecast, type ForecastStatus } from '@/store/forecast';
+import { useNightPlace } from '@/store/night-place';
 import { useSettings } from '@/store/settings';
 
 const MINUTE_MS = 60_000;
@@ -106,22 +107,32 @@ const lowerFirst = (text: string) => text.charAt(0).toLowerCase() + text.slice(1
  * przeliczało efemeryd Księżyca.
  */
 export function useNightVerdicts(): NightVerdicts {
-  const { active, config } = useSettings();
-  const { bundle, status, savedAt, stale, failure, refresh, refreshing, cycle } = useForecast();
-  const { sessions } = useSessions(active.coords, active.bortle, config, active.walkMinutes);
+  const { config } = useSettings();
+  // Werdykt jest o **miejscu nocy**, nie o punkcie, w którym stoisz: „odpuść"
+  // ma znaczyć „nigdzie w zasięgu nie warto", a nie „nie warto stąd".
+  const { place } = useNightPlace();
+  const { status, savedAt, stale, failure, refresh, refreshing, cycle } = useForecast();
+  const { sessions } = useSessions(
+    place.coords,
+    place.bortle,
+    config,
+    place.walkMinutes,
+    place.nights,
+  );
   const now = useNow();
-  const { lat, lon } = active.coords;
+  const { lat, lon } = place.coords;
 
   // „Dziś" i „jutro" zmieniają znaczenie o północy, a nie co minutę.
   const today = now.toDateString();
 
   const nights = useMemo<NightCard[]>(() => {
-    if (!bundle) return [];
+    const slices = place.nights;
+    if (!slices) return [];
 
-    const place = `${active.label} · Bortle ${active.bortle}`;
+    const where = `${place.label} · Bortle ${place.bortle}`;
 
     return sessions.flatMap((session, index) => {
-      const slice = bundle.nights[index];
+      const slice = slices[index];
       if (!slice) return [];
 
       const { verdict } = session;
@@ -134,7 +145,7 @@ export function useNightVerdicts(): NightVerdicts {
         {
           key: verdict.night.from.toISOString(),
           title: `noc ${span}`,
-          subtitle: `${relative} · ${place}${session.uncertain ? ' · orientacyjnie' : ''}`,
+          subtitle: `${relative} · ${where}${session.uncertain ? ' · orientacyjnie' : ''}`,
           relative,
           go: verdict.status === 'go' && observing !== null,
           score: ratingScore(session.rating),
@@ -157,7 +168,7 @@ export function useNightVerdicts(): NightVerdicts {
     });
     // `now` celowo poza zależnościami: etykiety przelicza zmiana daty (`today`).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bundle, sessions, lat, lon, config, active.label, active.bortle, today]);
+  }, [place, sessions, lat, lon, config, today]);
 
   const liveIndex = liveNightIndex(
     nights.map((card) => card.session.verdict.night),
@@ -194,15 +205,15 @@ export function useNightVerdicts(): NightVerdicts {
   const cooldown = rateLimitCooldown(cycle, now);
 
   return {
-    status: bundle ? 'ready' : status,
+    status: place.nights ? 'ready' : status,
     nights,
     moments,
     bestNight,
     liveIndex,
-    place: active.label,
-    placeNote: `Bortle ${active.bortle} · ${
-      active.bortleSource === 'map' ? 'policzone dla tego punktu' : 'z najbliższej miejscowości'
-    }`,
+    place: place.label,
+    // Skąd się to miejsce wzięło jest częścią werdyktu: bez tego „Złoty Potok"
+    // wyglądałby na ustawienie, które ktoś kiedyś wybrał i zapomniał zmienić.
+    placeNote: `Bortle ${place.bortle} · ${place.pinned ? 'wybrane ręcznie' : 'najlepsze z rankingu'}`,
     date: lowerFirst(formatLongDate(now)),
     // Zapis to normalne źródło odczytu. Ostrzegamy dopiero, gdy odświeżenie
     // zawiodło albo dane przetrwały termin, w którym miały się zmienić.

@@ -304,6 +304,8 @@ export function useSiteReview(
   return {
     status,
     reviews,
+    /** Wczytane prognozy per miejsce — miejsce nocy liczy z nich werdykt. */
+    forecasts: reviewed,
     savedAt,
     refresh,
     refreshing: status === 'loading',

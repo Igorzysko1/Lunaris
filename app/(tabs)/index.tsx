@@ -205,10 +205,10 @@ function NightSwitcher({
         <Text style={[styles.arrowText, first && styles.disabled]}>‹</Text>
       </Pressable>
       <Pressable
-        onPress={() => router.push('/location')}
+        onPress={() => router.push('/night-place')}
         onLongPress={() => router.push('/night-mode')}
         accessibilityRole="button"
-        accessibilityHint="Zmienia miejsce. Przytrzymaj, żeby otworzyć tryb nocny."
+        accessibilityHint="Wybiera miejsce nocy. Przytrzymaj, żeby otworzyć tryb nocny."
         style={styles.switcherCenter}
       >
         <Text style={styles.switcherTitle}>{current.title}</Text>

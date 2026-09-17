@@ -1,10 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Linking } from 'react-native';
 
 import { findPlaceById } from '@/data/places';
 import { capturePosition, type PositionFix } from '@/hooks/use-device-location';
 import { useNow } from '@/hooks/use-now';
-import { useSiteReview } from '@/hooks/use-site-review';
 import { distanceKm, formatDistance, ratingScore } from '@/lib/astro';
 import type { LunarisConfig } from '@/lib/config';
 import { formatTime } from '@/lib/date';
@@ -15,7 +14,6 @@ import { explainScore, type SiteOutlook } from '@/lib/site-review';
 import { skyQualityAt } from '@/lib/sky-map';
 import {
   ACTIVE_SITE_ID,
-  activeAsSite,
   coordsText,
   dominatedText,
   driveMinutes,
@@ -37,7 +35,7 @@ import {
   walkText,
   windowText,
 } from '@/lib/where-text';
-import { useForecast } from '@/store/forecast';
+import { useNightPlace } from '@/store/night-place';
 import { useSettings } from '@/store/settings';
 import type { Tone } from '@/ui/kit';
 
@@ -52,19 +50,12 @@ const NEARBY_SITES = 3;
 function useWhere() {
   const settings = useSettings();
   const { config, active, placeId } = settings;
-  const { bundle } = useForecast();
 
+  // Przegląd przychodzi z dostawcy miejsca nocy — ten sam, z którego liczy się
+  // werdykt w Nocy. Własne wywołanie `useSiteReview` oznaczałoby drugie
+  // pobranie tych samych prognoz i dwa rankingi, które mogłyby się rozjechać.
+  const { review } = useNightPlace();
   const activeIsSite = active.source === 'manual' && config.sites.some((s) => s.id === placeId);
-  const extraSite = useMemo(
-    () => (activeIsSite ? null : activeAsSite(active)),
-    [activeIsSite, active],
-  );
-  const extra = useMemo(
-    () => (extraSite ? { site: extraSite, nights: bundle?.nights ?? null } : null),
-    [extraSite, bundle],
-  );
-
-  const review = useSiteReview(config, extra);
   const homePlace = config.observer.homePlaceId ? findPlaceById(config.observer.homePlaceId) : null;
 
   return {

@@ -12,6 +12,7 @@ import {
 } from '@expo-google-fonts/ibm-plex-mono';
 
 import { ForecastProvider } from '@/store/forecast';
+import { NightPlaceProvider } from '@/store/night-place';
 import { GoogleProvider } from '@/store/google';
 import { SettingsProvider, useSettings } from '@/store/settings';
 import { colors } from '@/theme';
@@ -100,47 +101,52 @@ function AppStack() {
   // który użytkownik wybrał.
   return (
     <ForecastProvider>
-      <View style={styles.root} onStartShouldSetResponderCapture={watchForThreeFingers}>
-        {/* Klucz na trybie: zmiana palety montuje ekrany od nowa. Bez tego
+      {/* Miejsce nocy zna ranking miejscówek, a ten potrzebuje prognozy twojej
+          pozycji — dlatego pod cyklem, a nad ekranami. */}
+      <NightPlaceProvider>
+        <View style={styles.root} onStartShouldSetResponderCapture={watchForThreeFingers}>
+          {/* Klucz na trybie: zmiana palety montuje ekrany od nowa. Bez tego
             ekran już otwarty zostałby w starych kolorach — arkusz stylów
             przeliczy się sam, ale kolor wpisany wprost w JSX-ie dopiero przy
             kolejnym renderze, a tego nikt tym ekranom nie zleci. Cena jest
             jedna: przełączenie wraca na korzeń zakładki. */}
-        <Stack
-          key={mode}
-          screenOptions={{
-            headerShown: false,
-            contentStyle: { backgroundColor: colors.bg },
-          }}
-        >
-          <Stack.Screen name="(tabs)" />
+          <Stack
+            key={mode}
+            screenOptions={{
+              headerShown: false,
+              contentStyle: { backgroundColor: colors.bg },
+            }}
+          >
+            <Stack.Screen name="(tabs)" />
 
-          {/* Drill-down: szczegół albo edycja. */}
-          <Stack.Screen name="location" />
-          <Stack.Screen name="moon" />
-          <Stack.Screen name="thresholds" />
-          <Stack.Screen name="entry/[id]" />
-          <Stack.Screen name="notifications" />
-          <Stack.Screen name="library/targets" />
-          <Stack.Screen name="library/constellations" />
-          <Stack.Screen name="settings/equipment" />
-          <Stack.Screen name="settings/observer" />
-          <Stack.Screen name="settings/google" />
-          <Stack.Screen name="settings/location" />
-          <Stack.Screen name="apod" />
-          <Stack.Screen name="about" />
-          <Stack.Screen name="forecasts" />
+            {/* Drill-down: szczegół albo edycja. */}
+            <Stack.Screen name="location" />
+            <Stack.Screen name="moon" />
+            <Stack.Screen name="thresholds" />
+            <Stack.Screen name="entry/[id]" />
+            <Stack.Screen name="notifications" />
+            <Stack.Screen name="library/targets" />
+            <Stack.Screen name="library/constellations" />
+            <Stack.Screen name="settings/equipment" />
+            <Stack.Screen name="settings/observer" />
+            <Stack.Screen name="settings/google" />
+            <Stack.Screen name="settings/location" />
+            <Stack.Screen name="apod" />
+            <Stack.Screen name="about" />
+            <Stack.Screen name="forecasts" />
 
-          {/* Arkusze z projektu. */}
-          <Stack.Screen name="target/[id]" options={sheet} />
-          <Stack.Screen name="library/target/[id]" options={sheet} />
-          <Stack.Screen name="constellation/[id]" options={sheet} />
-          <Stack.Screen name="site/[id]" options={sheet} />
-          <Stack.Screen name="event/[id]" options={sheet} />
-          <Stack.Screen name="close-night" options={sheet} />
-          <Stack.Screen name="night-mode" options={{ ...sheet, sheetAllowedDetents: [0.8] }} />
-        </Stack>
-      </View>
+            {/* Arkusze z projektu. */}
+            <Stack.Screen name="target/[id]" options={sheet} />
+            <Stack.Screen name="library/target/[id]" options={sheet} />
+            <Stack.Screen name="constellation/[id]" options={sheet} />
+            <Stack.Screen name="site/[id]" options={sheet} />
+            <Stack.Screen name="event/[id]" options={sheet} />
+            <Stack.Screen name="close-night" options={sheet} />
+            <Stack.Screen name="night-place" options={sheet} />
+            <Stack.Screen name="night-mode" options={{ ...sheet, sheetAllowedDetents: [0.8] }} />
+          </Stack>
+        </View>
+      </NightPlaceProvider>
     </ForecastProvider>
   );
 }

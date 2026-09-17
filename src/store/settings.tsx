@@ -58,6 +58,10 @@ type Settings = {
   notifyCategories: NotifyCategory[];
   /** Paleta, automat po zmierzchu i jasność ekranu — patrz src/ui/theme.tsx. */
   theme: ThemeSettings;
+  /** Przypięte miejsce nocy; `null` — idź za rankingiem. */
+  nightPlaceId: string | null;
+  /** Przypina miejsce nocy albo (przy `null`) oddaje wybór rankingowi. */
+  setNightPlace: (id: string | null) => void;
   /** Jedno źródło prawdy dla progów, profilu obserwatora i parametrów sprzętu. */
   config: LunarisConfig;
   /** Czy wczytaliśmy już zapisane ustawienia — do czasu tego UI nie ma czego pokazywać. */
@@ -127,13 +131,14 @@ function defaultSettings(): PersistedSettings {
     leadTime: '2h',
     notifyCategories: [...DEFAULT_NOTIFY_CATEGORIES],
     theme: DEFAULT_THEME,
+    nightPlaceId: null,
     config: DEFAULT_CONFIG,
   };
 }
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
   const [
-    { placeId, autoLocation, notifications, leadTime, notifyCategories, theme, config },
+    { placeId, autoLocation, notifications, leadTime, notifyCategories, theme, nightPlaceId, config },
     setPersisted,
   ] = useState<PersistedSettings>(defaultSettings);
   const [hydrated, setHydrated] = useState(false);
@@ -166,9 +171,20 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       leadTime,
       notifyCategories,
       theme,
+      nightPlaceId,
       config,
     });
-  }, [hydrated, placeId, autoLocation, notifications, leadTime, notifyCategories, theme, config]);
+  }, [
+    hydrated,
+    placeId,
+    autoLocation,
+    notifications,
+    leadTime,
+    notifyCategories,
+    theme,
+    nightPlaceId,
+    config,
+  ]);
 
   // Jedna instancja na całą aplikację — inaczej każdy ekran pytałby o uprawnienia osobno.
   const device = useDeviceLocation(autoLocation);
@@ -227,9 +243,11 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       leadTime,
       notifyCategories,
       theme,
+      nightPlaceId,
       config,
       hydrated,
       active,
+      setNightPlace: (id) => setPersisted((s) => ({ ...s, nightPlaceId: id })),
       selectPlace: (id) => setPersisted((s) => ({ ...s, placeId: id, autoLocation: false })),
       enableGps: () => setAutoLocation(true),
       toggleAutoLocation: () => setAutoLocation((on) => !on),
@@ -379,6 +397,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       leadTime,
       notifyCategories,
       theme,
+      nightPlaceId,
       config,
       hydrated,
       active,
