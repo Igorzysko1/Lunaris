@@ -9,7 +9,12 @@ import { describe, it } from 'node:test';
 
 import type { ObservingSite } from '../src/data/observing-sites.ts';
 import { DEFAULT_CONFIG, type LunarisConfig } from '../src/lib/config.ts';
-import { explainScore, reviewNights, type ReviewInput } from '../src/lib/site-review.ts';
+import {
+  bestOutlook,
+  explainScore,
+  reviewNights,
+  type ReviewInput,
+} from '../src/lib/site-review.ts';
 import type { NightHour, NightSlice } from '../src/lib/weather.ts';
 
 const HOME = { lat: 50.205, lon: 19.275 };
@@ -77,6 +82,28 @@ function input(sites: ObservingSite[], clouds: number[], config = DEFAULT_CONFIG
 }
 
 const clone = (): LunarisConfig => structuredClone(DEFAULT_CONFIG);
+
+describe('miejsce nocy', () => {
+  const near = site('blisko', { lat: 50.35, lon: 19.53 });
+  const far = site('daleko', { lat: 49.57, lon: 19.35 });
+
+  it('wskazuje miejsce, które przechodzi progi, a nie pierwsze z brzegu', () => {
+    const [review] = reviewNights(input([near, far], [95, 0]));
+
+    assert.equal(review.go.length, 1);
+    assert.equal(bestOutlook(review)?.site.id, 'daleko');
+  });
+
+  it('przy samych odmowach wskazuje najbliższe przejścia, zamiast milczeć', () => {
+    // Tu jest cała różnica między „odpuść, bo w Jaworznie chmury" a „odpuść,
+    // bo nigdzie w zasięgu nie ma nocy" — drugie zdanie zamyka temat, pierwsze
+    // każe sprawdzić resztę ręcznie.
+    const [review] = reviewNights(input([near, far], [95, 90]));
+
+    assert.equal(review.go.length, 0);
+    assert.equal(bestOutlook(review)?.site.id, review.noGo[0].site.id);
+  });
+});
 
 describe('reviewNights', () => {
   it('każde miejsce dostaje własny werdykt', () => {

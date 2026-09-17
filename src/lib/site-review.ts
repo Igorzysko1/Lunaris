@@ -300,6 +300,19 @@ function splitDominated(
  * Bez tego ranking jest listą nazw: widać kolejność, nie widać powodu, a powód
  * bywa nieoczywisty, gdy bliższe i gorsze wygrywa z dalszym i lepszym.
  */
+/**
+ * Miejsce, o którym mówi zakładka Noc: najlepsze tej nocy.
+ *
+ * Kolejność ustalił już ranking, więc to wybór pierwszego z brzegu — ale
+ * z trzech list po kolei. Ostatnia jest tu najważniejsza: gdy nie przechodzi
+ * **żadne** miejsce, i tak wskazujemy to, które było najbliżej progu. Werdykt
+ * „odpuść" ma wtedy znaczyć „nigdzie nie warto", a nie „w tym jednym miejscu
+ * nie warto" — a to dwie różne wiadomości dla kogoś, kto ma auto.
+ */
+export function bestOutlook(review: NightReview): SiteOutlook | null {
+  return review.go[0] ?? review.dominated[0] ?? review.noGo[0] ?? null;
+}
+
 export function explainScore(outlook: SiteOutlook, config: LunarisConfig): string {
   const penalty = Math.round(outlook.rating - outlook.score);
   const rating = `niebo ${Math.round(outlook.rating)}/100`;
