@@ -86,8 +86,19 @@ export function useCalendarTab() {
     return ok;
   }
 
+  /**
+   * Data, pod którą stoi propozycja: wieczór, od którego zaczyna się noc — a nie
+   * godzina wyjazdu.
+   *
+   * Okno bywa po północy: noc 19/20 z oknem 00:00–02:00 i bez dojazdu wyjeżdża
+   * się już dwudziestego. Propozycja tej nocy pod datą 20 nie zgadzałaby się
+   * z niczym — ani z kartą nocy w zakładce Noc, ani z kluczem w dzienniku, które
+   * obie liczą noc od wieczoru.
+   */
+  const nightOf = (proposal: (typeof proposals)[number]) => proposal.session.verdict.night.from;
+
   const dayEvents = eventsOnDay(month.events, selected);
-  const dayProposals = proposals.filter((p) => p.booking && isSameDay(p.booking.start, selected));
+  const dayProposals = proposals.filter((p) => isSameDay(nightOf(p), selected));
   const dayNight = nights.find((n) => isSameDay(n.session.verdict.night.from, selected));
 
   return {
@@ -107,7 +118,7 @@ export function useCalendarTab() {
       const events = eventsOnDay(month.events, cell.date);
       const observation = events.some((e) => e.observation);
       const other = events.some((e) => !e.observation);
-      const proposal = proposals.some((p) => p.booking && isSameDay(p.booking.start, cell.date));
+      const proposal = proposals.some((p) => isSameDay(nightOf(p), cell.date));
       const marks = [
         observation && 'obserwacja',
         proposal && 'propozycja sesji',
