@@ -20,7 +20,7 @@ export const FIGURES: Record<string, Figure> = {
       [-0.62, 0.18, 'ζ', 'Mizar'],
       [-0.34, 0.1, 'ε', 'Alioth'],
       [-0.06, 0.3, 'δ', 'Megrez'],
-      [0.2, 0.52, 'γ', 'Phekda'],
+      [0.2, 0.52, 'γ', 'Phecda'],
       [0.52, 0.44, 'β', 'Merak'],
       [0.44, 0.14, 'α', 'Dubhe'],
     ],
@@ -84,7 +84,7 @@ export const FIGURES: Record<string, Figure> = {
       [0.28, -0.36, 'ε'],
       [0.02, 0.4, 'ι'],
       [0.3, 0.08, 'β', 'Algol'],
-      [0.66, 0.3, 'ρ', 'Gorgonea Tertia'],
+      [0.66, 0.3, 'ρ'],
     ],
     l: [
       [0, 1, 2, 3],
@@ -122,7 +122,7 @@ export const FIGURES: Record<string, Figure> = {
       [0.0, 0.7, 'α', 'Deneb'],
       [-0.72, 0.3, 'κ'],
       [-0.36, 0.2, 'δ', 'Fawaris'],
-      [0.42, 0.1, 'ε', 'Gienah'],
+      [0.42, 0.1, 'ε', 'Aljanah'],
       [0.8, 0.2, 'ζ'],
     ],
     l: [
@@ -147,7 +147,7 @@ export const FIGURES: Record<string, Figure> = {
       [0.24, -0.2, 'β', 'Alshain'],
       [-0.66, 0.7, 'ζ', 'Okab'],
       [0.3, 0.56, 'δ'],
-      [0.1, -0.68, 'λ', 'Althalimain'],
+      [0.1, -0.68, 'λ'],
       [0.72, 0.3, 'θ'],
     ],
     l: [
@@ -215,7 +215,7 @@ export const FIGURES: Record<string, Figure> = {
   },
   vul: {
     s: [
-      [-0.7, -0.1, 'α'],
+      [-0.7, -0.1, 'α', 'Anser'],
       [-0.1, 0.1, '13'],
       [0.5, 0.24, '15'],
     ],
@@ -296,7 +296,7 @@ export const FIGURES: Record<string, Figure> = {
       [-0.7, 0.3, 'σ', 'Brachium'],
       [-0.2, 0.5, 'β', 'Zubeneschamali'],
       [0.3, 0.1, 'α', 'Zubenelgenubi'],
-      [0.7, -0.3, 'γ'],
+      [0.7, -0.3, 'γ', 'Zubenelhakrabi'],
     ],
     l: [
       [0, 1, 2, 3],
@@ -346,7 +346,7 @@ export const FIGURES: Record<string, Figure> = {
       [-0.9, 0.4, 'ω'],
       [-0.5, 0.2, 'δ'],
       [-0.1, 0.3, 'ν'],
-      [0.2, 0.5, 'η'],
+      [0.2, 0.5, 'η', 'Alpherg'],
       [0.55, 0.3, 'ρ'],
       [0.8, 0.0, 'β', 'Fumalsamakah'],
       [0.3, -0.4, 'γ'],
@@ -359,8 +359,8 @@ export const FIGURES: Record<string, Figure> = {
   },
   cet: {
     s: [
-      [-0.8, 0.2, 'β', 'Deneb Kaitos'],
-      [-0.4, 0.4, 'η', 'Deneb Algenubi'],
+      [-0.8, 0.2, 'β', 'Diphda'],
+      [-0.4, 0.4, 'η'],
       [0.0, 0.1, 'τ'],
       [0.4, -0.1, 'δ'],
       [0.7, 0.3, 'α', 'Menkar'],
@@ -583,7 +583,7 @@ export const FIGURES: Record<string, Figure> = {
       [-0.3, 0.0, 'γ', 'Porrima'],
       [-0.6, 0.3, 'η', 'Zaniah'],
       [-0.9, 0.5, 'β', 'Zavijava'],
-      [0.1, 0.2, 'δ', 'Auva'],
+      [0.1, 0.2, 'δ', 'Minelauva'],
       [0.4, 0.45, 'ε', 'Vindemiatrix'],
       [0.5, -0.3, 'ζ', 'Heze'],
     ],
@@ -615,7 +615,7 @@ export const FIGURES: Record<string, Figure> = {
       [-0.7, 0.35, 'ζ'],
       [-0.5, 0.2, 'η'],
       [-0.2, 0.0, 'α', 'Alphard'],
-      [0.2, -0.2, 'υ'],
+      [0.2, -0.2, 'υ', 'Zhang'],
       [0.6, -0.35, 'β'],
       [0.9, -0.5, 'γ'],
     ],
@@ -624,7 +624,7 @@ export const FIGURES: Record<string, Figure> = {
   crv: {
     s: [
       [-0.5, 0.4, 'α', 'Alchiba'],
-      [-0.3, -0.1, 'ε', 'Minkar'],
+      [-0.3, -0.1, 'ε'],
       [0.2, 0.3, 'γ', 'Gienah'],
       [0.4, -0.2, 'δ', 'Algorab'],
       [0.0, -0.5, 'β', 'Kraz'],
