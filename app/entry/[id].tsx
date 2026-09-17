@@ -1,9 +1,10 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Alert, Pressable, Text, View } from 'react-native';
 
-import { saveEntryTimeline, useJournal } from '@/hooks/use-journal';
+import { changeJournal, saveEntryTimeline, useJournal } from '@/hooks/use-journal';
 import { formatTime } from '@/lib/date';
+import { withoutNight } from '@/lib/journal';
 import { TIMELINE_ROW_LABELS, failureWhy, nightSpanOfLog, timeOnNight } from '@/lib/journal-text';
 import {
   TIMELINE_STEPS,
@@ -13,7 +14,7 @@ import {
 } from '@/lib/session-timeline';
 import { targetLabel } from '@/lib/sky-targets';
 import { colors, fonts } from '@/theme';
-import { Body, Field, Label, Note, Notice, Panel, Screen, Stat, TitleBar } from '@/ui/kit';
+import { Body, Button, Field, Label, Note, Notice, Panel, Screen, Stat, TitleBar } from '@/ui/kit';
 import { themedStyles } from '@/ui/theme';
 
 type Times = Record<TimelineStep, string>;
@@ -100,6 +101,31 @@ export default function EntryScreen() {
 
     setError(null);
     setEditing(false);
+  }
+
+  /**
+   * Usunięcie wpisu za potwierdzeniem. Pytamy, bo zapisu nie da się odzyskać,
+   * a stuknięcie obok jest w rękawicach normalne — ale pytamy raz, nie dwa:
+   * ostrzeżenie, które trzeba przeklikać za każdym razem, przestaje być czytane.
+   */
+  function remove() {
+    Alert.alert(
+      'Usunąć ten wpis?',
+      `${nightSpanOfLog(entry)} — zniknie z dziennika na dobre, razem z odhaczonymi celami tej nocy.`,
+      [
+        { text: 'Zostaw', style: 'cancel' },
+        {
+          text: 'Usuń',
+          style: 'destructive',
+          onPress: () => {
+            void changeJournal((journal) => withoutNight(journal, entry.id)).then((saved) => {
+              if (saved) router.back();
+              else setError('Nie udało się usunąć wpisu — dziennik został nietknięty.');
+            });
+          },
+        },
+      ],
+    );
   }
 
   return (
@@ -208,6 +234,7 @@ export default function EntryScreen() {
           </Panel>
         </>
       ) : null}
+      <Button label="Usuń wpis" tone="bad" icon="trash-outline" onPress={remove} />
     </Screen>
   );
 }

@@ -217,6 +217,22 @@ export function withoutSighting(journal: Journal, nightId: string, targetId: str
 }
 
 /** Co dziennik wie o jednym obiekcie. */
+/**
+ * Usuwa całą noc z dziennika.
+ *
+ * Wyjątek od zasady „dopisuj, nie kasuj", która rządzi resztą tego modułu —
+ * i dlatego jedyna operacja, która czegoś nie zachowuje. Pomyłka się zdarza:
+ * zapisana nie ta noc, wpis z testowania aplikacji, sesja, która się nie odbyła.
+ * Bez tego jedynym wyjściem byłoby wyczyszczenie całego dziennika.
+ *
+ * Nieznany identyfikator zostawia dziennik nietknięty, zamiast rzucać — kasowanie
+ * czegoś, czego nie ma, jest już osiągniętym skutkiem.
+ */
+export function withoutNight(journal: Journal, nightId: string): Journal {
+  const logs = journal.logs.filter((log) => log.id !== nightId);
+  return logs.length === journal.logs.length ? journal : { ...journal, logs };
+}
+
 export type TargetHistory = {
   seenCount: number;
   /** Ostatnie udane podejście; `null`, gdy obiektu nigdy nie widziano. */

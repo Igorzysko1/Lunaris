@@ -21,6 +21,7 @@ import {
   parseJournal,
   rankOf,
   upsertLog,
+  withoutNight,
   type AttemptConditions,
   type NightLog,
 } from '../src/lib/journal.ts';
@@ -124,6 +125,27 @@ describe('odczyt i migracja', () => {
     const journal = upsertLog(EMPTY_JOURNAL, log({ observations: [seen('m31'), failed('m101')] }));
 
     assert.deepEqual(parseJournal(exportJournal(journal)), journal);
+  });
+});
+
+describe('usuwanie nocy', () => {
+  const nightOf = (day: number) => log({ nightFrom: new Date(2026, 2, day, 20, 0).toISOString() });
+
+  it('znika wskazana noc, reszta zostaje', () => {
+    const journal = upsertLog(upsertLog(EMPTY_JOURNAL, nightOf(12)), nightOf(14));
+    const left = withoutNight(journal, nightOf(12).id);
+
+    assert.deepEqual(
+      left.logs.map((l) => l.id),
+      [nightOf(14).id],
+    );
+  });
+
+  it('nieznana noc nie zmienia dziennika', () => {
+    // Kasowanie czegoś, czego nie ma, jest już osiągniętym skutkiem — rzucanie
+    // wyjątkiem zmusiłoby wywołujących do sprawdzania przed każdą próbą.
+    const journal = upsertLog(EMPTY_JOURNAL, nightOf(12));
+    assert.equal(withoutNight(journal, 'nie-ma-takiej'), journal);
   });
 });
 
