@@ -152,7 +152,7 @@ const styles = themedStyles(() => ({
     right: -1,
     bottom: -1,
     borderRadius: 13,
-    backgroundColor: colors.purple,
+    backgroundColor: colors.switchFill,
   },
   knob: {
     position: 'absolute',
@@ -170,6 +170,6 @@ const styles = themedStyles(() => ({
     right: 0,
     bottom: 0,
     borderRadius: 9,
-    backgroundColor: colors.textPrimary,
+    backgroundColor: colors.switchKnob,
   },
 }));

@@ -30,6 +30,14 @@ export type Palette = {
   borderStrong: string;
   /** Obrys przerywany: zapowiedź, propozycja, rzecz do dopisania. */
   borderDashed: string;
+  /**
+   * Włączony przełącznik i jego gałka. Osobne kolory, bo to jedyny element,
+   * w którym dwie jasne powierzchnie leżą na sobie: w ciemnej palecie dzieli
+   * je barwa (biała gałka na fiolecie), a w czerwonej barwy nie ma — więc
+   * dzielić je musi jasność, inaczej przełącznik jest jedną plamą.
+   */
+  switchFill: string;
+  switchKnob: string;
   /** Tło toru, słupka i innych rzeczy, na których coś się odkłada. */
   fill: string;
   /** To samo, ale ledwo widoczne: wyróżnienie komórki, tło obojętnego znacznika. */
@@ -67,6 +75,8 @@ const darkPalette: Palette = {
    */
   borderStrong: 'rgba(255,255,255,0.35)',
   borderDashed: 'rgba(255,255,255,0.16)',
+  switchFill: '#7F77DD',
+  switchKnob: '#FFFFFF',
   fill: 'rgba(255,255,255,0.10)',
   fillSoft: 'rgba(255,255,255,0.03)',
   grid: 'rgba(255,255,255,0.06)',
@@ -103,6 +113,10 @@ const redPalette: Palette = {
   // dawała 2,4:1, czyli obrys wyłączonego przełącznika znikał.
   borderStrong: 'rgba(255,122,94,0.6)',
   borderDashed: 'rgba(255,122,94,0.3)',
+  // Wypełnienie schodzi do przygaszonego, żeby jasna gałka miała się od czego
+  // odciąć — inaczej włączony przełącznik świeci cały i nie widać jego stanu.
+  switchFill: 'rgba(255,122,94,0.3)',
+  switchKnob: '#FF7A5E',
   fill: 'rgba(255,122,94,0.14)',
   fillSoft: 'rgba(255,122,94,0.06)',
   grid: 'rgba(255,122,94,0.12)',
