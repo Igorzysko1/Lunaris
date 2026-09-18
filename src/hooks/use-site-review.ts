@@ -19,7 +19,12 @@ import { nextDayWith } from '@/lib/calendar';
 import { assumedNextDay } from '@/lib/session-engine';
 import { reviewNights } from '@/lib/site-review';
 import { skyQualityAt } from '@/lib/sky-map';
-import { ForecastError, fetchUpcomingNightsForPoints, type NightSlice } from '@/lib/weather';
+import {
+  ForecastError,
+  fetchUpcomingNightsForPoints,
+  upcomingNights,
+  type NightSlice,
+} from '@/lib/weather';
 
 /** Tyle nocy naprzód, ile ma sens porównywać — dalej prognoza jest zgadywanką. */
 const REVIEW_NIGHTS = 3;
@@ -128,17 +133,24 @@ export function useSiteReview(
 
       const cached = new Map<string, NightSlice[]>();
       let oldest: Date | null = null;
+      // Zapis jest nieaktualny nie tylko wtedy, gdy minęła pora odświeżenia,
+      // ale też wtedy, gdy zaczyna się od nocy, która już minęła. Cykl dobowy
+      // tego nie widzi — patrzy na zegar pobrań, nie na treść zapisu.
+      let outdated = false;
+      const readAt = new Date();
 
       for (const entry of entries) {
         if (!entry) continue;
         const [id, hit] = entry;
-        cached.set(id, hit.payload);
+        const upcoming = upcomingNights(hit.payload, readAt);
+        if (upcoming.length < hit.payload.length) outdated = true;
+        cached.set(id, upcoming);
         // Wiek przeglądu to wiek jego najstarszej części — inaczej etykieta
         // obiecywałaby świeżość, której nie ma cała lista.
         if (!oldest || hit.savedAt < oldest) oldest = hit.savedAt;
       }
 
-      return { cached, oldest, complete: cached.size === sites.length };
+      return { cached, oldest, complete: cached.size === sites.length && !outdated };
     };
 
     const run = async () => {

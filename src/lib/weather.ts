@@ -312,6 +312,20 @@ export type NightSlice = {
 };
 
 /**
+ * Noce, które jeszcze się nie skończyły.
+ *
+ * Zapis prognozy żyje dłużej niż noce, które opisuje: wczorajszy zapis zaczyna
+ * się od wczorajszej nocy. Bez tego odcięcia pierwszą pozycją jest „miniona
+ * noc", a ranking miejsc liczy się z nocy, której już nie da się wykorzystać —
+ * i z niej wybiera miejsce na dziś.
+ *
+ * Noc trwająca (po północy, przed świtem) zostaje: kończy się dopiero o świcie.
+ */
+export function upcomingNights(slices: NightSlice[], now: Date): NightSlice[] {
+  return slices.filter((slice) => slice.night.to > now);
+}
+
+/**
  * Kolejne noce dla wielu punktów naraz — jednym żądaniem.
  *
  * Okna liczymy z efemeryd (zmierzch i świt astronomiczny), a nie z zachodu
