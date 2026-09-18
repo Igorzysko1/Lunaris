@@ -131,14 +131,6 @@ function NightView({
   const sky = useNightSky(card, profileId, skyWanted);
   const swipe = useNightSwipe(index, verdicts.nights.length, onNight);
 
-  const variant: VerdictVariant = live
-    ? 'live'
-    : shown === 'conditions'
-      ? 'full'
-      : shown === 'sky'
-        ? 'bar'
-        : 'compact';
-
   /** Panel celu dostaje noc, zestaw i okno — liczy ten sam cel, który stał na liście. */
   function openTarget(id: string) {
     router.push({
@@ -159,7 +151,7 @@ function NightView({
         />
         {verdicts.stale ? <StaleBar verdicts={verdicts} /> : <FreshnessRow verdicts={verdicts} />}
         {card.go ? (
-          <VerdictCard card={card} moment={moment} live={live} variant={variant} />
+          <VerdictCard card={card} live={live} />
         ) : (
           <RejectCard
             card={card}
@@ -265,8 +257,6 @@ function NightSwitcher({
   );
 }
 
-type VerdictVariant = 'full' | 'bar' | 'compact' | 'live';
-
 function Narrative({ parts }: { parts: Narration }) {
   return (
     <Text style={styles.narrative}>
@@ -311,25 +301,20 @@ function RejectCard({
   );
 }
 
-function VerdictCard({
-  card,
-  moment,
-  live,
-  variant,
-}: {
-  card: NightCard;
-  moment: NightMoment;
-  live: Live | null;
-  variant: VerdictVariant;
-}) {
+/**
+ * Karta werdyktu „jedź" — ta sama w każdym segmencie.
+ *
+ * Wcześniej miała trzy warianty: pełny w Warunkach, z samym paskiem w Niebie,
+ * z samymi godzinami w Planie. Przełączanie segmentów zmieniało wtedy jej
+ * wysokość i to, co było widać — werdykt skakał pod palcem, a szczegóły nocy
+ * znikały akurat tam, gdzie planuje się wyjazd. Karta jest jedna; zmienia się
+ * tylko w nocy w trakcie, gdzie zamiast okna liczy się to, ile go zostało.
+ */
+function VerdictCard({ card, live }: { card: NightCard; live: Live | null }) {
   const { window } = card;
   if (!window) return null;
 
-  const meta = live
-    ? live.remaining
-    : variant === 'bar'
-      ? (moment.remaining ?? window.duration)
-      : window.duration;
+  const meta = live ? live.remaining : window.duration;
 
   return (
     <Panel tone="go">
@@ -343,21 +328,13 @@ function VerdictCard({
         <Text style={styles.time}>{window.to}</Text>
       </View>
 
-      {live ? <ProgressBar progress={live.progress} start={window.from} end={window.to} /> : null}
-      {variant === 'full' ? <WindowBar {...window.bar} /> : null}
-      {variant === 'bar' ? (
-        <WindowBar
-          {...window.bar}
-          // „teraz" przy lewej krawędzi nachodzi na podpis zachodu — zostaje sama godzina.
-          labels={{
-            ...window.bar.labels,
-            start: moment.nowOnBar === null ? window.bar.labels.start : window.bar.sunset,
-          }}
-          now={moment.nowOnBar}
-        />
-      ) : null}
+      {live ? (
+        <ProgressBar progress={live.progress} start={window.from} end={window.to} />
+      ) : (
+        <WindowBar {...window.bar} />
+      )}
 
-      {variant === 'full' ? (
+      {live ? null : (
         <>
           <View style={styles.hairline} />
           <Narrative parts={card.narrative} />
@@ -372,7 +349,7 @@ function VerdictCard({
             ))}
           </ChipRow>
         </>
-      ) : null}
+      )}
     </Panel>
   );
 }

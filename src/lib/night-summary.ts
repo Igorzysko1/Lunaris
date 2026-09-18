@@ -206,8 +206,6 @@ export type NightBar = {
   moonRise: number;
   moonSet: number;
   labels: { start: string; moon: string; end: string };
-  /** Sam zachód, bez podpisu — gdy obok stoi już „teraz". */
-  sunset: string;
 };
 
 /**
@@ -240,6 +238,5 @@ export function nightBar(
       moon: moonLabel,
       end: formatTime(axis.to),
     },
-    sunset: formatTime(axis.from),
   };
 }

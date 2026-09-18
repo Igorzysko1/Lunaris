@@ -10,7 +10,6 @@ import { formatLongDate, formatNightSpan, formatTime } from '@/lib/date';
 import { formatAge } from '@/lib/forecast-cache';
 import {
   nightBar,
-  positionOnAxis,
   summarizeNight,
   type NightBar,
   type NightSummary,
@@ -60,10 +59,6 @@ export type NightCard = {
 
 /** Część karty zależna od zegara. */
 export type NightMoment = {
-  /** „Teraz" na pasku nocy; `null`, gdy chwila leży poza osią tej nocy. */
-  nowOnBar: number | null;
-  /** „zostało 4 h 04 min" — tylko w trakcie okna. */
-  remaining: string | null;
   /** Noc w trakcie: licznik zamiast werdyktu. */
   live: { now: string; remaining: string; progress: number } | null;
 };
@@ -180,10 +175,9 @@ export function useNightVerdicts(): NightVerdicts {
 
   const moments = nights.map((card, index): NightMoment => {
     const observing = card.session.verdict.window;
-    const nowOnBar = card.go ? positionOnAxis(card.summary.axis, now) : null;
 
     if (!card.go || !observing || now < observing.from || now > observing.to) {
-      return { nowOnBar, remaining: null, live: null };
+      return { live: null };
     }
 
     const left = Math.floor((observing.to.getTime() - now.getTime()) / MINUTE_MS);
@@ -193,8 +187,6 @@ export function useNightVerdicts(): NightVerdicts {
       (observing.to.getTime() - observing.from.getTime());
 
     return {
-      nowOnBar,
-      remaining,
       live: index === liveIndex ? { now: formatTime(now), remaining, progress } : null,
     };
   });
