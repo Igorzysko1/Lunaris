@@ -16,6 +16,7 @@ import {
   type NightVerdicts,
 } from '@/hooks/use-night-verdicts';
 import { useSessionTimeline } from '@/hooks/use-session-timeline';
+import { nightLogId } from '@/lib/journal';
 import { plural } from '@/lib/journal-text';
 import { STALE_BOOKING } from '@/lib/plan-text';
 import type { Narration } from '@/lib/session-text';
@@ -233,7 +234,13 @@ function NightSwitcher({
         <Text style={[styles.arrowText, first && styles.disabled]}>‹</Text>
       </Pressable>
       <Pressable
-        onPress={() => router.push('/night-place')}
+        onPress={() =>
+          router.push({
+            pathname: '/night-place',
+            // Ranking tej nocy, którą oglądasz — nie zawsze dzisiejszej.
+            params: { night: nightLogId(current.session.verdict.night.from) },
+          })
+        }
         onLongPress={() => router.push('/night-mode')}
         accessibilityRole="button"
         accessibilityHint="Wybiera miejsce nocy. Przytrzymaj, żeby otworzyć tryb nocny."

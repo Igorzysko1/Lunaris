@@ -1,7 +1,8 @@
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Text, View } from 'react-native';
 
 import { useRanking } from '@/hooks/use-where';
+import { nightLogId } from '@/lib/journal';
 import { useNightPlace } from '@/store/night-place';
 import { colors, fonts } from '@/theme';
 import { Body, Label, Note, Panel, Sheet } from '@/ui/kit';
@@ -11,7 +12,8 @@ import { themedStyles } from '@/ui/theme';
  * Miejsce, o którym mówi zakładka Noc.
  *
  * Ten arkusz jest rankingiem, a nie listą do przewinięcia: miejsca stoją
- * w kolejności, w jakiej silnik je ocenił na najbliższą noc, razem z powodem.
+ * w kolejności, w jakiej silnik je ocenił na noc, z której go otwarto, razem
+ * z powodem.
  * Dzięki temu wybór miejsca i sprawdzenie pogody są jedną czynnością — po to,
  * żeby nie trzeba było chodzić po nią do zakładki Gdzie.
  *
@@ -20,9 +22,16 @@ import { themedStyles } from '@/ui/theme';
  * droga, której się nie chce jechać po ciemku.
  */
 export default function NightPlaceSheet() {
-  const { place, choose } = useNightPlace();
-  const ranking = useRanking(0);
-  const rows = [...ranking.go, ...ranking.dominated, ...ranking.noGo];
+  const { night } = useLocalSearchParams<{ night?: string }>();
+  const { place, candidates, reviews, choose } = useNightPlace();
+
+  // Noce łączymy po dacie wieczoru, a nie po pozycji na liście: noce miejsca
+  // i noce rankingu nie muszą zaczynać się od tej samej. Gdy ranking tej nocy
+  // nie sięga, mówimy to wprost, zamiast po cichu pokazać dzisiejszy.
+  const found = night ? reviews.findIndex((r) => nightLogId(r.night.from) === night) : 0;
+  const beyond = found < 0;
+  const ranking = useRanking(Math.max(0, found));
+  const rows = beyond ? [] : [...ranking.go, ...ranking.dominated, ...ranking.noGo];
 
   const pick = (id: string | null) => {
     choose(id);
@@ -40,13 +49,22 @@ export default function NightPlaceSheet() {
         <View style={styles.flex}>
           <Text style={styles.name}>Automatycznie</Text>
           <Text style={styles.meta}>
-            najlepsze z rankingu na najbliższą noc — dziś {rows[0]?.name ?? 'brak danych'}
+            {/* Automat wybiera według dzisiejszej nocy i trzyma to miejsce dla
+                wszystkich nocy w zakładce — więc mówimy, kto wygrywa dziś, nawet
+                gdy lista niżej dotyczy innej nocy. */}
+            najlepsze z rankingu na dzisiejszą noc — teraz{' '}
+            {candidates[0]?.site.name ?? 'brak danych'}
           </Text>
         </View>
       </Panel>
 
       <Label right={ranking.nightLabel}>Miejsca na tę noc</Label>
       {ranking.loading ? <Note>Liczę oceny miejsc…</Note> : null}
+      {beyond ? (
+        <Note>
+          Na tę noc nie ma jeszcze prognozy miejscówek — ranking sięga tylko kilku nocy naprzód.
+        </Note>
+      ) : null}
 
       {rows.map((row) => {
         const chosen = place.pinned && place.id === row.id;
