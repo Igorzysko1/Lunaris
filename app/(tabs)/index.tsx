@@ -143,7 +143,7 @@ function NightView({
         live={live !== null}
         place={verdicts.place}
       />
-      {verdicts.stale ? <StaleBar verdicts={verdicts} /> : null}
+      {verdicts.stale ? <StaleBar verdicts={verdicts} /> : <FreshnessRow verdicts={verdicts} />}
       {card.go ? (
         <VerdictCard card={card} moment={moment} live={live} variant={variant} />
       ) : (
@@ -367,6 +367,40 @@ function StaleBar({ verdicts }: { verdicts: NightVerdicts }) {
         </Text>
       </Pressable>
     </Panel>
+  );
+}
+
+/**
+ * Wiek prognozy i ręczne odświeżenie — zawsze pod ręką, nie tylko wtedy, gdy coś
+ * jest nie tak. Przed wyjazdem sprawdza się prognozę jeszcze raz, i to nie
+ * dlatego, że aplikacja zgłosiła problem, tylko dlatego, że za oknem się zachmurzyło.
+ *
+ * Gdy dane są przestarzałe albo pobranie zawiodło, zamiast tego stoi `StaleBar`:
+ * ten sam przycisk, ale z ostrzeżeniem.
+ */
+function FreshnessRow({ verdicts }: { verdicts: NightVerdicts }) {
+  const blocked = verdicts.refreshing || verdicts.refreshAfter !== null;
+
+  return (
+    <View style={styles.freshness}>
+      <Text style={styles.freshnessText}>{verdicts.updated}</Text>
+      <Pressable
+        onPress={verdicts.refresh}
+        disabled={blocked}
+        hitSlop={12}
+        accessibilityRole="button"
+        accessibilityLabel="Odśwież prognozę"
+        accessibilityState={{ disabled: blocked }}
+      >
+        <Text style={[styles.freshnessLink, blocked && styles.disabled]}>
+          {verdicts.refreshing
+            ? 'pobieram…'
+            : verdicts.refreshAfter
+              ? `spróbuję po ${verdicts.refreshAfter}`
+              : '↻ Odśwież'}
+        </Text>
+      </Pressable>
+    </View>
   );
 }
 
@@ -1091,6 +1125,15 @@ const styles = themedStyles(() => ({
   },
   chevron: { fontFamily: fonts.mono, fontSize: 16, color: colors.purple },
   link: { fontFamily: fonts.sansMedium, fontSize: 14, color: colors.purple },
+  freshness: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    minHeight: 28,
+    paddingHorizontal: 4,
+  },
+  freshnessText: { fontFamily: fonts.mono, fontSize: 11.5, color: colors.textMuted },
+  freshnessLink: { fontFamily: fonts.sansMedium, fontSize: 13, color: colors.purple },
   legend: { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   swatch: { width: 12, height: 6, borderRadius: 2 },

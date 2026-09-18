@@ -138,7 +138,16 @@ function defaultSettings(): PersistedSettings {
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
   const [
-    { placeId, autoLocation, notifications, leadTime, notifyCategories, theme, nightPlaceId, config },
+    {
+      placeId,
+      autoLocation,
+      notifications,
+      leadTime,
+      notifyCategories,
+      theme,
+      nightPlaceId,
+      config,
+    },
     setPersisted,
   ] = useState<PersistedSettings>(defaultSettings);
   const [hydrated, setHydrated] = useState(false);

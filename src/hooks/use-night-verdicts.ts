@@ -29,6 +29,7 @@ import type { NightSlice } from '@/lib/weather';
 import { useNow } from '@/hooks/use-now';
 import { useSessions, type Session } from '@/hooks/use-sessions';
 import { useForecast, type ForecastStatus } from '@/store/forecast';
+import { ACTIVE_SITE_ID } from '@/lib/where-text';
 import { useNightPlace } from '@/store/night-place';
 import { useSettings } from '@/store/settings';
 
@@ -88,6 +89,8 @@ export type NightVerdicts = {
   lastError: string | null;
   refresh: () => void;
   refreshing: boolean;
+  /** „prognoza sprzed 2 godzin" — wiek danych, z których liczy się miejsce nocy. */
+  updated: string;
   /**
    * Godzina, od której wolno odświeżyć ręcznie — po odpowiedzi 429 przycisk
    * czeka 30 min. `null`, gdy nic nie blokuje.
@@ -110,7 +113,7 @@ export function useNightVerdicts(): NightVerdicts {
   const { config } = useSettings();
   // Werdykt jest o **miejscu nocy**, nie o punkcie, w którym stoisz: „odpuść"
   // ma znaczyć „nigdzie w zasięgu nie warto", a nie „nie warto stąd".
-  const { place } = useNightPlace();
+  const { place, review } = useNightPlace();
   const { status, savedAt, stale, failure, refresh, refreshing, cycle } = useForecast();
   const { sessions } = useSessions(
     place.coords,
@@ -204,6 +207,12 @@ export function useNightVerdicts(): NightVerdicts {
   const failureText = describeForecastFailure(failure);
   const cooldown = rateLimitCooldown(cycle, now);
 
+  // Wiek danych **miejsca nocy**: twoja pozycja ma prognozę z cyklu Nocy,
+  // miejscówka z katalogu — z przeglądu. Pokazanie wieku cyklu przy miejscówce
+  // obiecywałoby świeżość prognozy, której nikt nie pobrał.
+  const placeSavedAt =
+    place.id === ACTIVE_SITE_ID ? (savedAt ?? cycle.lastSuccessAt ?? null) : review.savedAt;
+
   return {
     status: place.nights ? 'ready' : status,
     nights,
@@ -223,8 +232,12 @@ export function useNightVerdicts(): NightVerdicts {
     lastError: failure ? cycle.lastError : null,
     refresh: () => {
       if (!cooldown) refresh();
+      // Miejsce nocy bywa miejscówką, a jej prognozę przynosi przegląd, nie cykl
+      // Nocy — odświeżenie samego cyklu zostawiłoby ją nietkniętą.
+      review.refresh();
     },
-    refreshing,
+    refreshing: refreshing || review.refreshing,
+    updated: placeSavedAt ? `prognoza ${formatAge(placeSavedAt, now)}` : 'prognoza świeża',
     refreshAfter: cooldown ? formatTime(cooldown) : null,
   };
 }
