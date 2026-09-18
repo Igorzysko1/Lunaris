@@ -540,20 +540,6 @@ function Sky({
         ) : null}
       </Panel>
 
-      {sky.nextEvent ? (
-        <Panel
-          tone="teal"
-          onPress={() => router.navigate({ pathname: '/calendar', params: { segment: 'events' } })}
-          style={styles.rowPanel}
-        >
-          <View style={styles.flex}>
-            <Text style={[styles.inlineLabel, styles.teal]}>NASTĘPNY EVENT</Text>
-            <Text style={styles.rowTitle}>{sky.nextEvent}</Text>
-          </View>
-          <Text style={[styles.chevron, styles.teal]}>›</Text>
-        </Panel>
-      ) : null}
-
       <Label right={`${sky.targets.length} · okno i wys. maks.`}>Cele w zasięgu</Label>
       {sky.targets.length === 0 ? (
         <Note>Tej nocy żaden cel nie jest w zasięgu tego zestawu.</Note>

@@ -9,7 +9,6 @@
  * Importy względne (nie alias @/), żeby moduł dało się uruchomić poza Metro.
  */
 
-import type { AstroEvent } from '../data/events.ts';
 import type { Journal, TargetHistory } from './journal.ts';
 import type { NightWindow } from './night-window.ts';
 import { rankedTargets, type SkyTarget } from './sky-targets.ts';
@@ -102,11 +101,6 @@ export function isFirstTime(
   journal: Journal,
 ): boolean {
   return target.kind === 'dso' && journal.logs.length > 0 && (history?.seenCount ?? 0) === 0;
-}
-
-/** Najbliższe zjawisko widoczne z tego miejsca; `null`, gdy w horyzoncie nie ma żadnego. */
-export function nextVisibleEvent(events: AstroEvent[], now: Date): AstroEvent | null {
-  return events.find((event) => event.visible && event.at >= now) ?? null;
 }
 
 /**

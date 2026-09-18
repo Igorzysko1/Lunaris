@@ -21,17 +21,9 @@ import {
 } from '../src/lib/journal.ts';
 import { sightingsOf } from '../src/lib/journal-text.ts';
 import { parseNightPicks, togglePick } from '../src/lib/night-picks.ts';
-import {
-  fullHours,
-  isFirstTime,
-  nextVisibleEvent,
-  outOfReach,
-  skyList,
-  slotsWithin,
-} from '../src/lib/night-sky.ts';
+import { fullHours, isFirstTime, outOfReach, skyList, slotsWithin } from '../src/lib/night-sky.ts';
 import { DEFAULT_OPTICS } from '../src/lib/optics.ts';
 import {
-  describeEventWhen,
   describeOpticsReach,
   describeShortOverlap,
   describeUpSpan,
@@ -172,35 +164,6 @@ describe('zdania o oknie celu', () => {
       'Nie pokrywa się z oknem — nad horyzontem od 20:00 do 21:30.',
     );
     assert.equal(describeShortOverlap(span(at(14, 21), at(15, 4)), WINDOW), null);
-  });
-
-  it('najbliższe zjawisko: pomija niewidoczne, liczy doby kalendarzowo', () => {
-    const now = at(15, 12);
-    const events = [
-      {
-        id: 'a',
-        cat: 'moon',
-        type: 'full_moon',
-        at: at(16, 3),
-        title: 'Pełnia',
-        desc: '',
-        visible: false,
-      },
-      {
-        id: 'b',
-        cat: 'planet',
-        type: 'opposition',
-        at: at(21, 3),
-        title: 'Opozycja Neptuna',
-        desc: '',
-        visible: true,
-      },
-    ] as unknown as Parameters<typeof nextVisibleEvent>[0];
-
-    const next = nextVisibleEvent(events, now)!;
-    assert.equal(describeEventWhen(next, now), 'Opozycja Neptuna · za 6 dni');
-    assert.equal(describeEventWhen({ title: 'Pełnia', at: at(15, 23) }, now), 'Pełnia · dziś');
-    assert.equal(describeEventWhen({ title: 'Pełnia', at: at(16, 1) }, now), 'Pełnia · jutro');
   });
 
   it('zestaw i godzina odhaczenia', () => {

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 
 import { CONSTELLATIONS } from '@/data/constellations';
 import { DEEP_SKY_OBJECTS } from '@/data/deep-sky';
@@ -8,18 +8,12 @@ import type { NightCard } from '@/hooks/use-night-verdicts';
 import { useNow } from '@/hooks/use-now';
 import { constellationsTonight } from '@/lib/constellations';
 import { formatTime } from '@/lib/date';
-import { upcomingEvents } from '@/lib/events';
 import { horizonOf } from '@/lib/horizon';
 import { historyOf, nightLogId } from '@/lib/journal';
 import { picksFor } from '@/lib/night-picks';
-import { isFirstTime, nextVisibleEvent, outOfReach, skyList } from '@/lib/night-sky';
+import { isFirstTime, outOfReach, skyList } from '@/lib/night-sky';
 import { profileLabel } from '@/lib/optics';
-import {
-  describeEventWhen,
-  describeSettingSoon,
-  describeUpSpan,
-  outOfReachTitle,
-} from '@/lib/sky-text';
+import { describeSettingSoon, describeUpSpan, outOfReachTitle } from '@/lib/sky-text';
 import { describeOutOfReach, nightTargetsForProfiles } from '@/lib/sky-targets';
 import { useNightPlace } from '@/store/night-place';
 import { useSettings } from '@/store/settings';
@@ -68,8 +62,6 @@ export type SkyView = {
     /** Ilu nie pokazano pod wierszem. */
     more: number;
   };
-  /** „Opozycja Neptuna · za 6 dni"; `null`, gdy w horyzoncie nie ma widocznego zjawiska. */
-  nextEvent: string | null;
   constellations: { id: string; label: string; altitude: number }[];
   libraryTargets: number;
   libraryConstellations: number;
@@ -88,7 +80,6 @@ export function useNightSky(card: NightCard, profileId: string | null, enabled: 
   const { place } = useNightPlace();
   const { journal } = useJournal();
   const picks = useNightPicks();
-  const [opened] = useState(() => new Date());
   const now = useNow();
   const { lat, lon } = place.coords;
 
@@ -126,12 +117,6 @@ export function useNightSky(card: NightCard, profileId: string | null, enabled: 
     () => (enabled ? constellationsTonight(dark, { lat, lon }).slice(0, CONSTELLATION_CHIPS) : []),
     [enabled, dark, lat, lon],
   );
-
-  const nextEvent = useMemo(() => {
-    if (!enabled) return null;
-    const event = nextVisibleEvent(upcomingEvents(opened, { lat, lon }), opened);
-    return event ? describeEventWhen(event, opened) : null;
-  }, [enabled, opened, lat, lon]);
 
   const history = useMemo(() => historyOf(journal), [journal]);
 
@@ -183,7 +168,6 @@ export function useNightSky(card: NightCard, profileId: string | null, enabled: 
       })),
       more: Math.max(0, out.length - OUT_OF_REACH_SHOWN),
     },
-    nextEvent,
     constellations: constellations.map((entry) => ({
       id: entry.constellation.id,
       label: entry.constellation.latin,

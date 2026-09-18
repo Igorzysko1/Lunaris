@@ -8,7 +8,6 @@
  * Importy względne (nie alias @/), żeby moduł dało się uruchomić poza Metro.
  */
 
-import type { AstroEvent } from '../data/events.ts';
 import { formatTime } from './date.ts';
 import { compassLabel } from './horizon.ts';
 import { plural } from './journal-text.ts';
@@ -17,8 +16,6 @@ import type { NightWindow } from './night-window.ts';
 import type { Optics } from './optics.ts';
 import { formatDuration } from './session-text.ts';
 import type { UpSpan } from './sky-targets.ts';
-
-const DAY_MS = 86_400_000;
 
 const decimal = (value: number) => value.toFixed(1).replace('.', ',');
 
@@ -61,16 +58,6 @@ export function describeShortOverlap(up: UpSpan | null, window: NightWindow): st
     return `${lead} — zostaw go na koniec, wschodzi o ${formatTime(up.from)}.`;
   }
   return `${lead}, od ${formatTime(overlap.from)} do ${formatTime(overlap.to)}.`;
-}
-
-const dayStart = (date: Date) =>
-  new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
-
-/** „Opozycja Neptuna · za 6 dni" — żeton nad listą celów. */
-export function describeEventWhen(event: Pick<AstroEvent, 'title' | 'at'>, now: Date): string {
-  const days = Math.round((dayStart(event.at) - dayStart(now)) / DAY_MS);
-  const when = days <= 0 ? 'dziś' : days === 1 ? 'jutro' : `za ${days} dni`;
-  return `${event.title} · ${when}`;
 }
 
 /** „3 cele poza zasięgiem · SCT 8″" */
