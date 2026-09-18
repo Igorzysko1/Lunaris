@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Fragment, useState } from 'react';
-import { Alert, Animated, Pressable, Text, View } from 'react-native';
+import { Fragment, useDeferredValue, useState } from 'react';
+import { ActivityIndicator, Alert, Animated, Pressable, Text, View } from 'react-native';
 
 import { useBooking, type BookingView } from '@/hooks/use-booking';
 import { useKnownTonight } from '@/hooks/use-known-tonight';
@@ -106,10 +106,21 @@ function NightView({
   profileId: string | null;
   onProfile: (id: string) => void;
 }) {
+  // Podświetlenie segmentu zmienia się od razu, a treść dociąga się w tle.
+  // Niebo i Plan liczą przy pierwszym wejściu efemerydy wszystkich celów — to
+  // trwa, a liczone w tym samym przebiegu co podświetlenie zatrzymywało je
+  // razem z treścią, więc dotknięcie wyglądało, jakby nie trafiło. `shown`
+  // goni `segment` w przebiegu o niższym priorytecie: podświetlenie i kółko
+  // wczytywania zdążą się narysować, zanim zacznie się liczenie.
+  const shown = useDeferredValue(segment);
+  const pending = shown !== segment;
+
   // Efemerydy celów liczą się przy pierwszym wejściu do Nieba albo Planu —
-  // otwarcie zakładki na Warunkach nie ma na nie czekać.
+  // otwarcie zakładki na Warunkach nie ma na nie czekać. Włącza je segment
+  // już pokazywany, a nie dopiero dotknięty: inaczej liczenie wróciłoby do
+  // przebiegu z podświetleniem i znów by je zatrzymało.
   const [skyWanted, setSkyWanted] = useState(segment !== 'conditions');
-  if (segment !== 'conditions' && !skyWanted) setSkyWanted(true);
+  if (shown !== 'conditions' && !skyWanted) setSkyWanted(true);
 
   // Nowa prognoza może przynieść mniej nocy — wybór nie może wskazywać w próżnię.
   const index = Math.min(night, verdicts.nights.length - 1);
@@ -122,9 +133,9 @@ function NightView({
 
   const variant: VerdictVariant = live
     ? 'live'
-    : segment === 'conditions'
+    : shown === 'conditions'
       ? 'full'
-      : segment === 'sky'
+      : shown === 'sky'
         ? 'bar'
         : 'compact';
 
@@ -159,11 +170,12 @@ function NightView({
           />
         )}
         <Segments items={SEGMENTS} value={segment} onChange={onSegment} />
-        {segment === 'conditions' ? <Conditions card={card} /> : null}
-        {segment === 'sky' ? (
+        {pending ? <SegmentLoading segment={segment} /> : null}
+        {!pending && shown === 'conditions' ? <Conditions card={card} /> : null}
+        {!pending && shown === 'sky' ? (
           <Sky sky={sky} onProfile={() => onProfile(sky.nextProfileId)} onTarget={openTarget} />
         ) : null}
-        {segment === 'plan' ? (
+        {!pending && shown === 'plan' ? (
           live ? (
             <LivePlan card={card} sky={sky} onTarget={openTarget} />
           ) : (
@@ -177,6 +189,26 @@ function NightView({
         ) : null}
       </Animated.View>
     </Screen>
+  );
+}
+
+/** Co się właśnie liczy — żeby było wiadomo, że dotknięcie trafiło. */
+const LOADING: Record<Segment, string> = {
+  conditions: 'Wczytuję warunki…',
+  sky: 'Liczę, co będzie widać tej nocy…',
+  plan: 'Układam plan nocy…',
+};
+
+/**
+ * Wczytywanie segmentu. Kółko jest natywne, więc kręci się także wtedy, gdy
+ * JavaScript liczy efemerydy — narysowane w JS stanęłoby razem z nim.
+ */
+function SegmentLoading({ segment }: { segment: Segment }) {
+  return (
+    <Panel style={styles.loading}>
+      <ActivityIndicator color={colors.purple} />
+      <Text style={styles.loadingText}>{LOADING[segment]}</Text>
+    </Panel>
   );
 }
 
@@ -1131,6 +1163,8 @@ const styles = themedStyles(() => ({
   link: { fontFamily: fonts.sansMedium, fontSize: 14, color: colors.purple },
   // Ten sam odstęp co między dziećmi ekranu — owinięcie w gest nie może go zgubić.
   swipe: { gap: 12 },
+  loading: { alignItems: 'center', gap: 10, paddingVertical: 28 },
+  loadingText: { fontFamily: fonts.mono, fontSize: 12, color: colors.textSecondary },
   freshness: {
     flexDirection: 'row',
     justifyContent: 'space-between',
