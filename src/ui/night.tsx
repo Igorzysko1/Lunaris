@@ -5,6 +5,22 @@ import Svg, { Defs, Line, Pattern, Rect } from 'react-native-svg';
 import { colors, fonts, hexA } from '@/theme';
 import { themedStyles } from '@/ui/theme';
 
+/**
+ * Ile szerokości paska zajmuje podpis godziny („01:23" przy 10,5 pt) — poniżej
+ * tej odległości dwa podpisy na siebie wchodzą.
+ */
+const LABEL_CLEARANCE = 0.16;
+
+/**
+ * Podpis przy znaczniku, ale nie za krawędzią paska: przy brzegu przyklejamy
+ * go do brzegu zamiast centrować, bo wycentrowany wyjechałby poza ekran.
+ */
+function placeLabel(at: number) {
+  if (at < LABEL_CLEARANCE) return { left: 0 };
+  if (at > 1 - LABEL_CLEARANCE) return { right: 0 };
+  return { left: pct(at), transform: [{ translateX: -20 }] };
+}
+
 /** Ułamek szerokości jako procent w stylu React Native. */
 export function pct(fraction: number): `${number}%` {
   return `${Math.round(fraction * 1000) / 10}%`;
@@ -69,6 +85,19 @@ export function WindowBar({
     moonRise > 0 && moonRise < 1 ? moonRise : moonSet > 0 && moonSet < 1 ? moonSet : null;
   const showNow = now !== undefined && now !== null;
 
+  // Podpis Księżyca stoi tam, gdzie Księżyc wschodzi albo zachodzi — a to bywa
+  // tuż przy zmierzchu, świcie albo „teraz". Wtedy schodzi rząd niżej, zamiast
+  // wejść na sąsiedni podpis. Żaden nie znika, bo każdy niesie inną godzinę.
+  const moonClashes =
+    moonMark !== null &&
+    (moonMark < LABEL_CLEARANCE ||
+      moonMark > 1 - LABEL_CLEARANCE ||
+      (now != null && Math.abs(moonMark - now) < LABEL_CLEARANCE));
+  const moonLabel =
+    moonMark !== null && labels.moon ? (
+      <Text style={[styles.axis, styles.moonText, placeLabel(moonMark)]}>{labels.moon}</Text>
+    ) : null;
+
   return (
     <View style={styles.wrap}>
       <View style={styles.track}>
@@ -87,13 +116,10 @@ export function WindowBar({
         {showNow ? (
           <Text style={[styles.axis, styles.nowLabel, { left: pct(now) }]}>teraz</Text>
         ) : null}
-        {moonMark !== null && labels.moon ? (
-          <Text style={[styles.axis, styles.moonLabel, { left: pct(moonMark) }]}>
-            {labels.moon}
-          </Text>
-        ) : null}
+        {moonClashes ? null : moonLabel}
         <Text style={[styles.axis, styles.end]}>{labels.end}</Text>
       </View>
+      {moonClashes ? <View style={styles.labels}>{moonLabel}</View> : null}
     </View>
   );
 }
@@ -239,7 +265,7 @@ const styles = themedStyles(() => ({
   start: { left: 0 },
   end: { right: 0 },
   nowLabel: { color: colors.textPrimary, transform: [{ translateX: -12 }] },
-  moonLabel: { color: colors.amber, transform: [{ translateX: -20 }] },
+  moonText: { color: colors.amber },
   bars: { flexDirection: 'row', alignItems: 'flex-end', gap: 4 },
   bar: { flex: 1, borderRadius: 2 },
   highlight: {
