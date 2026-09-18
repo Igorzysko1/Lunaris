@@ -1,13 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Fragment, useState } from 'react';
-import { Alert, Pressable, Text, View } from 'react-native';
+import { Alert, Animated, Pressable, Text, View } from 'react-native';
 
 import { useBooking, type BookingView } from '@/hooks/use-booking';
 import { useKnownTonight } from '@/hooks/use-known-tonight';
 import { useNightConditions } from '@/hooks/use-night-conditions';
 import { useNightPlan } from '@/hooks/use-night-plan';
 import { useNightSky, type SkyView } from '@/hooks/use-night-sky';
+import { useNightSwipe } from '@/hooks/use-night-swipe';
 import {
   useNightVerdicts,
   type NightCard,
@@ -117,6 +118,7 @@ function NightView({
   const live = moment.live;
   const best = verdicts.bestNight(index);
   const sky = useNightSky(card, profileId, skyWanted);
+  const swipe = useNightSwipe(index, verdicts.nights.length, onNight);
 
   const variant: VerdictVariant = live
     ? 'live'
@@ -136,42 +138,44 @@ function NightView({
 
   return (
     <Screen>
-      <NightSwitcher
-        nights={verdicts.nights}
-        index={index}
-        onChange={onNight}
-        live={live !== null}
-        place={verdicts.place}
-      />
-      {verdicts.stale ? <StaleBar verdicts={verdicts} /> : <FreshnessRow verdicts={verdicts} />}
-      {card.go ? (
-        <VerdictCard card={card} moment={moment} live={live} variant={variant} />
-      ) : (
-        <RejectCard
-          card={card}
-          best={best === null ? null : verdicts.nights[best]}
-          onBest={() => {
-            if (best !== null) onNight(best);
-          }}
+      <Animated.View {...swipe.panHandlers} style={[styles.swipe, swipe.style]}>
+        <NightSwitcher
+          nights={verdicts.nights}
+          index={index}
+          onChange={onNight}
+          live={live !== null}
+          place={verdicts.place}
         />
-      )}
-      <Segments items={SEGMENTS} value={segment} onChange={onSegment} />
-      {segment === 'conditions' ? <Conditions card={card} /> : null}
-      {segment === 'sky' ? (
-        <Sky sky={sky} onProfile={() => onProfile(sky.nextProfileId)} onTarget={openTarget} />
-      ) : null}
-      {segment === 'plan' ? (
-        live ? (
-          <LivePlan card={card} sky={sky} onTarget={openTarget} />
+        {verdicts.stale ? <StaleBar verdicts={verdicts} /> : <FreshnessRow verdicts={verdicts} />}
+        {card.go ? (
+          <VerdictCard card={card} moment={moment} live={live} variant={variant} />
         ) : (
-          <Plan
+          <RejectCard
             card={card}
-            tonight={index === verdicts.liveIndex}
-            sky={sky}
-            onTarget={openTarget}
+            best={best === null ? null : verdicts.nights[best]}
+            onBest={() => {
+              if (best !== null) onNight(best);
+            }}
           />
-        )
-      ) : null}
+        )}
+        <Segments items={SEGMENTS} value={segment} onChange={onSegment} />
+        {segment === 'conditions' ? <Conditions card={card} /> : null}
+        {segment === 'sky' ? (
+          <Sky sky={sky} onProfile={() => onProfile(sky.nextProfileId)} onTarget={openTarget} />
+        ) : null}
+        {segment === 'plan' ? (
+          live ? (
+            <LivePlan card={card} sky={sky} onTarget={openTarget} />
+          ) : (
+            <Plan
+              card={card}
+              tonight={index === verdicts.liveIndex}
+              sky={sky}
+              onTarget={openTarget}
+            />
+          )
+        ) : null}
+      </Animated.View>
     </Screen>
   );
 }
@@ -1125,6 +1129,8 @@ const styles = themedStyles(() => ({
   },
   chevron: { fontFamily: fonts.mono, fontSize: 16, color: colors.purple },
   link: { fontFamily: fonts.sansMedium, fontSize: 14, color: colors.purple },
+  // Ten sam odstęp co między dziećmi ekranu — owinięcie w gest nie może go zgubić.
+  swipe: { gap: 12 },
   freshness: {
     flexDirection: 'row',
     justifyContent: 'space-between',

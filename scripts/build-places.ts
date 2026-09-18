@@ -50,6 +50,22 @@ const VOIVODESHIPS: Record<string, string> = {
 type Row = { id: string; name: string; region: string; lat: number; lon: number; bortle: number };
 
 /**
+ * Pierwszy wiersz z każdym identyfikatorem.
+ *
+ * OSM potrafi mieć tę samą miejscowość dwa razy — dwa węzły w tym samym punkcie
+ * (tak było z Włodowicami). Identyfikator jest wtedy identyczny, a zdublowany
+ * klucz wywraca listę w aplikacji: React odmawia dwóch elementów z jednym kluczem.
+ */
+function uniqueById(rows: Row[]): Row[] {
+  const seen = new Set<string>();
+  return rows.filter((row) => {
+    if (seen.has(row.id)) return false;
+    seen.add(row.id);
+    return true;
+  });
+}
+
+/**
  * Nazwa nie identyfikuje miejsca: „Andrychów" to jednocześnie miasto i gmina w tym
  * samym województwie, a „Bolesławiec" występuje pięć razy w kraju. Klucz musi więc
  * zawierać współrzędne.
@@ -181,16 +197,18 @@ async function main() {
 
   // ── miasta ──
   const nodes = await overpassCities();
-  const cityRows: Row[] = nodes
-    .filter((n) => n.tags?.name)
-    .map((n) => ({
-      id: placeId('m', n.tags.name!, n.lat, n.lon),
-      name: n.tags.name!,
-      region: '',
-      lat: n.lat,
-      lon: n.lon,
-      bortle: 0,
-    }));
+  const cityRows: Row[] = uniqueById(
+    nodes
+      .filter((n) => n.tags?.name)
+      .map((n) => ({
+        id: placeId('m', n.tags.name!, n.lat, n.lon),
+        name: n.tags.name!,
+        region: '',
+        lat: n.lat,
+        lon: n.lon,
+        bortle: 0,
+      })),
+  );
 
   // Miasto leży w gminie, więc województwo bierzemy z najbliższego centroidu gminy.
   for (const city of cityRows) {

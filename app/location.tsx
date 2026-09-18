@@ -131,6 +131,17 @@ export default function LocationScreen() {
               style={styles.mapLink}
             />
 
+            {/* Liczba przy każdym wierszu to odległość — ale od czego, ekran
+                dotąd nie mówił. Gmina ma przy tym inny punkt niż miasto o tej
+                samej nazwie (środek obszaru, nie centrum), więc „Jaworzno"
+                w Gminach stoi kilka kilometrów dalej niż w Miastach. */}
+            <Text style={styles.originNote}>
+              {`Odległość od: ${active.source === 'gps' ? 'twojej pozycji (GPS)' : active.label}`}
+              {tab === 'gminy'
+                ? ' · gmina liczona od środka jej obszaru, więc bywa dalej niż miasto o tej samej nazwie'
+                : ''}
+            </Text>
+
             {!pickingHome && (
               <Pressable accessibilityRole="button" onPress={chooseGps} style={styles.gpsRow}>
                 <View style={styles.gpsLeft}>
@@ -228,6 +239,14 @@ function PlaceRow({
 }
 
 const styles = themedStyles(() => ({
+  originNote: {
+    fontFamily: fonts.mono,
+    fontSize: 11.5,
+    lineHeight: 16,
+    color: colors.textMuted,
+    marginHorizontal: 16,
+    marginBottom: 8,
+  },
   safe: {
     flex: 1,
     backgroundColor: colors.bg,

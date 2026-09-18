@@ -958,7 +958,6 @@ export const CITIES: Place[] = [
   { id: "m:Włocławek:52.660,19.072", name: "Włocławek", region: "kujawsko-pomorskie", lat: 52.6604, lon: 19.0719, bortle: 6 },
   { id: "m:Włodawa:51.547,23.553", name: "Włodawa", region: "lubelskie", lat: 51.5466, lon: 23.5532, bortle: 4 },
   { id: "m:Włodowice:50.552,19.450", name: "Włodowice", region: "śląskie", lat: 50.5521, lon: 19.4504, bortle: 5 },
-  { id: "m:Włodowice:50.552,19.450", name: "Włodowice", region: "śląskie", lat: 50.5521, lon: 19.4504, bortle: 5 },
   { id: "m:Włoszczowa:50.852,19.967", name: "Włoszczowa", region: "świętokrzyskie", lat: 50.8521, lon: 19.9668, bortle: 4 },
   { id: "m:Wodzisław:50.521,20.191", name: "Wodzisław", region: "świętokrzyskie", lat: 50.5211, lon: 20.1909, bortle: 4 },
   { id: "m:Wodzisław Śląski:50.002,18.463", name: "Wodzisław Śląski", region: "śląskie", lat: 50.0024, lon: 18.4630, bortle: 6 },
