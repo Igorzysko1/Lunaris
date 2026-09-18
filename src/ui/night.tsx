@@ -85,14 +85,10 @@ export function WindowBar({
     moonRise > 0 && moonRise < 1 ? moonRise : moonSet > 0 && moonSet < 1 ? moonSet : null;
   const showNow = now !== undefined && now !== null;
 
-  // Podpis Księżyca stoi tam, gdzie Księżyc wschodzi albo zachodzi — a to bywa
-  // tuż przy zmierzchu, świcie albo „teraz". Wtedy schodzi rząd niżej, zamiast
-  // wejść na sąsiedni podpis. Żaden nie znika, bo każdy niesie inną godzinę.
-  const moonClashes =
-    moonMark !== null &&
-    (moonMark < LABEL_CLEARANCE ||
-      moonMark > 1 - LABEL_CLEARANCE ||
-      (now != null && Math.abs(moonMark - now) < LABEL_CLEARANCE));
+  // Podpis Księżyca stoi nad paskiem, nie pod nim. Księżyc wschodzi albo
+  // zachodzi gdziekolwiek w nocy — często tuż przy zmierzchu, świcie albo
+  // „teraz" — więc w jednym rzędzie z nimi prędzej czy później na coś wchodzi.
+  // Nad paskiem jest sam, a znacznik na pasku i tak pokazuje, której chwili dotyczy.
   const moonLabel =
     moonMark !== null && labels.moon ? (
       <Text style={[styles.axis, styles.moonText, placeLabel(moonMark)]}>{labels.moon}</Text>
@@ -100,6 +96,7 @@ export function WindowBar({
 
   return (
     <View style={styles.wrap}>
+      {moonLabel ? <View style={styles.labels}>{moonLabel}</View> : null}
       <View style={styles.track}>
         <Hatch from={0} to={darkFrom} />
         <Hatch from={moonRise} to={moonSet} />
@@ -116,10 +113,8 @@ export function WindowBar({
         {showNow ? (
           <Text style={[styles.axis, styles.nowLabel, { left: pct(now) }]}>teraz</Text>
         ) : null}
-        {moonClashes ? null : moonLabel}
         <Text style={[styles.axis, styles.end]}>{labels.end}</Text>
       </View>
-      {moonClashes ? <View style={styles.labels}>{moonLabel}</View> : null}
     </View>
   );
 }
