@@ -15,7 +15,6 @@ import { isFirstTime, outOfReach, skyList } from '@/lib/night-sky';
 import { profileLabel } from '@/lib/optics';
 import { describeSettingSoon, describeUpSpan, outOfReachTitle } from '@/lib/sky-text';
 import { describeOutOfReach, nightTargetsForProfiles } from '@/lib/sky-targets';
-import { useNightPlace } from '@/store/night-place';
 import { useSettings } from '@/store/settings';
 
 /** Ile gwiazdozbiorów w żetonach — dalej to już lista, a ta jest w bibliotece. */
@@ -75,9 +74,9 @@ export type SkyView = {
  */
 export function useNightSky(card: NightCard, profileId: string | null, enabled: boolean): SkyView {
   const { config } = useSettings();
-  // Cele liczą się dla miejsca nocy: jego nieba, jego horyzontu. Werdykt
+  // Cele liczą się dla miejsca tej nocy: jego nieba, jego horyzontu. Werdykt
   // o Złotym Potoku z listą celów widzianych z Jaworzna byłby sklejką.
-  const { place } = useNightPlace();
+  const { place } = card;
   const { journal } = useJournal();
   const picks = useNightPicks();
   const now = useNow();

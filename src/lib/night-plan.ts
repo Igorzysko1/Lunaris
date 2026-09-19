@@ -86,6 +86,12 @@ export type NightPlanInput = {
   bortle: number;
   walkMinutes: number;
   /**
+   * Numer pierwszej z podanych nocy wśród nocy prognozy. Noce dalej niż
+   * `UNCERTAIN_FROM_INDEX` są orientacyjne — a gdy noce liczy się pojedynczo,
+   * każdą dla jej własnego miejsca, bez tego numeru każda byłaby „pierwsza".
+   */
+  startIndex?: number;
+  /**
    * Zjawiska na najbliższe noce. Bez nich żadna noc nie jest „niepowtarzalna",
    * a wtedy silnik skraca dla snu nawet noc zaćmienia.
    */
@@ -126,6 +132,7 @@ export function planNights({
   walkMinutes,
   events = [],
   nextDay,
+  startIndex = 0,
 }: NightPlanInput): PlannedNight[] {
   const windLimit = nightWindLimit(config);
 
@@ -186,7 +193,7 @@ export function planNights({
         ? Math.min(...inWindow.map((h) => feltTemperature(h.temperature, h.windSpeed)))
         : null,
       targets: window ? nightTargetsForProfiles(window, target, config.opticsProfiles, bortle) : [],
-      uncertain: index >= UNCERTAIN_FROM_INDEX,
+      uncertain: startIndex + index >= UNCERTAIN_FROM_INDEX,
     };
   });
 }

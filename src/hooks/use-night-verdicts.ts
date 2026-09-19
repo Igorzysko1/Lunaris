@@ -8,12 +8,7 @@ import {
 } from '@/lib/daily-cycle';
 import { formatLongDate, formatNightSpan, formatTime } from '@/lib/date';
 import { formatAge } from '@/lib/forecast-cache';
-import {
-  nightBar,
-  summarizeNight,
-  type NightBar,
-  type NightSummary,
-} from '@/lib/night-summary';
+import { nightBar, summarizeNight, type NightBar, type NightSummary } from '@/lib/night-summary';
 import {
   formatDuration,
   narrateVerdict,
@@ -29,7 +24,7 @@ import { useNow } from '@/hooks/use-now';
 import { useSessions, type Session } from '@/hooks/use-sessions';
 import { useForecast, type ForecastStatus } from '@/store/forecast';
 import { ACTIVE_SITE_ID } from '@/lib/where-text';
-import { useNightPlace } from '@/store/night-place';
+import { useNightPlace, type NightPlace } from '@/store/night-place';
 import { useSettings } from '@/store/settings';
 
 const MINUTE_MS = 60_000;
@@ -37,6 +32,8 @@ const MINUTE_MS = 60_000;
 /** Jedna noc z prognozy, gotowa do karty werdyktu i selektora nocy. */
 export type NightCard = {
   key: string;
+  /** Miejsce tej nocy — zwycięzca jej rankingu albo przypięte. */
+  place: NightPlace;
   /** „noc 14/15 września" */
   title: string;
   /** „dziś · Zawoja · Bortle 4" */
@@ -105,36 +102,26 @@ const lowerFirst = (text: string) => text.charAt(0).toLowerCase() + text.slice(1
  * przeliczało efemeryd Księżyca.
  */
 export function useNightVerdicts(): NightVerdicts {
-  const { config } = useSettings();
-  // Werdykt jest o **miejscu nocy**, nie o punkcie, w którym stoisz: „odpuść"
-  // ma znaczyć „nigdzie w zasięgu nie warto", a nie „nie warto stąd".
-  const { place, review } = useNightPlace();
+  const { config, active } = useSettings();
+  // Werdykt każdej nocy jest o **jej** miejscu, nie o punkcie, w którym stoisz:
+  // „odpuść" ma znaczyć „tej nocy nigdzie w zasięgu nie warto".
+  const { review } = useNightPlace();
   const { status, savedAt, stale, failure, refresh, refreshing, cycle } = useForecast();
-  const { sessions } = useSessions(
-    place.coords,
-    place.bortle,
-    config,
-    place.walkMinutes,
-    place.nights,
-  );
+  const { sessions, places } = useSessions();
   const now = useNow();
-  const { lat, lon } = place.coords;
 
   // „Dziś" i „jutro" zmieniają znaczenie o północy, a nie co minutę.
   const today = now.toDateString();
 
   const nights = useMemo<NightCard[]>(() => {
-    const slices = place.nights;
-    if (!slices) return [];
-
-    const where = `${place.label} · Bortle ${place.bortle}`;
-
     return sessions.flatMap((session, index) => {
-      const slice = slices[index];
-      if (!slice) return [];
+      const place = places[index];
+      if (!place) return [];
+      const { slice } = place;
+      const where = `${place.label} · Bortle ${place.bortle}`;
 
       const { verdict } = session;
-      const summary = summarizeNight({ slice, planned: session, coords: { lat, lon }, config });
+      const summary = summarizeNight({ slice, planned: session, coords: place.coords, config });
       const relative = nightRelative(verdict.night, now);
       const span = formatNightSpan(verdict.night.from, verdict.night.to);
       const observing = verdict.window;
@@ -142,6 +129,7 @@ export function useNightVerdicts(): NightVerdicts {
       return [
         {
           key: verdict.night.from.toISOString(),
+          place,
           title: `noc ${span}`,
           subtitle: `${relative} · ${where}${session.uncertain ? ' · orientacyjnie' : ''}`,
           relative,
@@ -166,7 +154,7 @@ export function useNightVerdicts(): NightVerdicts {
     });
     // `now` celowo poza zależnościami: etykiety przelicza zmiana daty (`today`).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [place, sessions, lat, lon, config, today]);
+  }, [places, sessions, config, today]);
 
   const liveIndex = liveNightIndex(
     nights.map((card) => card.session.verdict.night),
@@ -199,22 +187,24 @@ export function useNightVerdicts(): NightVerdicts {
   const failureText = describeForecastFailure(failure);
   const cooldown = rateLimitCooldown(cycle, now);
 
-  // Wiek danych **miejsca nocy**: twoja pozycja ma prognozę z cyklu Nocy,
-  // miejscówka z katalogu — z przeglądu. Pokazanie wieku cyklu przy miejscówce
-  // obiecywałoby świeżość prognozy, której nikt nie pobrał.
-  const placeSavedAt =
-    place.id === ACTIVE_SITE_ID ? (savedAt ?? cycle.lastSuccessAt ?? null) : review.savedAt;
+  // Wiek danych, z których liczą się te noce: twoja pozycja ma prognozę z cyklu
+  // Nocy, miejscówki — z przeglądu. Gdy noce biorą z obu, liczy się starsza —
+  // inaczej pasek obiecywałby świeżość, której część danych nie ma.
+  const ages = [
+    places.some((p) => p.id === ACTIVE_SITE_ID) ? (savedAt ?? cycle.lastSuccessAt ?? null) : null,
+    places.some((p) => p.id !== ACTIVE_SITE_ID) ? review.savedAt : null,
+  ].filter((age): age is Date => age !== null);
+  const placeSavedAt = ages.length ? new Date(Math.min(...ages.map((d) => d.getTime()))) : null;
 
   return {
-    status: place.nights ? 'ready' : status,
+    status: places.length ? 'ready' : status,
     nights,
     moments,
     bestNight,
     liveIndex,
-    place: place.label,
-    // Skąd się to miejsce wzięło jest częścią werdyktu: bez tego „Złoty Potok"
-    // wyglądałby na ustawienie, które ktoś kiedyś wybrał i zapomniał zmienić.
-    placeNote: `Bortle ${place.bortle} · ${place.pinned ? 'wybrane ręcznie' : 'najlepsze z rankingu'}`,
+    // Tylko do ekranu bez prognozy — tam nie ma jeszcze nocy, więc i miejsc nocy.
+    place: active.label,
+    placeNote: `Bortle ${active.bortle} · twoja pozycja — miejsca nocy wskaże ranking`,
     date: lowerFirst(formatLongDate(now)),
     // Zapis to normalne źródło odczytu. Ostrzegamy dopiero, gdy odświeżenie
     // zawiodło albo dane przetrwały termin, w którym miały się zmienić.

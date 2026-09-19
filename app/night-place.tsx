@@ -23,7 +23,7 @@ import { themedStyles } from '@/ui/theme';
  */
 export default function NightPlaceSheet() {
   const { night } = useLocalSearchParams<{ night?: string }>();
-  const { place, candidates, reviews, choose } = useNightPlace();
+  const { places, reviews, pinnedId, choose } = useNightPlace();
 
   // Noce łączymy po dacie wieczoru, a nie po pozycji na liście: noce miejsca
   // i noce rankingu nie muszą zaczynać się od tej samej. Gdy ranking tej nocy
@@ -33,27 +33,31 @@ export default function NightPlaceSheet() {
   const ranking = useRanking(Math.max(0, found));
   const rows = beyond ? [] : [...ranking.go, ...ranking.dominated, ...ranking.noGo];
 
+  // Miejsce tej nocy — zwycięzca jej rankingu albo przypięte.
+  const here = beyond
+    ? null
+    : night
+      ? (places.find((p) => nightLogId(p.slice.night.from) === night) ?? null)
+      : (places[0] ?? null);
+
   const pick = (id: string | null) => {
     choose(id);
     router.back();
   };
 
   return (
-    <Sheet title="Miejsce nocy" subtitle={`teraz: ${place.label}`}>
-      <Panel
-        onPress={() => pick(null)}
-        tone={place.pinned ? undefined : 'accent'}
-        style={styles.row}
-      >
-        <Text style={styles.mark}>{place.pinned ? '·' : '✓'}</Text>
+    <Sheet
+      title="Miejsce nocy"
+      subtitle={here ? `tej nocy: ${here.label}` : 'na tę noc brak prognozy'}
+    >
+      <Panel onPress={() => pick(null)} tone={pinnedId ? undefined : 'accent'} style={styles.row}>
+        <Text style={styles.mark}>{pinnedId ? '·' : '✓'}</Text>
         <View style={styles.flex}>
           <Text style={styles.name}>Automatycznie</Text>
           <Text style={styles.meta}>
-            {/* Automat wybiera według dzisiejszej nocy i trzyma to miejsce dla
-                wszystkich nocy w zakładce — więc mówimy, kto wygrywa dziś, nawet
-                gdy lista niżej dotyczy innej nocy. */}
-            najlepsze z rankingu na dzisiejszą noc — teraz{' '}
-            {candidates[0]?.site.name ?? 'brak danych'}
+            {/* Automat bierze zwycięzcę rankingu każdej nocy osobno — więc tu
+                stoi zwycięzca tej nocy, której dotyczy lista niżej. */}
+            każda noc bierze zwycięzcę swojego rankingu — tej nocy {rows[0]?.name ?? 'brak danych'}
           </Text>
         </View>
       </Panel>
@@ -67,7 +71,7 @@ export default function NightPlaceSheet() {
       ) : null}
 
       {rows.map((row) => {
-        const chosen = place.pinned && place.id === row.id;
+        const chosen = pinnedId === row.id;
 
         return (
           <Panel

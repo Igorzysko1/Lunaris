@@ -5,7 +5,6 @@ import { useNow } from '@/hooks/use-now';
 import type { NightCard } from '@/hooks/use-night-verdicts';
 import { NO_PLAN, planSchedule, tonightAhead } from '@/lib/plan-text';
 import { bookingId } from '@/lib/session-booking';
-import { useSettings } from '@/store/settings';
 
 /**
  * Noc › Plan dla wybranej nocy: przebieg doby z `planNights` rozpisany na
@@ -13,13 +12,13 @@ import { useSettings } from '@/store/settings';
  * przebieg nocy dosyła godziny do kalendarza.
  */
 export function useNightPlan(card: NightCard) {
-  const { active } = useSettings();
-  const site = useBookingSite();
+  // Dojście od parkingu i rezerwacja — dla miejsca tej nocy, nie twojej pozycji.
+  const site = useBookingSite(card.place);
   const now = useNow();
 
   const schedule = useMemo(
-    () => planSchedule(card.session, { walkMinutes: active.walkMinutes }),
-    [card.session, active.walkMinutes],
+    () => planSchedule(card.session, { walkMinutes: card.place.walkMinutes }),
+    [card.session, card.place.walkMinutes],
   );
 
   return {

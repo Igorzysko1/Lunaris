@@ -18,7 +18,7 @@ export type BookingView = ReturnType<typeof useBookingEntry>;
  * Nieba — z celami dopisanymi ręcznie do planu tej nocy.
  */
 export function useBooking(card: NightCard, targets: string[]) {
-  const site = useBookingSite();
+  const site = useBookingSite(card.place);
   const { verdict, rating } = card.session;
 
   return useBookingEntry(

@@ -148,7 +148,6 @@ function NightView({
           index={index}
           onChange={onNight}
           live={live !== null}
-          place={verdicts.place}
         />
         {verdicts.stale ? <StaleBar verdicts={verdicts} /> : <FreshnessRow verdicts={verdicts} />}
         {card.go ? (
@@ -210,13 +209,11 @@ function NightSwitcher({
   index,
   onChange,
   live,
-  place,
 }: {
   nights: NightCard[];
   index: number;
   onChange: (index: number) => void;
   live: boolean;
-  place: string;
 }) {
   const current = nights[index];
   const first = index === 0;
@@ -248,7 +245,7 @@ function NightSwitcher({
       >
         <Text style={styles.switcherTitle}>{current.title}</Text>
         <Text style={styles.switcherSubtitle}>
-          {live ? `sesja trwa · ${place}` : current.subtitle}
+          {live ? `sesja trwa · ${current.place.label}` : current.subtitle}
         </Text>
       </Pressable>
       <Pressable
@@ -863,6 +860,7 @@ function TimelinePanel({ card, bookingId }: { card: NightCard; bookingId: string
     plan: verdict.plan,
     window: verdict.window,
     bookingId,
+    place: card.place,
   });
 
   if (!run.loaded) return null;

@@ -1,16 +1,17 @@
 /**
- * Miejsce nocy — to, o którym mówi cała zakładka Noc.
+ * Miejsce nocy — to, o którym mówi zakładka Noc. **Każda noc ma swoje.**
  *
  * Do tej pory aplikacja znała jedno „miejsce": punkt z GPS albo miejscowość
  * wybraną w ustawieniach. Werdykt „odpuść" znaczył wtedy „odpuść **tutaj**",
- * choć czterdzieści kilometrów dalej noc przechodziła progi — i trzeba było
- * o tym wiedzieć samemu, żeby zajrzeć do zakładki Gdzie. To nie jest odpowiedź
- * na pytanie „czy jechać", bo jechać właśnie się zamierza.
+ * choć czterdzieści kilometrów dalej noc przechodziła progi. Teraz każda noc
+ * bierze zwycięzcę własnego rankingu: dziś może wygrywać Pustynia Błędowska,
+ * jutro Złoty Potok — i tak ma być, bo pogoda nie rozkłada się co noc tak samo.
  *
- * Dlatego są teraz dwa pojęcia. **Twoja pozycja** (`useSettings().active`)
- * mówi, skąd liczy się dojazd i gdzie jesteś. **Miejsce nocy** mówi, o czym
- * jest werdykt: domyślnie najlepsze z rankingu, a po przypięciu — wskazane
- * ręcznie, bo powody wyboru gorszego miejsca bywają pozaastronomiczne.
+ * Dwa pojęcia zostają rozdzielone. **Twoja pozycja** (`useSettings().active`)
+ * mówi, skąd liczy się dojazd, i sama staje w rankingu jak każda miejscówka.
+ * **Miejsce nocy** mówi, o czym jest werdykt danej nocy: domyślnie zwycięzca
+ * jej rankingu, a po przypięciu — wskazane ręcznie dla wszystkich nocy, bo
+ * powody wyboru gorszego miejsca bywają pozaastronomiczne.
  *
  * Jeden dostawca na aplikację, bo przegląd miejscówek **pobiera** prognozy.
  * Dwa niezależne wywołania hooka oznaczałyby dwa żądania o te same dane —
@@ -22,7 +23,9 @@ import { createContext, useContext, useMemo, type ReactNode } from 'react';
 import type { Coords } from '@/data/places';
 import { useSiteReview } from '@/hooks/use-site-review';
 import type { HorizonMask, HorizonOverride } from '@/lib/horizon';
-import { bestOutlook, type NightReview, type SiteOutlook } from '@/lib/site-review';
+import { nightLogId } from '@/lib/journal';
+import type { NightWindow } from '@/lib/night-window';
+import { bestOutlook, type NightReview } from '@/lib/site-review';
 import type { NightSlice } from '@/lib/weather';
 import { ACTIVE_SITE_ID, activeAsSite } from '@/lib/where-text';
 import { useForecast } from '@/store/forecast';
@@ -37,19 +40,20 @@ export type NightPlace = {
   walkMinutes: number;
   horizonMask: HorizonMask | null;
   horizonOverrides: HorizonOverride[];
-  /** Noce tego miejsca; `null`, dopóki nie ma dla niego prognozy. */
-  nights: NightSlice[] | null;
+  /** Noc, której dotyczy, z godzinami prognozy **tego** miejsca. */
+  slice: NightSlice;
   /** Wskazane ręcznie, a nie przez ranking. */
   pinned: boolean;
 };
 
 type NightPlaceValue = {
-  place: NightPlace;
-  /** Miejsca w kolejności rankingu na najbliższą noc — do wyboru w Nocy. */
-  candidates: SiteOutlook[];
+  /** Miejsce każdej nocy po kolei, od dzisiejszej. */
+  places: NightPlace[];
   /** Ranking na kolejne noce; zakładka Gdzie czyta go stąd, zamiast pobierać drugi raz. */
   reviews: NightReview[];
   review: ReturnType<typeof useSiteReview>;
+  /** Przypięte miejsce; `null` — każda noc bierze zwycięzcę swojego rankingu. */
+  pinnedId: string | null;
   /** Przypina miejsce po identyfikatorze; `null` oddaje wybór rankingowi. */
   choose: (id: string | null) => void;
 };
@@ -72,17 +76,28 @@ export function NightPlaceProvider({ children }: { children: ReactNode }) {
   const review = useSiteReview(config, extra);
 
   const value = useMemo<NightPlaceValue>(() => {
-    // Miejsce rozstrzyga ranking **najbliższej nocy**, a nie tej wybranej
-    // w przełączniku: jedno miejsce na całą zakładkę jest zrozumiałe, a wynik
-    // skaczący przy przewijaniu nocy — nie. Kto chce inaczej, przypina.
-    const tonight = review.reviews[0] ?? null;
-    const ranked = tonight ? [...tonight.go, ...tonight.dominated, ...tonight.noGo] : [];
+    // Godziny prognozy danego miejsca na daną noc. Noce łączymy po dacie
+    // wieczoru, a nie po pozycji: listy nocy z różnych źródeł nie muszą
+    // zaczynać się od tej samej.
+    const sliceOf = (siteId: string, night: NightWindow) => {
+      const slices = siteId === ACTIVE_SITE_ID ? bundle?.nights : review.forecasts.get(siteId);
+      const key = nightLogId(night.from);
+      return slices?.find((s) => nightLogId(s.night.from) === key) ?? null;
+    };
 
-    const pinned = nightPlaceId ? (ranked.find((o) => o.site.id === nightPlaceId) ?? null) : null;
-    const chosen = pinned ?? (tonight ? bestOutlook(tonight) : null);
+    const ranked = review.reviews.flatMap((night): NightPlace[] => {
+      const all = [...night.go, ...night.dominated, ...night.noGo];
+      const pinned = nightPlaceId ? (all.find((o) => o.site.id === nightPlaceId) ?? null) : null;
+      // Przypięte, o ile ma tej nocy prognozę; inaczej zwycięzca tej nocy —
+      // lepiej pokazać najlepsze miejsce niż pustą noc.
+      const chosen = pinned ?? bestOutlook(night);
+      if (!chosen) return [];
 
-    const place: NightPlace = chosen
-      ? {
+      const slice = sliceOf(chosen.site.id, night.night);
+      if (!slice) return [];
+
+      return [
+        {
           id: chosen.site.id,
           label: chosen.site.name,
           coords: { lat: chosen.site.lat, lon: chosen.site.lon },
@@ -90,31 +105,34 @@ export function NightPlaceProvider({ children }: { children: ReactNode }) {
           walkMinutes: chosen.site.walkMinutes,
           horizonMask: chosen.site.horizonMask,
           horizonOverrides: chosen.site.horizonOverrides,
-          nights:
-            chosen.site.id === ACTIVE_SITE_ID
-              ? (bundle?.nights ?? null)
-              : (review.forecasts.get(chosen.site.id) ?? null),
+          slice,
           pinned: pinned !== null,
-        }
-      : // Zanim ranking się policzy (pierwsze uruchomienie, brak sieci) zakładka
-        // pokazuje to, co zawsze pokazywała: twoją pozycję z jej prognozą.
-        {
-          id: ACTIVE_SITE_ID,
-          label: active.label,
-          coords: active.coords,
-          bortle: active.bortle,
-          walkMinutes: active.walkMinutes,
-          horizonMask: active.horizonMask,
-          horizonOverrides: active.horizonOverrides,
-          nights: bundle?.nights ?? null,
-          pinned: false,
-        };
+        },
+      ];
+    });
+
+    // Zanim ranking się policzy (pierwsze uruchomienie, brak sieci) zakładka
+    // pokazuje to, co zawsze pokazywała: twoją pozycję z jej prognozą.
+    const places =
+      ranked.length > 0
+        ? ranked
+        : (bundle?.nights ?? []).map((slice): NightPlace => ({
+            id: ACTIVE_SITE_ID,
+            label: active.label,
+            coords: active.coords,
+            bortle: active.bortle,
+            walkMinutes: active.walkMinutes,
+            horizonMask: active.horizonMask,
+            horizonOverrides: active.horizonOverrides,
+            slice,
+            pinned: false,
+          }));
 
     return {
-      place,
-      candidates: ranked,
+      places,
       reviews: review.reviews,
       review,
+      pinnedId: nightPlaceId,
       choose: setNightPlace,
     };
   }, [review, nightPlaceId, active, bundle, setNightPlace]);

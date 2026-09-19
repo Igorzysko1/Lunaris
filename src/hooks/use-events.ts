@@ -34,7 +34,6 @@ import type { NightVerdict } from '@/lib/session-engine';
 import { LEAD_TIMES } from '@/lib/settings-storage';
 import { rankedTargets } from '@/lib/sky-targets';
 import { useForecast } from '@/store/forecast';
-import { useNightPlace } from '@/store/night-place';
 import { useSettings } from '@/store/settings';
 
 /** Ile celów wymieniamy w opisie rezerwacji — tyle samo co przy propozycji w Kalendarzu. */
@@ -79,16 +78,8 @@ function useMuted(): string[] {
 function useEventHorizon() {
   const { active, config, notifications, notifyCategories } = useSettings();
   const { bundle, notices, reviewAgain } = useForecast();
-  const { place } = useNightPlace();
-  // Ta sama noc co w zakładce Noc: sesja i rezerwacja muszą mówić o jednym
-  // miejscu, inaczej wpis w kalendarzu wiezie gdzie indziej niż werdykt.
-  const { sessions } = useSessions(
-    place.coords,
-    place.bortle,
-    config,
-    place.walkMinutes,
-    place.nights,
-  );
+  // Te same noce co w zakładce Noc — każda ze swoim miejscem.
+  const { sessions, places } = useSessions();
   const muted = useMuted();
   const [now] = useState(() => new Date());
   const { lat, lon } = active.coords;
@@ -101,6 +92,7 @@ function useEventHorizon() {
     now,
     events,
     sessions,
+    places,
     nights: nights.length,
     horizonEnd: nights.length ? nights[nights.length - 1].night.to : null,
     notices,
@@ -158,13 +150,16 @@ export function useEventsList() {
 /** Arkusz zjawiska (15b): co to znaczy stąd, kiedy się odezwie, rezerwacja nocy. */
 export function useEventDetail(id: string) {
   const horizon = useEventHorizon();
-  const site = useBookingSite();
 
   const event = horizon.events.find((e) => e.id === id) ?? null;
   const outlook = event ? horizon.outlookOf(event) : null;
   const session = outlook?.verdict
     ? (horizon.sessions.find((s) => s.verdict === outlook.verdict) ?? null)
     : null;
+  // Rezerwujemy miejsce tej nocy, na którą wypada zjawisko; zapowiedź spoza
+  // prognozy nie ma jeszcze rankingu — wtedy twoja pozycja.
+  const nightPlace = session ? (horizon.places[horizon.sessions.indexOf(session)] ?? null) : null;
+  const site = useBookingSite(nightPlace);
   const night = event
     ? (outlook?.verdict?.night ?? currentNightWindow(event.at, horizon.coords))
     : null;

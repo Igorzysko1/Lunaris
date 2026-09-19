@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { AppState } from 'react-native';
 
 import { useBookingSite } from '@/hooks/use-booking-site';
+import type { NightPlace } from '@/store/night-place';
 import { saveEntryTimeline } from '@/hooks/use-journal';
 import { formatTime } from '@/lib/date';
 import { bookingCalendar, googleAccessToken } from '@/lib/google-account';
@@ -49,13 +50,16 @@ export function useSessionTimeline({
   plan,
   window,
   bookingId,
+  place,
 }: {
   night: { from: Date; to: Date };
   plan: Plan;
   window: { from: Date; to: Date } | null;
   bookingId: string;
+  /** Miejsce tej nocy — pod nim wisi jej rezerwacja. */
+  place: NightPlace;
 }) {
-  const site = useBookingSite();
+  const site = useBookingSite(place);
   const { config } = useSettings();
   const { connected } = useGoogle();
 

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 
-import { useBookingSite } from '@/hooks/use-booking-site';
+import { bookingSiteOf } from '@/hooks/use-booking-site';
 import { useCalendarMonth } from '@/hooks/use-calendar-month';
 import { useSessions } from '@/hooks/use-sessions';
 import { PROPOSAL_NOTE, dayDot, dayVerdictLine, spanText } from '@/lib/calendar-text';
@@ -17,7 +17,6 @@ import { deleteBooking, patchObservation, upsertBooking } from '@/lib/google-cal
 import { bookingFor, bookingId } from '@/lib/session-booking';
 import { rankedTargets } from '@/lib/sky-targets';
 import { useGoogle } from '@/store/google';
-import { useNightPlace } from '@/store/night-place';
 import { useSettings } from '@/store/settings';
 
 /** Ile celów wymieniamy w opisie rezerwacji — tyle samo co przy karcie nocy. */
@@ -41,18 +40,10 @@ export type CalendarObservation = {
  */
 export function useCalendarTab() {
   const google = useGoogle();
-  const { active, config } = useSettings();
-  const site = useBookingSite();
-  const { place } = useNightPlace();
-  // Ta sama noc co w zakładce Noc: sesja i rezerwacja muszą mówić o jednym
-  // miejscu, inaczej wpis w kalendarzu wiezie gdzie indziej niż werdykt.
-  const { sessions } = useSessions(
-    place.coords,
-    place.bortle,
-    config,
-    place.walkMinutes,
-    place.nights,
-  );
+  const { active, config, placeId } = useSettings();
+  // Te same noce co w zakładce Noc — każda ze swoim miejscem. Rezerwacja idzie
+  // pod miejsce tej nocy, inaczej wpis wiózłby gdzie indziej niż jej werdykt.
+  const { sessions, places } = useSessions();
 
   const [today] = useState(() => new Date());
   const [cursor, setCursor] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
@@ -67,7 +58,8 @@ export function useCalendarTab() {
 
   const nights = useMemo(
     () =>
-      sessions.map((session) => {
+      sessions.map((session, index) => {
+        const site = bookingSiteOf(places[index] ?? null, active, placeId);
         const booking = bookingFor({
           verdict: session.verdict,
           site,
@@ -81,7 +73,7 @@ export function useCalendarTab() {
           bookable: booking !== null,
         };
       }),
-    [sessions, site],
+    [sessions, places, active, placeId],
   );
 
   // Zarysy tylko wtedy, gdy wiadomo, co jest w kalendarzu — inaczej propozycja
